@@ -12,6 +12,7 @@ pub mod activate;
 pub mod adapter;
 pub mod adapters_builtin;
 pub mod atomicity;
+pub mod deactivate;
 pub mod error;
 pub mod fs;
 pub mod home;
