@@ -1,0 +1,18 @@
+[package]
+name = "aenv-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Command-line interface for aenv."
+
+[[bin]]
+name = "aenv"
+path = "src/main.rs"
+
+[dependencies]
+aenv-core = { path = "../aenv-core" }
+clap = { workspace = true }
+thiserror = { workspace = true }
