@@ -5,6 +5,8 @@
 
 use clap::Parser;
 
+mod paths;
+
 /// Top-level CLI definition.
 #[derive(Debug, Parser)]
 #[command(
