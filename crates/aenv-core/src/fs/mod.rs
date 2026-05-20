@@ -212,3 +212,6 @@ impl Filesystem for RealFilesystem {
         Ok(out)
     }
 }
+
+mod mock;
+pub use mock::MockFilesystem;
