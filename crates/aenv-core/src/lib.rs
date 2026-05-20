@@ -10,5 +10,6 @@
 
 pub mod error;
 pub mod fs;
+pub mod home;
 
 pub use error::{AenvError, Result};
