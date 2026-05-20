@@ -1,2 +1,10 @@
 edition = "2021"
 max_width = 100
+
+# Convention (NOT enforced on stable rustfmt — nightly only):
+#   imports_granularity = "Crate"   # combine `use foo::bar; use foo::baz;`
+#   group_imports = "StdExternalCrate"  # std / external / local groups
+#
+# Stable rustfmt warns and ignores these. Enable when we move to nightly
+# fmt, or apply manually in review until then. Tracking via this comment
+# beats letting import style drift silently across contributors.

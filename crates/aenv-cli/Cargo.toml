@@ -15,4 +15,5 @@ path = "src/main.rs"
 [dependencies]
 aenv-core = { path = "../aenv-core" }
 clap = { workspace = true }
-thiserror = { workspace = true }
+# thiserror lands when the CLI layer starts mapping AenvError to formatted
+# user output in Phase 1. Until then, keep deps lean.
