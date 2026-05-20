@@ -8,6 +8,8 @@
 #![warn(missing_docs)]
 #![warn(clippy::all)]
 
+pub mod adapter;
+pub mod adapters_builtin;
 pub mod error;
 pub mod fs;
 pub mod home;
