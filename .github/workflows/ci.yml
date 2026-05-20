@@ -21,17 +21,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # GitHub-hosted runners (ubuntu-latest, macos-latest) ship with rustup
-      # and a current stable toolchain pre-installed. Using the bundled one
-      # avoids depending on an unpinned third-party action; the trade-off is
-      # we run against whatever stable GitHub ships, which moves over time.
-      # We rely on Cargo.toml's rust-version (MSRV) for compatibility.
+      # GitHub-hosted runners ship rustup + a current stable toolchain
+      # pre-installed. Using the bundled one avoids depending on an unpinned
+      # third-party action.
       - name: Setup Rust toolchain
         run: |
           rustup default stable
           rustup component add rustfmt clippy
           rustc --version
           cargo --version
+
+      # Capture rustc version so the cache key invalidates when GitHub bumps
+      # the bundled stable. Without this, a toolchain bump can leave us
+      # rebuilding against a stale incremental-compile cache.
+      - name: Capture toolchain version
+        id: rust-version
+        run: echo "version=$(rustc --version)" >> "$GITHUB_OUTPUT"
 
       - name: Cache cargo registry and target
         uses: actions/cache@v4
@@ -40,8 +45,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ steps.rust-version.outputs.version }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
+            ${{ runner.os }}-cargo-${{ steps.rust-version.outputs.version }}-
             ${{ runner.os }}-cargo-
 
       - name: Format check
@@ -55,3 +61,64 @@ jobs:
 
       - name: Test
         run: cargo test --workspace --verbose
+
+      - name: Doc build (warnings as errors)
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+        run: cargo doc --no-deps --workspace
+
+  windows-check:
+    name: Cross-compile check (Windows GNU)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust + Windows target
+        run: |
+          rustup default stable
+          rustup target add x86_64-pc-windows-gnu
+          rustc --version
+
+      - name: Install mingw cross-toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64
+
+      - name: Compile-check the Windows codepath
+        # Type-checks the #[cfg(windows)] symlink_file branch in
+        # RealFilesystem. Phase 7 adds a real Windows CI runner; this is a
+        # cheap intermediate guard so the Windows branch doesn't bit-rot.
+        run: cargo check --workspace --target x86_64-pc-windows-gnu
+
+  msrv:
+    name: MSRV (1.79)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned MSRV toolchain
+        run: |
+          rustup toolchain install 1.79.0 --profile minimal
+          rustc +1.79.0 --version
+
+      - name: Check workspace against MSRV
+        # Locks the rust-version declared in Cargo.toml: a dep upgrade that
+        # silently raises the floor will fail here rather than at user
+        # install time.
+        run: cargo +1.79.0 check --workspace --all-targets --locked
+
+  audit:
+    name: Security audit (cargo-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        run: rustup default stable
+
+      - name: Install cargo-audit
+        # --locked uses cargo-audit's own Cargo.lock for reproducibility.
+        run: cargo install cargo-audit --locked
+
+      - name: Run audit
+        run: cargo audit
