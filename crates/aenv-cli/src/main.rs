@@ -1,13 +1,13 @@
 //! `aenv` command-line entry point.
-//!
-//! The binary is intentionally thin: parse arguments via clap, dispatch into
-//! `aenv-core`, map the result to an exit code. No business logic lives here.
 
-use clap::Parser;
+use aenv_core::fs::RealFilesystem;
+use clap::{Parser, Subcommand};
+use std::path::PathBuf;
+use std::process::ExitCode;
 
+mod cmd;
 mod paths;
 
-/// Top-level CLI definition.
 #[derive(Debug, Parser)]
 #[command(
     name = "aenv",
@@ -16,12 +16,76 @@ mod paths;
     long_about = None,
 )]
 struct Cli {
-    // Subcommands land in later phases. For now, `--version` is the only
-    // supported invocation; clap derives it from `version` above.
+    #[command(subcommand)]
+    command: Command,
 }
 
-fn main() {
-    let _cli = Cli::parse();
-    // Phase 1 adds subcommand dispatch here. For now, if we reach this point
-    // with no subcommand and clap has already handled --version, we exit 0.
+#[derive(Debug, Subcommand)]
+enum Command {
+    /// Create a new namespace in the registry.
+    Create {
+        /// Name of the namespace.
+        name: String,
+    },
+    /// List every namespace in the registry.
+    List,
+    /// Delete a namespace from the registry.
+    Delete {
+        /// Name of the namespace.
+        name: String,
+    },
+    /// Pin the current project to a namespace by writing `.aenv`.
+    Use {
+        /// Name of the namespace.
+        name: String,
+        /// Project root override (defaults to ancestor walk from cwd).
+        #[arg(long)]
+        project: Option<PathBuf>,
+    },
+    /// Adapter operations.
+    Adapter {
+        #[command(subcommand)]
+        action: AdapterAction,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum AdapterAction {
+    /// Install an adapter from a TOML file.
+    Add {
+        /// Source file.
+        path: PathBuf,
+    },
+    /// List installed adapters.
+    List,
+}
+
+fn main() -> ExitCode {
+    let cli = Cli::parse();
+    let fs = RealFilesystem;
+
+    let result = (|| -> aenv_core::Result<()> {
+        let layout = aenv_core::home::RegistryLayout::new(paths::resolve_aenv_home()?);
+        match cli.command {
+            Command::Create { name } => cmd::create::run(&fs, &layout, &name),
+            Command::List => cmd::list::run(&fs, &layout),
+            Command::Delete { name } => cmd::delete::run(&fs, &layout, &name),
+            Command::Use { name, project } => {
+                let project_root = paths::resolve_project_root(&fs, project)?;
+                cmd::use_::run(&fs, &layout, &project_root, &name)
+            }
+            Command::Adapter { action } => match action {
+                AdapterAction::Add { path } => cmd::adapter::run_add(&fs, &layout, &path),
+                AdapterAction::List => cmd::adapter::run_list(&fs, &layout),
+            },
+        }
+    })();
+
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("error: {e}");
+            ExitCode::from(e.exit_code() as u8)
+        }
+    }
 }
