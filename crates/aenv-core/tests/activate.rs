@@ -1,0 +1,140 @@
+//! Tests for the activation primitive `activate_namespace`.
+//!
+//! Mock-driven so we can exercise rollback paths via fail injection.
+//! Real-filesystem end-to-end coverage lives in `aenv-cli/tests/cli_e2e.rs`.
+
+use aenv_core::activate::activate_namespace;
+use aenv_core::adapter::{Adapter, AdapterRegistry};
+use aenv_core::fs::{Filesystem, MockFilesystem};
+use aenv_core::home::RegistryLayout;
+use aenv_core::namespace::create_namespace;
+use aenv_core::state::{ActivationState, MaterializeStrategy};
+use std::path::PathBuf;
+
+fn layout() -> RegistryLayout {
+    RegistryLayout::new(PathBuf::from("/aenv"))
+}
+
+fn claude_adapter() -> Adapter {
+    Adapter {
+        name: "claude-code".to_string(),
+        files: vec!["CLAUDE.md".to_string()],
+        merge_strategies: Default::default(),
+    }
+}
+
+fn setup_registry_with_namespace(fs: &MockFilesystem, ns: &str, files: &[(&str, &[u8])]) {
+    let layout = layout();
+    create_namespace(fs, &layout, ns).unwrap();
+    // Patch the manifest to reference claude-code so the adapter's files apply.
+    let manifest = format!("name = \"{ns}\"\n\n[adapters.claude-code]\nfiles = [\"CLAUDE.md\"]\n");
+    fs.write(&layout.manifest_path(ns), manifest.as_bytes())
+        .unwrap();
+    for (rel, content) in files {
+        fs.write(&layout.namespace_dir(ns).join(rel), content)
+            .unwrap();
+    }
+}
+
+fn registry_with_claude() -> AdapterRegistry {
+    let mut r = AdapterRegistry::new();
+    r.insert(claude_adapter());
+    r
+}
+
+#[test]
+fn symlinks_new_file_into_project() {
+    let fs = MockFilesystem::new();
+    let layout = layout();
+    setup_registry_with_namespace(&fs, "experiments", &[("CLAUDE.md", b"disposition")]);
+    let project = PathBuf::from("/projects/p");
+    fs.create_dir_all(&project).unwrap();
+
+    let state = activate_namespace(
+        &fs,
+        &layout,
+        &registry_with_claude(),
+        &project,
+        "experiments",
+    )
+    .unwrap();
+
+    // Project file is a symlink to the namespace file.
+    assert!(fs.is_symlink(&project.join("CLAUDE.md")).unwrap());
+    assert_eq!(
+        fs.read_link(&project.join("CLAUDE.md")).unwrap(),
+        layout.namespace_dir("experiments").join("CLAUDE.md")
+    );
+
+    // State records exactly that.
+    assert_eq!(state.active_namespace, "experiments");
+    assert_eq!(state.managed_files.len(), 1);
+    assert_eq!(state.managed_files[0].path, PathBuf::from("CLAUDE.md"));
+    assert_eq!(
+        state.managed_files[0].strategy,
+        MaterializeStrategy::Symlink
+    );
+    assert!(state.backed_up.is_empty());
+
+    // State file is persisted at .aenv/state.json.
+    let on_disk = fs.read(&project.join(".aenv/state.json")).unwrap();
+    let parsed = ActivationState::from_json(&String::from_utf8(on_disk).unwrap()).unwrap();
+    assert_eq!(parsed, state);
+}
+
+#[test]
+fn errors_when_namespace_does_not_exist() {
+    let fs = MockFilesystem::new();
+    let layout = layout();
+    let project = PathBuf::from("/projects/p");
+    fs.create_dir_all(&project).unwrap();
+    let err = activate_namespace(&fs, &layout, &registry_with_claude(), &project, "missing")
+        .expect_err("must error");
+    assert!(matches!(err, aenv_core::AenvError::NamespaceNotFound(_)));
+    assert_eq!(err.exit_code(), 10);
+}
+
+#[test]
+fn errors_when_manifest_names_unknown_adapter() {
+    let fs = MockFilesystem::new();
+    let layout = layout();
+    create_namespace(&fs, &layout, "experiments").unwrap();
+    // Manifest names an adapter not in the registry.
+    let manifest = "name = \"experiments\"\n\n[adapters.cursor]\nfiles = [\".cursorrules\"]\n";
+    fs.write(&layout.manifest_path("experiments"), manifest.as_bytes())
+        .unwrap();
+    let project = PathBuf::from("/projects/p");
+    fs.create_dir_all(&project).unwrap();
+
+    let err = activate_namespace(
+        &fs,
+        &layout,
+        &registry_with_claude(),
+        &project,
+        "experiments",
+    )
+    .expect_err("must error");
+    assert!(matches!(err, aenv_core::AenvError::AdapterMissing(_)));
+    assert_eq!(err.exit_code(), 11);
+}
+
+#[test]
+fn missing_adapter_file_is_skipped_silently() {
+    // If the adapter declares CLAUDE.md but the namespace doesn't ship it,
+    // nothing happens for that file.
+    let fs = MockFilesystem::new();
+    let layout = layout();
+    setup_registry_with_namespace(&fs, "experiments", &[]);
+    let project = PathBuf::from("/projects/p");
+    fs.create_dir_all(&project).unwrap();
+
+    let state = activate_namespace(
+        &fs,
+        &layout,
+        &registry_with_claude(),
+        &project,
+        "experiments",
+    )
+    .unwrap();
+    assert!(state.managed_files.is_empty());
+}

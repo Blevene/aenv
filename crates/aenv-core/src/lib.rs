@@ -8,6 +8,7 @@
 #![warn(missing_docs)]
 #![warn(clippy::all)]
 
+pub mod activate;
 pub mod adapter;
 pub mod adapters_builtin;
 pub mod atomicity;
