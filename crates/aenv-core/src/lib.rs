@@ -10,6 +10,7 @@
 
 pub mod adapter;
 pub mod adapters_builtin;
+pub mod atomicity;
 pub mod error;
 pub mod fs;
 pub mod home;
