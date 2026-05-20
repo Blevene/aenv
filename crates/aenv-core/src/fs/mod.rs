@@ -36,9 +36,16 @@ pub struct Metadata {
 
 /// All filesystem operations `aenv` performs.
 ///
-/// Methods take `&mut self` where they mutate the filesystem so the mock can
-/// hold its in-memory state behind a single borrow; `RealFilesystem` is a
-/// zero-sized type so `&mut self` is free.
+/// All methods take `&self`. Mutating operations on the mock are routed
+/// through interior mutability (`RefCell` around the in-memory state) so
+/// callers never have to thread `&mut Filesystem` references. `RealFilesystem`
+/// is a ZST that ignores `&self` entirely.
+///
+/// The trait is intentionally NOT `Send + Sync`. Production use is
+/// single-threaded; the mock uses `RefCell` for cheap interior mutability.
+/// If concurrent use ever becomes needed (e.g. parallel hashing via rayon
+/// per engineering §12), swap the mock's `RefCell` for `Mutex` and add a
+/// `Send + Sync` bound.
 pub trait Filesystem {
     /// Read the entire contents of `path`. Follows symlinks.
     fn read(&self, path: &Path) -> io::Result<Vec<u8>>;
@@ -49,26 +56,45 @@ pub trait Filesystem {
     /// before writing. All implementations must honor this — Phase 1's
     /// materialization code depends on being able to write to deep paths
     /// without an explicit `create_dir_all` at each call site.
-    fn write(&mut self, path: &Path, contents: &[u8]) -> io::Result<()>;
+    fn write(&self, path: &Path, contents: &[u8]) -> io::Result<()>;
 
     /// Create a symlink at `link` pointing to `target`.
     ///
+    /// Argument order matches `std::os::unix::fs::symlink`: the *target*
+    /// (what the link points at) comes first, the *link* (the new path on
+    /// disk) comes second. Remember it as "from data to handle" — same as
+    /// `write(path, contents)`, but with target/link in place of path/contents.
+    ///
     /// `target` may be absolute or relative; `link` must be absolute.
-    fn symlink(&mut self, target: &Path, link: &Path) -> io::Result<()>;
+    /// Relative targets are resolved against `link`'s parent directory at
+    /// read time (matching POSIX semantics).
+    ///
+    /// ```ignore
+    /// // Symlink `/project/.claude/skills/foo` -> `/home/user/.aenv/.../foo`
+    /// fs.symlink(&namespace_path, &project_path)?;
+    /// ```
+    fn symlink(&self, target: &Path, link: &Path) -> io::Result<()>;
 
     /// Atomically rename `from` to `to`. Both must be on the same filesystem
     /// for true atomicity (engineering §7 — the atomicity probe is built on
     /// top of this).
-    fn rename(&mut self, from: &Path, to: &Path) -> io::Result<()>;
+    ///
+    /// **Contract:** Renaming a directory moves all of its descendants with
+    /// it. Implementations that store paths flat (e.g. the mock's
+    /// `BTreeMap`) must rebase every descendant key.
+    fn rename(&self, from: &Path, to: &Path) -> io::Result<()>;
 
     /// Remove a single file (not a directory). Fails if the path is a directory.
-    fn remove_file(&mut self, path: &Path) -> io::Result<()>;
+    fn remove_file(&self, path: &Path) -> io::Result<()>;
 
     /// Recursively remove a directory and all its contents.
-    fn remove_dir_all(&mut self, path: &Path) -> io::Result<()>;
+    ///
+    /// **Contract:** Fails with `NotADirectory` (or platform-equivalent) if
+    /// `path` exists but is not a directory.
+    fn remove_dir_all(&self, path: &Path) -> io::Result<()>;
 
     /// Create `path` and all missing parent directories. Idempotent.
-    fn create_dir_all(&mut self, path: &Path) -> io::Result<()>;
+    fn create_dir_all(&self, path: &Path) -> io::Result<()>;
 
     /// Fetch metadata, following symlinks.
     fn metadata(&self, path: &Path) -> io::Result<Metadata>;
@@ -110,14 +136,14 @@ impl Filesystem for RealFilesystem {
         std::fs::read(path)
     }
 
-    fn write(&mut self, path: &Path, contents: &[u8]) -> io::Result<()> {
+    fn write(&self, path: &Path, contents: &[u8]) -> io::Result<()> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
         std::fs::write(path, contents)
     }
 
-    fn symlink(&mut self, target: &Path, link: &Path) -> io::Result<()> {
+    fn symlink(&self, target: &Path, link: &Path) -> io::Result<()> {
         #[cfg(unix)]
         {
             std::os::unix::fs::symlink(target, link)
@@ -132,19 +158,19 @@ impl Filesystem for RealFilesystem {
         }
     }
 
-    fn rename(&mut self, from: &Path, to: &Path) -> io::Result<()> {
+    fn rename(&self, from: &Path, to: &Path) -> io::Result<()> {
         std::fs::rename(from, to)
     }
 
-    fn remove_file(&mut self, path: &Path) -> io::Result<()> {
+    fn remove_file(&self, path: &Path) -> io::Result<()> {
         std::fs::remove_file(path)
     }
 
-    fn remove_dir_all(&mut self, path: &Path) -> io::Result<()> {
+    fn remove_dir_all(&self, path: &Path) -> io::Result<()> {
         std::fs::remove_dir_all(path)
     }
 
-    fn create_dir_all(&mut self, path: &Path) -> io::Result<()> {
+    fn create_dir_all(&self, path: &Path) -> io::Result<()> {
         std::fs::create_dir_all(path)
     }
 

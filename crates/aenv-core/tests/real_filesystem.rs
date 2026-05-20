@@ -15,7 +15,7 @@ fn rfs() -> RealFilesystem {
 fn write_then_read_roundtrip() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("hello.txt");
-    let mut fs = rfs();
+    let fs = rfs();
 
     fs.write(&path, b"hello world").unwrap();
     let read = fs.read(&path).unwrap();
@@ -33,7 +33,7 @@ fn exists_returns_ok_false_for_missing() {
 fn exists_returns_ok_true_after_write() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("file");
-    let mut fs = rfs();
+    let fs = rfs();
     fs.write(&path, b"x").unwrap();
     assert!(fs.exists(&path).unwrap());
 }
@@ -42,7 +42,7 @@ fn exists_returns_ok_true_after_write() {
 fn create_dir_all_is_idempotent() {
     let dir = tempdir().unwrap();
     let nested = dir.path().join("a/b/c");
-    let mut fs = rfs();
+    let fs = rfs();
     fs.create_dir_all(&nested).unwrap();
     fs.create_dir_all(&nested).unwrap(); // second call is a no-op
     assert!(fs.exists(&nested).unwrap());
@@ -54,7 +54,7 @@ fn symlink_then_read_link_roundtrip() {
     let dir = tempdir().unwrap();
     let target = dir.path().join("target.txt");
     let link = dir.path().join("link.txt");
-    let mut fs = rfs();
+    let fs = rfs();
 
     fs.write(&target, b"target contents").unwrap();
     fs.symlink(&target, &link).unwrap();
@@ -71,7 +71,7 @@ fn rename_moves_file() {
     let dir = tempdir().unwrap();
     let from = dir.path().join("a");
     let to = dir.path().join("b");
-    let mut fs = rfs();
+    let fs = rfs();
 
     fs.write(&from, b"data").unwrap();
     fs.rename(&from, &to).unwrap();
@@ -84,7 +84,7 @@ fn rename_moves_file() {
 fn remove_file_deletes() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("kill-me");
-    let mut fs = rfs();
+    let fs = rfs();
     fs.write(&path, b"x").unwrap();
     fs.remove_file(&path).unwrap();
     assert!(!fs.exists(&path).unwrap());
@@ -94,7 +94,7 @@ fn remove_file_deletes() {
 fn remove_dir_all_deletes_tree() {
     let dir = tempdir().unwrap();
     let tree = dir.path().join("a/b/c");
-    let mut fs = rfs();
+    let fs = rfs();
     fs.create_dir_all(&tree).unwrap();
     fs.write(&tree.join("leaf"), b"x").unwrap();
 
@@ -108,7 +108,7 @@ fn write_auto_creates_parent_directories() {
     // parents. Phase 1 materialization depends on this.
     let dir = tempdir().unwrap();
     let deep = dir.path().join("a/b/c/leaf.txt");
-    let mut fs = rfs();
+    let fs = rfs();
     fs.write(&deep, b"hi").unwrap();
     assert_eq!(fs.read(&deep).unwrap(), b"hi");
 }
@@ -122,7 +122,7 @@ fn symlink_metadata_reports_symlink_kind_not_target() {
     let dir = tempdir().unwrap();
     let target = dir.path().join("target.txt");
     let link = dir.path().join("link.txt");
-    let mut fs = rfs();
+    let fs = rfs();
 
     fs.write(&target, b"target contents").unwrap();
     fs.symlink(&target, &link).unwrap();
@@ -135,7 +135,7 @@ fn symlink_metadata_reports_symlink_kind_not_target() {
 fn metadata_reports_kind_and_size() {
     let dir = tempdir().unwrap();
     let file = dir.path().join("f");
-    let mut fs = rfs();
+    let fs = rfs();
     fs.write(&file, b"abcd").unwrap();
 
     let meta = fs.metadata(&file).unwrap();
@@ -147,7 +147,7 @@ fn metadata_reports_kind_and_size() {
 fn metadata_distinguishes_directory_from_file() {
     let dir = tempdir().unwrap();
     let nested = dir.path().join("d");
-    let mut fs = rfs();
+    let fs = rfs();
     fs.create_dir_all(&nested).unwrap();
 
     let meta = fs.metadata(&nested).unwrap();
@@ -157,7 +157,7 @@ fn metadata_distinguishes_directory_from_file() {
 #[test]
 fn list_dir_returns_immediate_children() {
     let dir = tempdir().unwrap();
-    let mut fs = rfs();
+    let fs = rfs();
     fs.write(&dir.path().join("a"), b"x").unwrap();
     fs.write(&dir.path().join("b"), b"y").unwrap();
     fs.create_dir_all(&dir.path().join("c")).unwrap();
