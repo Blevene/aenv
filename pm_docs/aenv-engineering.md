@@ -1,8 +1,10 @@
 # Engineering Doc: aenv
 
 **Companion to:** PRD v0.3 (namespaces), Functional Spec v0.3
-**Status:** Draft
-**Last updated:** 2026-05-19
+**Status:** Draft v0.3
+**Last updated:** 2026-05-20
+
+Changes from v0.2: §5 Filesystem trait expanded — methods take `&self` (interior mutability in mock) instead of `&mut self`; `symlink_metadata` added (13 methods total); contract clarifications for `write` parent-dir creation, `exists` return type, `rename` descendant-rebase, `remove_dir_all` and `list_dir` error kinds; mock failure-injection ergonomics documented.
 
 This document covers implementation-level decisions that the PRD and functional spec deliberately omit. It is owned by engineering and may evolve independently as long as it does not violate the public contracts defined in the PRD.
 
@@ -97,25 +99,41 @@ Built-in adapters (Claude, Cursor, Aider, Cline, Continue, MCP) ship as embedded
 
 ## 5. Filesystem abstraction for testability
 
-A `Filesystem` trait isolates all I/O. Production code uses `RealFilesystem`; tests use a programmable mock.
+A `Filesystem` trait isolates all I/O. Production code uses `RealFilesystem`; tests use the in-memory `MockFilesystem`.
 
 ```rust
 pub trait Filesystem {
     fn read(&self, path: &Path) -> io::Result<Vec<u8>>;
-    fn write(&mut self, path: &Path, contents: &[u8]) -> io::Result<()>;
-    fn symlink(&mut self, src: &Path, dst: &Path) -> io::Result<()>;
-    fn rename(&mut self, from: &Path, to: &Path) -> io::Result<()>;
-    fn remove_file(&mut self, path: &Path) -> io::Result<()>;
-    fn remove_dir_all(&mut self, path: &Path) -> io::Result<()>;
-    fn create_dir_all(&mut self, path: &Path) -> io::Result<()>;
+    fn write(&self, path: &Path, contents: &[u8]) -> io::Result<()>;
+    fn symlink(&self, target: &Path, link: &Path) -> io::Result<()>;
+    fn rename(&self, from: &Path, to: &Path) -> io::Result<()>;
+    fn remove_file(&self, path: &Path) -> io::Result<()>;
+    fn remove_dir_all(&self, path: &Path) -> io::Result<()>;
+    fn create_dir_all(&self, path: &Path) -> io::Result<()>;
     fn metadata(&self, path: &Path) -> io::Result<Metadata>;
+    fn symlink_metadata(&self, path: &Path) -> io::Result<Metadata>;
+    fn is_symlink(&self, path: &Path) -> io::Result<bool>;
     fn read_link(&self, path: &Path) -> io::Result<PathBuf>;
-    fn exists(&self, path: &Path) -> bool;
-    // ~12 methods total
+    fn exists(&self, path: &Path) -> io::Result<bool>;
+    fn list_dir(&self, path: &Path) -> io::Result<Vec<PathBuf>>;
 }
 ```
 
-Keep this surface narrow. Mocking `std::fs` wholesale is a tar pit; mocking the dozen operations `aenv` actually performs is tractable.
+13 methods. Keep the surface narrow: mocking `std::fs` wholesale is a tar pit; mocking the operations `aenv` actually performs is tractable.
+
+**Why `&self` for mutating ops?** `RealFilesystem` is a ZST that doesn't care, but the mock holds in-memory state. `RefCell` interior mutability lets callers thread a `&Filesystem` reference everywhere instead of `&mut Filesystem` — Phase 1's resolve-then-materialize flow is mostly read-heavy and reads as more natural without the `&mut` plumbing. The trait is intentionally NOT `Send + Sync`. If concurrent use ever becomes needed (rayon-parallel hashing per §12), swap the mock's `RefCell` for `Mutex` and add the bound.
+
+**Contract decisions worth flagging up-front (load-bearing for Phase 1):**
+
+- `write(path, contents)` **shall** create any missing parent directories. This is part of the trait contract, not an implementation detail; every `Filesystem` impl honors it. Lets Phase 1 materialization write to deep paths without `create_dir_all` boilerplate at each call site.
+- `exists(path)` returns `io::Result<bool>`, not `bool`. `Ok(false)` means "we confirmed it's not there"; `Err` means "we couldn't stat" (permission denied on an intermediate directory, etc.). `std::path::Path::exists` walked into the conflate-the-two trap and the std team deprecated it; we decline to inherit the wart.
+- `symlink_metadata` is the version of `metadata` that does NOT follow symlinks. Phase 1's activation logic needs to ask "is this an aenv-managed symlink?" — doing that as `is_symlink` + `metadata` opens a TOCTOU window between the two calls; `symlink_metadata` closes it in one syscall.
+- `rename(from, to)` on a directory **shall** move all descendants with it, even in impls (like the mock) that store paths flat. Phase 1's two-phase staging-then-promote pattern depends on this.
+- `remove_dir_all(path)` **shall** fail (`NotADirectory` or platform-equivalent) when `path` is not a directory. The std impl errors here; the mock matches.
+- `list_dir(path)` **shall** distinguish "not found" from "found but not a directory" via distinct error kinds.
+- `symlink(target, link)` argument order matches `std::os::unix::fs::symlink`: target first, link second. Relative targets resolve against the link's parent directory at read time (POSIX semantics).
+
+**Mock-only ergonomics:** the in-memory implementation also exposes `fail_writes_to(path)` and `fail_stats_on(path)` for failure injection. The latter is the hook for exercising the `Err` branch of `exists` — without it the `io::Result<bool>` return type is untestable in the mock.
 
 ## 6. Path handling
 

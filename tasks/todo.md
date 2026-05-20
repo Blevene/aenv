@@ -306,6 +306,22 @@
 
 ---
 
+## Phase 0.5 — post-review cleanup (executed 2026-05-20)
+
+After Phase 0 landed (tag `phase-0-complete` at commit `3650c4a`), an independent code-review pass found contract divergences in `MockFilesystem`, an ergonomics issue with the `&mut self` trait shape, and several CI gaps. Phase 0.5 addressed all of them before Phase 1 starts. Commits `c5f041a` → `b2f8b31` (six commits). Summary:
+
+- **Filesystem trait flipped from `&mut self` to `&self`** with `RefCell` interior mutability in `MockFilesystem`. Trait grew from 12 → 13 methods with the addition of `symlink_metadata` (TOCTOU-free symlink detection for Phase 1 activation logic).
+- **Mock contract fixes:** `rename` rebases descendants; `write` errors over an existing directory; `remove_dir_all` errors on a file; `list_dir` distinguishes `NotFound` from "not a directory"; relative symlink targets resolve against the link's parent (POSIX); new `fail_stats_on` failure injection.
+- **End-to-end mock scenario test** (`phase_1_shaped_scenario_backup_then_restore`) exercises the operations Phase 1 activation will use.
+- **Error coverage:** `?`-driven `io::Error` round-trip test + exit-code pairwise-distinctness test (locks PRD R-82).
+- **CI hardening:** `cargo doc` with warnings-as-errors, `rustc --version` baked into the cache key, Windows GNU cross-compile job, MSRV-1.79 verification job, `cargo audit` supply-chain job.
+- **Cleanup:** dropped unused `thiserror` from `aenv-cli`; documented (but did not enable on stable) the `imports_granularity = "Crate"` rustfmt convention.
+- **Docs reconciliation:** engineering doc §5 bumped to v0.3 with the revised trait + contracts; the Phase 0 plan got a "Post-implementation deltas" section recording what diverged from the original literal text.
+
+Test count: 37 → 46 after Phase 0.5. Tag `phase-0-complete` still points at the Phase 0 commit; Phase 0.5 work is in the `c5f041a..b2f8b31` range.
+
+---
+
 ## Requirement → phase mapping
 
 This is the audit table. Every R-number from the PRD appears exactly once on the left; the right column names the phase that delivers it. Where a requirement is split across phases (e.g. `aenv status` text in Phase 1, `--json` flavor in Phase 5), both phases are listed with the slice each owns. Use this to verify nothing in the PRD has slipped through the planning.
@@ -455,7 +471,7 @@ Engineering-doc sections referenced in the roadmap: §3 error strategy (Phase 0)
 
 ## Open questions tagged to phase boundaries
 
-- **Phase 0 → 1:** finalize the `Filesystem` trait surface (~12 methods) before Phase 1 writes its first integration test. Adding a method later is cheap; removing one is not.
+- **Phase 0 → 1:** ~~finalize the `Filesystem` trait surface (~12 methods) before Phase 1 writes its first integration test~~. **Resolved.** Trait surface settled at 13 methods in Phase 0.5 (`&self` throughout, `RefCell` mock, `symlink_metadata` added). See engineering doc §5.
 - **Phase 2 → 3:** confirm the parameter-projection mechanism — pure declarative TOML in the adapter file, or a small Rust trait per adapter? Engineering §4 leaves this slightly open. Default to declarative; bump to trait only if a built-in adapter needs branching logic.
 - **Phase 4 → 5:** confirm cache layout for git-imported skills. Default `~/.aenv/cache/skills/<source-hash>/<ref>/` unless a better scheme surfaces during implementation. The hash uses what scheme — SHA-256 of the source URL? Lock that before Phase 4 ships.
 - **Phase 6 → 7:** decide on the v1.0 milestone gating. Phase 7 produces v0.1.0; the move to v1.0.0 should follow a dogfooding period (one or two contributors using it daily for a month). Out of scope for this roadmap to commit a date.
@@ -464,4 +480,6 @@ Engineering-doc sections referenced in the roadmap: §3 error strategy (Phase 0)
 
 ## Next step
 
-This roadmap defines milestones at the phase level. The next planning step is a detailed bite-sized plan for **Phase 0** — every step expanded to file paths, test code, and commit boundaries per `superpowers:writing-plans`. That detailed plan will land at `tasks/2026-05-20-phase-0-skeleton.md` once we agree the roadmap shape is right.
+~~The next planning step is a detailed bite-sized plan for **Phase 0**.~~ **Done.** The Phase 0 plan landed at [`tasks/2026-05-20-phase-0-skeleton.md`](./2026-05-20-phase-0-skeleton.md) and was executed (tag `phase-0-complete` at commit `3650c4a`). A post-review pass (Phase 0.5) then addressed reviewer findings — see the "Phase 0.5 — post-review cleanup" section above.
+
+The next concrete planning step is a detailed bite-sized plan for **Phase 1 — Single-namespace happy path** (manifest parsing, claude-code adapter, `create`/`use`/`activate`/`deactivate`/`status`/`restore`, state file, atomicity probe, rollback). It will follow the same shape as the Phase 0 plan and land at `tasks/YYYY-MM-DD-phase-1-single-namespace.md`.

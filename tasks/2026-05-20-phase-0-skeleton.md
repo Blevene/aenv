@@ -14,6 +14,40 @@
 
 ---
 
+## Post-implementation deltas (Phase 0 + Phase 0.5)
+
+This plan was executed; the resulting commits are `d35e717` → `3650c4a` (Phase 0, tagged `phase-0-complete`), with follow-up cleanup landing in `c5f041a` → `b2f8b31` (Phase 0.5, post-review). The plan body below is the *original intent* — useful as a historical record but no longer the source of truth for what the code looks like. Where the implementation diverged from the plan, the divergence is recorded here.
+
+**Mechanical formatter/linter nudges (applied during execution):**
+
+- `rustfmt` reflowed the literal `assert!(...)` macros in `version.rs` and `error_exit_codes.rs` (the plan's one-line asserts exceeded `max_width = 100`).
+- `rustfmt` collapsed the multi-line iterator chain in `real_filesystem.rs::list_dir_returns_immediate_children`.
+- `clippy::io_other_error` rewrote `std::io::Error::new(ErrorKind::Other, "boom")` → `std::io::Error::other("boom")`.
+- `clippy::bool_assert_comparison` rewrote `assert_eq!(fs.exists(...).unwrap(), false)` → `assert!(!fs.exists(...).unwrap())`.
+
+None changed semantics; the on-disk code is what shipped.
+
+**Phase 0.5 follow-up changes** (driven by an independent code-review pass — see commit `c5f041a` onward; the review's findings are in conversation history, not checked in):
+
+- **`Filesystem` trait flipped from `&mut self` to `&self`** across all mutating methods. `MockFilesystem` now wraps its state in `RefCell` for interior mutability. Callers in Phase 1+ won't thread `&mut`. The trait is intentionally `!Sync`; swap `RefCell` → `Mutex` if concurrency is needed later.
+- **Trait grew from 12 to 13 methods.** `symlink_metadata` joined the surface so activation logic can answer "is this an aenv-managed symlink?" without a TOCTOU window. Engineering doc §5 updated to record this.
+- **Four mock contract divergences from real fixed** (each had a corresponding test added):
+  - `rename` of a directory now rebases every descendant key (was orphaning them).
+  - `write` errors when path is currently a directory (was silently overwriting).
+  - `remove_dir_all` errors when path is a regular file (was silently removing).
+  - `list_dir` distinguishes `NotFound` from "not a directory."
+- **Relative symlink targets** now resolve against the link's parent directory (POSIX semantics), with lexical path normalization. New test in `mock_filesystem.rs`.
+- **`MockFilesystem::fail_stats_on(path)`** added — makes stat-shaped reads (`exists`, `metadata`, `symlink_metadata`, `is_symlink`) return `PermissionDenied`. This is the hook needed to exercise the `Err` branch of `Filesystem::exists` — without it, the whole point of `exists` returning `io::Result<bool>` was untestable.
+- **New "Phase-1-shaped scenario" test** (`phase_1_shaped_scenario_backup_then_restore`) exercises backup → symlink → restore against the mock end-to-end. This is the test that would have caught the mock contract gaps during Phase 0 if it had existed.
+- **Two new error-coverage tests:** `io_error_round_trips_via_question_mark_with_exit_one` locks the `#[from] io::Error` conversion path every Phase 1 fs call will use; `all_exit_codes_are_pairwise_distinct` locks PRD R-82 via a `HashSet` equality check.
+- **`thiserror` dropped from `aenv-cli/Cargo.toml`** — was declared but unused. Returns when Phase 1's CLI error-formatting layer needs it.
+- **CI hardened:** added `cargo doc` (with `RUSTDOCFLAGS=-D warnings` so `missing_docs` actually fails the build), `rustc --version` baked into the cargo cache key, an `x86_64-pc-windows-gnu` cross-compile job to type-check the `#[cfg(windows)]` codepath, an MSRV-1.79 verification job, and a `cargo audit` supply-chain job.
+- **`rustfmt.toml`** documents the `imports_granularity = "Crate"` convention as a comment rather than enabling it — the setting is nightly-only and would emit a permanent warning on stable.
+
+**Final state after Phase 0.5:** 46 tests passing across the workspace; `phase-0-complete` tag still points at the Phase 0 commit (`3650c4a`), not the Phase 0.5 head. Phase 0.5 work lives in the commit range `c5f041a..b2f8b31`.
+
+---
+
 ## Prerequisites
 
 The implementing engineer needs Rust stable installed.
