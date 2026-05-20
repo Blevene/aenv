@@ -91,7 +91,9 @@ fn happy_path_create_use_activate_status_deactivate() {
         .unwrap();
     assert_success(&out, "use");
     assert_eq!(
-        std::fs::read_to_string(h.project().join(".aenv")).unwrap().trim(),
+        std::fs::read_to_string(h.project().join(".aenv"))
+            .unwrap()
+            .trim(),
         "experiments"
     );
 
@@ -167,12 +169,10 @@ fn backup_then_restore_round_trip() {
         .output()
         .unwrap();
     assert_success(&out, "activate");
-    assert!(
-        std::fs::symlink_metadata(&project_claude)
-            .unwrap()
-            .file_type()
-            .is_symlink()
-    );
+    assert!(std::fs::symlink_metadata(&project_claude)
+        .unwrap()
+        .file_type()
+        .is_symlink());
 
     // Deactivate -> backup is restored.
     let out = h
@@ -185,12 +185,10 @@ fn backup_then_restore_round_trip() {
     let restored = std::fs::read_to_string(&project_claude).unwrap();
     assert_eq!(restored, "user-authored\n");
     // Symlink-bit gone.
-    assert!(
-        !std::fs::symlink_metadata(&project_claude)
-            .unwrap()
-            .file_type()
-            .is_symlink()
-    );
+    assert!(!std::fs::symlink_metadata(&project_claude)
+        .unwrap()
+        .file_type()
+        .is_symlink());
 }
 
 #[test]

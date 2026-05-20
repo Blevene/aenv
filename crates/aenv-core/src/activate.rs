@@ -129,7 +129,8 @@ fn perform_activation<F: Filesystem>(
                     });
                 }
                 ProjectPathState::Displaced => {
-                    let backup_rel = PathBuf::from(format!(".aenv-state/backup/{timestamp}")).join(&rel);
+                    let backup_rel =
+                        PathBuf::from(format!(".aenv-state/backup/{timestamp}")).join(&rel);
                     let backup_path = project_root.join(&backup_rel);
                     // Refuse to clobber an existing backup file at the
                     // target — protects R-61 against nanosecond-precision
