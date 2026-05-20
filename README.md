@@ -18,7 +18,7 @@ cargo build --workspace
 cargo test --workspace
 ```
 
-Requires Rust stable 1.79 or later.
+Requires Rust stable 1.85 or later.
 
 ## License
 

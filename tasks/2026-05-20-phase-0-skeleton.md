@@ -46,6 +46,8 @@ None changed semantics; the on-disk code is what shipped.
 
 **Final state after Phase 0.5:** 46 tests passing across the workspace; `phase-0-complete` tag still points at the Phase 0 commit (`3650c4a`), not the Phase 0.5 head. Phase 0.5 work lives in the commit range `c5f041a..b2f8b31`.
 
+**Phase 0.5 post-push delta:** First CI run on origin revealed that the declared MSRV of 1.79 was too low — `clap_lex 1.1.0` (transitive dep of `clap 4.5`) uses Cargo edition 2024, which requires Cargo 1.85+. MSRV bumped to 1.85 across `Cargo.toml`, `clippy.toml`, `.github/workflows/ci.yml`, and `README.md`. The plan's literal code blocks below still show 1.79; the actual repo is at 1.85.
+
 ---
 
 ## Prerequisites

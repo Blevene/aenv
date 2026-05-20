@@ -5,10 +5,10 @@ members = ["crates/aenv-core", "crates/aenv-cli"]
 [workspace.package]
 version = "0.0.1"
 edition = "2021"
-# MSRV: workspace deps (clap 4.5, thiserror 1, serde 1, toml 0.8) all
-# comfortably support 1.79. Bump if a dep upgrade requires it; do not bump
-# without a CI MSRV job to verify the new floor.
-rust-version = "1.79"
+# MSRV: clap_lex 1.1.0 (a transitive dep of clap 4.5) uses Cargo edition
+# 2024, which requires Cargo 1.85+. The MSRV CI job (`cargo +1.85.0 check`)
+# catches floor regressions. Do not bump without re-running that job.
+rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/blevene/aenv"
 authors = ["aenv contributors"]

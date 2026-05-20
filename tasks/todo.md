@@ -314,7 +314,7 @@ After Phase 0 landed (tag `phase-0-complete` at commit `3650c4a`), an independen
 - **Mock contract fixes:** `rename` rebases descendants; `write` errors over an existing directory; `remove_dir_all` errors on a file; `list_dir` distinguishes `NotFound` from "not a directory"; relative symlink targets resolve against the link's parent (POSIX); new `fail_stats_on` failure injection.
 - **End-to-end mock scenario test** (`phase_1_shaped_scenario_backup_then_restore`) exercises the operations Phase 1 activation will use.
 - **Error coverage:** `?`-driven `io::Error` round-trip test + exit-code pairwise-distinctness test (locks PRD R-82).
-- **CI hardening:** `cargo doc` with warnings-as-errors, `rustc --version` baked into the cache key, Windows GNU cross-compile job, MSRV-1.79 verification job, `cargo audit` supply-chain job.
+- **CI hardening:** `cargo doc` with warnings-as-errors, `rustc --version` baked into the cache key, Windows GNU cross-compile job, MSRV verification job (initially 1.79, bumped to 1.85 after the first CI run revealed `clap_lex 1.1.0` requires Cargo edition 2024), `cargo audit` supply-chain job.
 - **Cleanup:** dropped unused `thiserror` from `aenv-cli`; documented (but did not enable on stable) the `imports_granularity = "Crate"` rustfmt convention.
 - **Docs reconciliation:** engineering doc §5 bumped to v0.3 with the revised trait + contracts; the Phase 0 plan got a "Post-implementation deltas" section recording what diverged from the original literal text.
 
