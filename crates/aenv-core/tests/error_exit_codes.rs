@@ -77,3 +77,54 @@ fn display_includes_namespace_in_not_found_message() {
     );
     assert!(msg.contains("foo"), "expected 'foo' in {:?}", msg);
 }
+
+#[test]
+fn io_error_round_trips_via_question_mark_with_exit_one() {
+    // Every fs call in Phase 1 will use `?` to propagate io::Error through
+    // the #[from] conversion. Lock the round-trip path: io::Error -> ? ->
+    // AenvError::Io -> exit_code() == 1.
+    fn might_fail() -> aenv_core::Result<()> {
+        // Trigger a guaranteed-failing std::fs read so `?` actually runs.
+        let _bytes = std::fs::read("/this/path/should/not/exist/anywhere")?;
+        Ok(())
+    }
+    let err = might_fail().expect_err("read of nonexistent path must fail");
+    assert!(
+        matches!(err, AenvError::Io(_)),
+        "expected Io variant, got {:?}",
+        err
+    );
+    assert_eq!(err.exit_code(), 1);
+    // The Display impl includes the underlying io::Error message.
+    assert!(format!("{}", err).contains("io error"));
+}
+
+#[test]
+fn all_exit_codes_are_pairwise_distinct() {
+    // Locks the public contract from PRD R-82: distinct non-zero exit codes
+    // per failure class. If a future variant accidentally shares a code,
+    // this fails immediately rather than at integration time.
+    let codes = [
+        AenvError::Io(std::io::Error::other("x")).exit_code(),
+        AenvError::NamespaceNotFound("x".into()).exit_code(),
+        AenvError::AdapterMissing("x".into()).exit_code(),
+        AenvError::ManifestInvalid("x".into()).exit_code(),
+        AenvError::ActivationConflict("x".into()).exit_code(),
+        AenvError::RemoteUnreachable("x".into()).exit_code(),
+        AenvError::ExtendsCycle("x".into()).exit_code(),
+        AenvError::ParameterUndefined("x".into()).exit_code(),
+        AenvError::PolicyViolation("x".into()).exit_code(),
+        AenvError::ProjectNotPinned.exit_code(),
+    ];
+    let unique: std::collections::HashSet<i32> = codes.iter().copied().collect();
+    assert_eq!(
+        unique.len(),
+        codes.len(),
+        "exit codes must be pairwise distinct; got duplicates in {:?}",
+        codes
+    );
+    // Sanity: none are zero (0 is success).
+    for c in codes {
+        assert!(c != 0, "exit code 0 reserved for success");
+    }
+}
