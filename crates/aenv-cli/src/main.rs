@@ -42,6 +42,28 @@ enum Command {
         #[arg(long)]
         project: Option<PathBuf>,
     },
+    /// Activate the pinned namespace (or a named one) in a project.
+    Activate {
+        /// Namespace name (defaults to the .aenv pin).
+        name: Option<String>,
+        #[arg(long)]
+        project: Option<PathBuf>,
+    },
+    /// Deactivate the active namespace in a project.
+    Deactivate {
+        #[arg(long)]
+        project: Option<PathBuf>,
+    },
+    /// Restore the most recent backup set in a project.
+    Restore {
+        #[arg(long)]
+        project: Option<PathBuf>,
+    },
+    /// Show the active namespace and managed files in a project.
+    Status {
+        #[arg(long)]
+        project: Option<PathBuf>,
+    },
     /// Adapter operations.
     Adapter {
         #[command(subcommand)]
@@ -73,6 +95,22 @@ fn main() -> ExitCode {
             Command::Use { name, project } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;
                 cmd::use_::run(&fs, &layout, &project_root, &name)
+            }
+            Command::Activate { name, project } => {
+                let project_root = paths::resolve_project_root(&fs, project)?;
+                cmd::activate::run(&fs, &layout, &project_root, name.as_deref())
+            }
+            Command::Deactivate { project } => {
+                let project_root = paths::resolve_project_root(&fs, project)?;
+                cmd::deactivate::run(&fs, &project_root)
+            }
+            Command::Restore { project } => {
+                let project_root = paths::resolve_project_root(&fs, project)?;
+                cmd::restore::run(&fs, &project_root)
+            }
+            Command::Status { project } => {
+                let project_root = paths::resolve_project_root(&fs, project)?;
+                cmd::status::run(&fs, &project_root)
             }
             Command::Adapter { action } => match action {
                 AdapterAction::Add { path } => cmd::adapter::run_add(&fs, &layout, &path),
