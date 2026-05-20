@@ -31,5 +31,5 @@ Cargo.lock.bak
 
 # Project-local aenv state in test/dev projects under this repo.
 # Cargo.lock is intentionally tracked (this is a binary crate).
-.aenv/state.json
-.aenv/backup/
+.aenv-state/state.json
+.aenv-state/backup/

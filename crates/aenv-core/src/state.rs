@@ -1,4 +1,4 @@
-//! Activation state file (`.aenv/state.json`).
+//! Activation state file (`.aenv-state/state.json`).
 //!
 //! Persisted after a successful activation. Records the active namespace,
 //! every file aenv materialized, every original it backed up, and a schema

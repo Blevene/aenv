@@ -19,7 +19,7 @@ use crate::state::{
 use std::path::{Path, PathBuf};
 
 /// Activate `namespace_name` into `project_root`. Writes a state file at
-/// `<project>/.aenv/state.json` on success.
+/// `<project>/.aenv-state/state.json` on success.
 pub fn activate_namespace<F: Filesystem>(
     fs: &F,
     layout: &RegistryLayout,
@@ -129,7 +129,7 @@ fn perform_activation<F: Filesystem>(
                     });
                 }
                 ProjectPathState::Displaced => {
-                    let backup_rel = PathBuf::from(format!(".aenv/backup/{timestamp}")).join(&rel);
+                    let backup_rel = PathBuf::from(format!(".aenv-state/backup/{timestamp}")).join(&rel);
                     let backup_path = project_root.join(&backup_rel);
                     // Refuse to clobber an existing backup file at the
                     // target — protects R-61 against nanosecond-precision
@@ -174,7 +174,7 @@ fn perform_activation<F: Filesystem>(
         backed_up,
     };
     fs.write(
-        &project_root.join(".aenv/state.json"),
+        &project_root.join(".aenv-state/state.json"),
         state.to_json()?.as_bytes(),
     )?;
     Ok(state)

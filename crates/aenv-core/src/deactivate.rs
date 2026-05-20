@@ -8,17 +8,17 @@ use std::path::Path;
 
 /// Deactivate the namespace currently active in `project_root`.
 ///
-/// Reads `.aenv/state.json` to know what to undo. Files with strategy
+/// Reads `.aenv-state/state.json` to know what to undo. Files with strategy
 /// `Symlink` or `Copy` are removed; the corresponding backed-up original
 /// (if any) is renamed back into place. Files with strategy `Identical`
 /// are left alone — they were the user's to begin with. After a
-/// successful deactivation, `.aenv/state.json` is removed.
+/// successful deactivation, `.aenv-state/state.json` is removed.
 ///
 /// Missing state.json -> `ActivationConflict` (exit 13). A missing pin
 /// file is a distinct condition (`ProjectNotPinned`, exit 20) — a user
 /// can be pinned but not activated.
 pub fn deactivate_namespace<F: Filesystem>(fs: &F, project_root: &Path) -> Result<()> {
-    let state_path = project_root.join(".aenv/state.json");
+    let state_path = project_root.join(".aenv-state/state.json");
     if !fs.exists(&state_path)? {
         return Err(AenvError::ActivationConflict(format!(
             "no active namespace in {}",

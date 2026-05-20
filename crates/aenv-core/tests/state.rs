@@ -16,7 +16,7 @@ fn sample_state() -> ActivationState {
         }],
         backed_up: vec![BackedUpFile {
             original_path: PathBuf::from("CLAUDE.md"),
-            backup_path: PathBuf::from(".aenv/backup/2026-05-20T14-22-03/CLAUDE.md"),
+            backup_path: PathBuf::from(".aenv-state/backup/2026-05-20T14-22-03/CLAUDE.md"),
         }],
     }
 }

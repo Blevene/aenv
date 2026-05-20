@@ -15,7 +15,7 @@ fn strategy_label(s: MaterializeStrategy) -> &'static str {
 }
 
 pub fn run<F: Filesystem>(fs: &F, project_root: &Path) -> Result<()> {
-    let state_path = project_root.join(".aenv/state.json");
+    let state_path = project_root.join(".aenv-state/state.json");
     if !fs.exists(&state_path)? {
         println!("No active namespace in {}", project_root.display());
         return Ok(());

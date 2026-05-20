@@ -16,20 +16,20 @@ use crate::error::{AenvError, Result};
 use crate::fs::Filesystem;
 use std::path::Path;
 
-/// Restore the most recent backup set under `<project>/.aenv/backup/`.
+/// Restore the most recent backup set under `<project>/.aenv-state/backup/`.
 /// Latest is determined by lex-order on the timestamp directory name
 /// (matching how `backup_timestamp()` formats it).
 pub fn restore_latest_backup<F: Filesystem>(fs: &F, project_root: &Path) -> Result<()> {
-    let backup_root = project_root.join(".aenv/backup");
+    let backup_root = project_root.join(".aenv-state/backup");
     if !fs.exists(&backup_root)? {
         return Err(AenvError::ActivationConflict(
-            "no backups found under .aenv/backup/".to_string(),
+            "no backups found under .aenv-state/backup/".to_string(),
         ));
     }
     let mut sets = fs.list_dir(&backup_root)?;
     sets.sort();
     let latest = sets.last().ok_or_else(|| {
-        AenvError::ActivationConflict("no backup sets in .aenv/backup/".to_string())
+        AenvError::ActivationConflict("no backup sets in .aenv-state/backup/".to_string())
     })?;
 
     // Walk the backup set, restoring every file with the correct

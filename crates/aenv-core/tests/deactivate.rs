@@ -53,7 +53,7 @@ fn deactivate_removes_symlink_and_state() {
     deactivate_namespace(&fs, &project).unwrap();
 
     assert!(!fs.exists(&project.join("CLAUDE.md")).unwrap());
-    assert!(!fs.exists(&project.join(".aenv/state.json")).unwrap());
+    assert!(!fs.exists(&project.join(".aenv-state/state.json")).unwrap());
 }
 
 #[test]

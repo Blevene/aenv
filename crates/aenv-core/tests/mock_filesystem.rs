@@ -223,16 +223,16 @@ fn phase_1_shaped_scenario_backup_then_restore() {
         .unwrap();
 
     // Activation step 1: back up the project file.
-    fs.create_dir_all(&p("/project/.aenv/backup/2026-05-20"))
+    fs.create_dir_all(&p("/project/.aenv-state/backup/2026-05-20"))
         .unwrap();
     fs.rename(
         &p("/project/CLAUDE.md"),
-        &p("/project/.aenv/backup/2026-05-20/CLAUDE.md"),
+        &p("/project/.aenv-state/backup/2026-05-20/CLAUDE.md"),
     )
     .unwrap();
     assert!(!fs.exists(&p("/project/CLAUDE.md")).unwrap());
     assert_eq!(
-        fs.read(&p("/project/.aenv/backup/2026-05-20/CLAUDE.md"))
+        fs.read(&p("/project/.aenv-state/backup/2026-05-20/CLAUDE.md"))
             .unwrap(),
         b"user content"
     );
@@ -263,7 +263,7 @@ fn phase_1_shaped_scenario_backup_then_restore() {
 
     // Deactivation step 2: restore the backup.
     fs.rename(
-        &p("/project/.aenv/backup/2026-05-20/CLAUDE.md"),
+        &p("/project/.aenv-state/backup/2026-05-20/CLAUDE.md"),
         &p("/project/CLAUDE.md"),
     )
     .unwrap();

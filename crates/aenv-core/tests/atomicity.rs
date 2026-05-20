@@ -17,7 +17,7 @@ fn probe_creates_aenv_dir_if_absent() {
     let fs = MockFilesystem::new();
     let project = PathBuf::from("/projects/p");
     probe_rename_atomicity(&fs, &project).unwrap();
-    assert!(fs.exists(&project.join(".aenv")).unwrap());
+    assert!(fs.exists(&project.join(".aenv-state")).unwrap());
 }
 
 #[test]
@@ -25,7 +25,7 @@ fn probe_leaves_no_probe_files_behind() {
     let fs = MockFilesystem::new();
     let project = PathBuf::from("/projects/p");
     probe_rename_atomicity(&fs, &project).unwrap();
-    let entries = fs.list_dir(&project.join(".aenv")).unwrap();
+    let entries = fs.list_dir(&project.join(".aenv-state")).unwrap();
     // Probe should leave .aenv/ empty (or containing nothing it created).
     assert!(entries.is_empty(), "found leftover entries: {entries:?}");
 }

@@ -76,8 +76,8 @@ fn symlinks_new_file_into_project() {
     );
     assert!(state.backed_up.is_empty());
 
-    // State file is persisted at .aenv/state.json.
-    let on_disk = fs.read(&project.join(".aenv/state.json")).unwrap();
+    // State file is persisted at .aenv-state/state.json.
+    let on_disk = fs.read(&project.join(".aenv-state/state.json")).unwrap();
     let parsed = ActivationState::from_json(&String::from_utf8(on_disk).unwrap()).unwrap();
     assert_eq!(parsed, state);
 }
@@ -272,7 +272,7 @@ fn stale_symlink_to_other_target_is_displaced() {
 fn rolls_back_when_state_write_fails_after_displacement() {
     // Setup: a project with a user-authored CLAUDE.md (which will be
     // displaced to backup during activation), then inject a write failure
-    // on .aenv/state.json — the final write in perform_activation. The
+    // on .aenv-state/state.json — the final write in perform_activation. The
     // failure fires after both the backup-rename and the symlink-create
     // have succeeded, so rollback must replay BOTH undo steps in reverse:
     // remove the new symlink, then rename the backup back into place.
@@ -284,7 +284,7 @@ fn rolls_back_when_state_write_fails_after_displacement() {
     fs.create_dir_all(&project).unwrap();
     fs.write(&project.join("CLAUDE.md"), b"user-authored")
         .unwrap();
-    fs.fail_writes_to(&project.join(".aenv/state.json"));
+    fs.fail_writes_to(&project.join(".aenv-state/state.json"));
 
     let err = activate_namespace(
         &fs,
@@ -311,5 +311,5 @@ fn rolls_back_when_state_write_fails_after_displacement() {
         b"user-authored"
     );
     // 3. No state.json on disk.
-    assert!(!fs.exists(&project.join(".aenv/state.json")).unwrap());
+    assert!(!fs.exists(&project.join(".aenv-state/state.json")).unwrap());
 }

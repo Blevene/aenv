@@ -11,9 +11,9 @@ fn restores_latest_backup_set() {
     let project = PathBuf::from("/projects/p");
 
     // Two backup sets; latest by lex order wins (epoch timestamps sort lex).
-    fs.write(&project.join(".aenv/backup/epoch-1000/CLAUDE.md"), b"older")
+    fs.write(&project.join(".aenv-state/backup/epoch-1000/CLAUDE.md"), b"older")
         .unwrap();
-    fs.write(&project.join(".aenv/backup/epoch-2000/CLAUDE.md"), b"newer")
+    fs.write(&project.join(".aenv-state/backup/epoch-2000/CLAUDE.md"), b"newer")
         .unwrap();
     fs.write(&project.join("CLAUDE.md"), b"current symlink target")
         .unwrap();
@@ -27,10 +27,10 @@ fn restores_latest_backup_set() {
 fn restores_multiple_files_in_one_set() {
     let fs = MockFilesystem::new();
     let project = PathBuf::from("/projects/p");
-    fs.write(&project.join(".aenv/backup/epoch-1000/CLAUDE.md"), b"a")
+    fs.write(&project.join(".aenv-state/backup/epoch-1000/CLAUDE.md"), b"a")
         .unwrap();
     fs.write(
-        &project.join(".aenv/backup/epoch-1000/.claude/foo.md"),
+        &project.join(".aenv-state/backup/epoch-1000/.claude/foo.md"),
         b"b",
     )
     .unwrap();
@@ -66,7 +66,7 @@ fn restore_is_idempotent_re_running_reproduces_state() {
     let fs = MockFilesystem::new();
     let project = PathBuf::from("/projects/p");
     fs.write(
-        &project.join(".aenv/backup/epoch-1000/CLAUDE.md"),
+        &project.join(".aenv-state/backup/epoch-1000/CLAUDE.md"),
         b"original",
     )
     .unwrap();
@@ -83,7 +83,7 @@ fn restore_is_idempotent_re_running_reproduces_state() {
 
     // Backup file is still there (not consumed).
     assert_eq!(
-        fs.read(&project.join(".aenv/backup/epoch-1000/CLAUDE.md"))
+        fs.read(&project.join(".aenv-state/backup/epoch-1000/CLAUDE.md"))
             .unwrap(),
         b"original"
     );

@@ -17,7 +17,7 @@ use std::path::Path;
 /// Run the probe. Creates `<project>/.aenv/` if it doesn't exist. Leaves
 /// no probe files behind on success.
 pub fn probe_rename_atomicity<F: Filesystem>(fs: &F, project_root: &Path) -> Result<()> {
-    let aenv_dir = project_root.join(".aenv");
+    let aenv_dir = project_root.join(".aenv-state");
     fs.create_dir_all(&aenv_dir)?;
 
     let a = aenv_dir.join(".probe.a");
