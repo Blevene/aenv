@@ -7,3 +7,7 @@
 
 #![warn(missing_docs)]
 #![warn(clippy::all)]
+
+pub mod error;
+
+pub use error::{AenvError, Result};
