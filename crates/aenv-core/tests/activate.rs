@@ -267,3 +267,49 @@ fn stale_symlink_to_other_target_is_displaced() {
         layout.namespace_dir("experiments").join("CLAUDE.md")
     );
 }
+
+#[test]
+fn rolls_back_when_state_write_fails_after_displacement() {
+    // Setup: a project with a user-authored CLAUDE.md (which will be
+    // displaced to backup during activation), then inject a write failure
+    // on .aenv/state.json — the final write in perform_activation. The
+    // failure fires after both the backup-rename and the symlink-create
+    // have succeeded, so rollback must replay BOTH undo steps in reverse:
+    // remove the new symlink, then rename the backup back into place.
+    let fs = MockFilesystem::new();
+    let layout = layout();
+    setup_registry_with_namespace(&fs, "experiments", &[("CLAUDE.md", b"namespace")]);
+
+    let project = PathBuf::from("/projects/p");
+    fs.create_dir_all(&project).unwrap();
+    fs.write(&project.join("CLAUDE.md"), b"user-authored")
+        .unwrap();
+    fs.fail_writes_to(&project.join(".aenv/state.json"));
+
+    let err = activate_namespace(
+        &fs,
+        &layout,
+        &registry_with_claude(),
+        &project,
+        "experiments",
+    )
+    .expect_err("must error");
+    assert!(matches!(
+        err,
+        aenv_core::AenvError::Io(_) | aenv_core::AenvError::ActivationConflict(_)
+    ));
+
+    // Rollback invariants:
+    // 1. No symlink left at the project path.
+    assert!(
+        !fs.is_symlink(&project.join("CLAUDE.md")).unwrap_or(false),
+        "symlink should be rolled back"
+    );
+    // 2. Original content restored.
+    assert_eq!(
+        fs.read(&project.join("CLAUDE.md")).unwrap(),
+        b"user-authored"
+    );
+    // 3. No state.json on disk.
+    assert!(!fs.exists(&project.join(".aenv/state.json")).unwrap());
+}

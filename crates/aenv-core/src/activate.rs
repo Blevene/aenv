@@ -1,10 +1,11 @@
 //! Activation: materialize a namespace's files into a project.
 //!
-//! Phase 1 supports one adapter at a time with the simplest set of cases:
-//! file doesn't exist in project -> symlink; file exists and differs ->
-//! back up then symlink; file exists and is byte-identical -> leave in
-//! place and mark managed. Activation failure rolls back any partial
-//! materialization (Task 10).
+//! Phase 1 supports one adapter at a time. The four project-path classifications
+//! (Absent / AlreadyOurSymlink / ByteIdenticalRegular / Displaced) are handled
+//! in `perform_activation`; every reversible operation pushes an UndoStep
+//! onto a log. On error, the log is replayed in reverse (best-effort) before
+//! the error bubbles, so partial activations leave the project as we found it
+//! (R-63).
 
 use crate::adapter::AdapterRegistry;
 use crate::atomicity::probe_rename_atomicity;
@@ -38,6 +39,56 @@ pub fn activate_namespace<F: Filesystem>(
     // Probe rename atomicity before doing anything irreversible.
     probe_rename_atomicity(fs, project_root)?;
 
+    let mut undo_log: Vec<UndoStep> = Vec::new();
+    let result = perform_activation(
+        fs,
+        layout,
+        adapters,
+        project_root,
+        namespace_name,
+        &manifest,
+        &mut undo_log,
+    );
+    match result {
+        Ok(state) => Ok(state),
+        Err(e) => {
+            undo(fs, undo_log);
+            Err(e)
+        }
+    }
+}
+
+enum UndoStep {
+    /// Created a symlink at `link`; undo by removing it.
+    RemoveSymlink { link: PathBuf },
+    /// Backed up `original` to `backup`; undo by renaming `backup` -> `original`.
+    RestoreBackup { original: PathBuf, backup: PathBuf },
+}
+
+fn undo<F: Filesystem>(fs: &F, log: Vec<UndoStep>) {
+    // Replay in reverse; best-effort (we're already in an error path, so
+    // we can't recursively bail on a failed undo step).
+    for step in log.into_iter().rev() {
+        match step {
+            UndoStep::RemoveSymlink { link } => {
+                let _ = fs.remove_file(&link);
+            }
+            UndoStep::RestoreBackup { original, backup } => {
+                let _ = fs.rename(&backup, &original);
+            }
+        }
+    }
+}
+
+fn perform_activation<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    adapters: &AdapterRegistry,
+    project_root: &Path,
+    namespace_name: &str,
+    manifest: &AenvManifest,
+    undo_log: &mut Vec<UndoStep>,
+) -> Result<ActivationState> {
     let timestamp = backup_timestamp();
     let mut managed_files = Vec::new();
     let mut backed_up = Vec::new();
@@ -54,6 +105,9 @@ pub fn activate_namespace<F: Filesystem>(
             match action {
                 ProjectPathState::Absent => {
                     fs.symlink(&source, &project_path)?;
+                    undo_log.push(UndoStep::RemoveSymlink {
+                        link: project_path.clone(),
+                    });
                     managed_files.push(ManagedFile {
                         path: PathBuf::from(&rel),
                         strategy: MaterializeStrategy::Symlink,
@@ -90,7 +144,14 @@ pub fn activate_namespace<F: Filesystem>(
                         fs.create_dir_all(parent)?;
                     }
                     fs.rename(&project_path, &backup_path)?;
+                    undo_log.push(UndoStep::RestoreBackup {
+                        original: project_path.clone(),
+                        backup: backup_path.clone(),
+                    });
                     fs.symlink(&source, &project_path)?;
+                    undo_log.push(UndoStep::RemoveSymlink {
+                        link: project_path.clone(),
+                    });
                     backed_up.push(BackedUpFile {
                         original_path: PathBuf::from(&rel),
                         backup_path: backup_rel,
@@ -136,13 +197,9 @@ fn load_manifest<F: Filesystem>(
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ProjectPathState {
-    /// Nothing at the project path.
     Absent,
-    /// Already an aenv-managed symlink pointing at our intended source.
     AlreadyOurSymlink,
-    /// Regular file whose contents match the namespace's source.
     ByteIdenticalRegular,
-    /// Something exists and differs — must back up.
     Displaced,
 }
 
@@ -159,8 +216,6 @@ fn classify_project_path<F: Filesystem>(
     project_path: &Path,
     source: &Path,
 ) -> Result<ProjectPathState> {
-    // Inspect the path itself, not what it points to. NotFound means
-    // nothing at the path; any other error propagates.
     let meta = match fs.symlink_metadata(project_path) {
         Ok(m) => m,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
@@ -173,13 +228,8 @@ fn classify_project_path<F: Filesystem>(
         if target == source {
             return Ok(ProjectPathState::AlreadyOurSymlink);
         }
-        // Stale or other-target symlink: displace it. The backup will be
-        // the link itself (rename moves the link, not the target). Reading
-        // the backup later dereferences to whatever the link pointed at;
-        // dangling-target case behaves as it did before activation.
         return Ok(ProjectPathState::Displaced);
     }
-    // Regular file: compare bytes for the identical-case shortcut.
     if matches!(meta.kind, crate::fs::FileKind::File) {
         let project_bytes = fs.read(project_path)?;
         let source_bytes = fs.read(source)?;
@@ -191,11 +241,6 @@ fn classify_project_path<F: Filesystem>(
 }
 
 /// Filesystem-safe timestamp string for backup directory names.
-///
-/// Uses nanosecond precision so two activations within the same wall-clock
-/// second don't collide. Same-nanosecond collisions are vanishingly rare;
-/// if one ever happens we still avoid silent overwrite by checking for
-/// directory existence at the caller (see the `Displaced` arm).
 fn backup_timestamp() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let nanos = SystemTime::now()
@@ -205,10 +250,6 @@ fn backup_timestamp() -> String {
     format!("epoch-{nanos}")
 }
 
-/// Compute the set of project-relative files an adapter manages for a given
-/// manifest entry. Phase 1 just intersects the adapter's `files` with the
-/// entry's `files`: a path managed by the adapter is materialized only if
-/// the manifest also lists it.
 fn adapter_files_for_entry(
     adapter: &crate::adapter::Adapter,
     entry: &crate::manifest::AdapterEntry,
@@ -226,9 +267,6 @@ fn adapter_files_for_entry(
     out
 }
 
-/// Whether `file` is a relative path under the directory `prefix` (which
-/// ends in `/`). Adapters declare directory prefixes like `.claude/` to
-/// mean "everything under this path."
 fn file_under_prefix(file: &str, prefix: &str) -> bool {
     if !prefix.ends_with('/') {
         return false;
