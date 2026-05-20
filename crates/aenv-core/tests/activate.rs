@@ -138,3 +138,132 @@ fn missing_adapter_file_is_skipped_silently() {
     .unwrap();
     assert!(state.managed_files.is_empty());
 }
+
+#[test]
+fn backs_up_displaced_project_file() {
+    let fs = MockFilesystem::new();
+    let layout = layout();
+    setup_registry_with_namespace(
+        &fs,
+        "experiments",
+        &[("CLAUDE.md", b"namespace disposition")],
+    );
+    let project = PathBuf::from("/projects/p");
+    fs.create_dir_all(&project).unwrap();
+    fs.write(&project.join("CLAUDE.md"), b"user-authored")
+        .unwrap();
+
+    let state = activate_namespace(
+        &fs,
+        &layout,
+        &registry_with_claude(),
+        &project,
+        "experiments",
+    )
+    .unwrap();
+
+    // Project file is now a symlink.
+    assert!(fs.is_symlink(&project.join("CLAUDE.md")).unwrap());
+    // Backup file holds the original contents.
+    assert_eq!(state.backed_up.len(), 1);
+    let backup = &state.backed_up[0];
+    assert_eq!(backup.original_path, PathBuf::from("CLAUDE.md"));
+    let backed_bytes = fs.read(&project.join(&backup.backup_path)).unwrap();
+    assert_eq!(backed_bytes, b"user-authored");
+}
+
+#[test]
+fn byte_identical_file_is_managed_in_place_not_symlinked() {
+    let fs = MockFilesystem::new();
+    let layout = layout();
+    let body: &[u8] = b"# CLAUDE.md\nshared content\n";
+    setup_registry_with_namespace(&fs, "experiments", &[("CLAUDE.md", body)]);
+    let project = PathBuf::from("/projects/p");
+    fs.create_dir_all(&project).unwrap();
+    fs.write(&project.join("CLAUDE.md"), body).unwrap();
+
+    let state = activate_namespace(
+        &fs,
+        &layout,
+        &registry_with_claude(),
+        &project,
+        "experiments",
+    )
+    .unwrap();
+
+    // R-46: file matches namespace -> leave in place, do NOT symlink, mark managed.
+    assert!(!fs.is_symlink(&project.join("CLAUDE.md")).unwrap());
+    assert_eq!(state.managed_files.len(), 1);
+    assert_eq!(
+        state.managed_files[0].strategy,
+        MaterializeStrategy::Identical
+    );
+    assert!(state.backed_up.is_empty(), "no backup needed");
+}
+
+#[test]
+fn aenv_managed_symlink_pointing_at_same_target_is_left_alone() {
+    // Edge case: previous activation left a symlink pointing exactly where
+    // we'd point now. No-op rather than backup + recreate.
+    let fs = MockFilesystem::new();
+    let layout = layout();
+    setup_registry_with_namespace(&fs, "experiments", &[("CLAUDE.md", b"x")]);
+    let project = PathBuf::from("/projects/p");
+    fs.create_dir_all(&project).unwrap();
+    // Pre-existing symlink to the same target.
+    fs.symlink(
+        &layout.namespace_dir("experiments").join("CLAUDE.md"),
+        &project.join("CLAUDE.md"),
+    )
+    .unwrap();
+
+    let state = activate_namespace(
+        &fs,
+        &layout,
+        &registry_with_claude(),
+        &project,
+        "experiments",
+    )
+    .unwrap();
+
+    // No backup; symlink stays.
+    assert!(state.backed_up.is_empty());
+    assert!(fs.is_symlink(&project.join("CLAUDE.md")).unwrap());
+}
+
+#[test]
+fn stale_symlink_to_other_target_is_displaced() {
+    // Regression: a project path that's a symlink to a non-aenv target (or
+    // a stale aenv symlink whose target is gone) was previously
+    // misclassified as Absent — exists() follows symlinks. The fix checks
+    // symlink_metadata BEFORE exists, so the link itself surfaces as
+    // Displaced and gets backed up rather than overwritten silently.
+    let fs = MockFilesystem::new();
+    let layout = layout();
+    setup_registry_with_namespace(&fs, "experiments", &[("CLAUDE.md", b"new")]);
+    let project = PathBuf::from("/projects/p");
+    fs.create_dir_all(&project).unwrap();
+    // Pre-existing symlink to a path that does NOT exist (stale).
+    fs.symlink(
+        &PathBuf::from("/elsewhere/CLAUDE.md"),
+        &project.join("CLAUDE.md"),
+    )
+    .unwrap();
+
+    let state = activate_namespace(
+        &fs,
+        &layout,
+        &registry_with_claude(),
+        &project,
+        "experiments",
+    )
+    .unwrap();
+
+    // Backed up the stale link; fresh symlink in place pointing at our source.
+    assert_eq!(state.backed_up.len(), 1);
+    assert_eq!(state.backed_up[0].original_path, PathBuf::from("CLAUDE.md"));
+    assert_eq!(
+        fs.read_link(&project.join("CLAUDE.md")).unwrap(),
+        layout.namespace_dir("experiments").join("CLAUDE.md")
+    );
+}
