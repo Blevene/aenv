@@ -9,5 +9,6 @@
 #![warn(clippy::all)]
 
 pub mod error;
+pub mod fs;
 
 pub use error::{AenvError, Result};
