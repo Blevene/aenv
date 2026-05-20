@@ -14,5 +14,6 @@ pub mod error;
 pub mod fs;
 pub mod home;
 pub mod manifest;
+pub mod namespace;
 
 pub use error::{AenvError, Result};
