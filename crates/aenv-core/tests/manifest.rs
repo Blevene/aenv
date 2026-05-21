@@ -100,11 +100,26 @@ fn adapter_entry_default_files_is_empty() {
 }
 
 #[test]
+fn parses_per_file_merge_override() {
+    let toml = r#"
+name = "leaf"
+extends = ["base"]
+[adapters.claude-code]
+files = ["CLAUDE.md", ".mcp.json"]
+merge = { ".mcp.json" = "deep" }
+"#;
+    let m: aenv_core::manifest::AenvManifest = toml::from_str(toml).unwrap();
+    let entry = m.adapters.get("claude-code").unwrap();
+    assert_eq!(entry.merge.as_ref().unwrap().get(".mcp.json").unwrap(), "deep");
+}
+
+#[test]
 fn adapter_entry_fields_are_publicly_constructible() {
     // Compile-time check: AdapterEntry's fields stay pub. Downstream
     // consumers (Phase 2's composition layer) build these directly.
     let entry = AdapterEntry {
         files: vec!["CLAUDE.md".to_string()],
+        merge: None,
     };
     assert_eq!(entry.files.len(), 1);
 }

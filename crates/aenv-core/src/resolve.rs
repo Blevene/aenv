@@ -90,3 +90,268 @@ pub enum DeepMergeFormat {
 // re-exports this one. The kebab-case + alias combination above preserves
 // schema-1 compatibility: existing on-disk state files store `"symlink"` and
 // `"merged"`, both of which the new enum accepts.
+
+// ---- Task 3: extends-chain resolver ----
+
+use std::collections::BTreeSet;
+
+use crate::adapter::AdapterRegistry;
+use crate::fs::Filesystem;
+use crate::home::RegistryLayout;
+use crate::manifest::AenvManifest;
+use crate::AenvError;
+
+/// One candidate contribution from a single namespace for a single path.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Candidate {
+    /// The namespace this candidate comes from.
+    pub namespace: NamespaceId,
+    /// Relative path of the artifact (project-relative).
+    pub path: PathBuf,
+    /// Absolute source path inside the namespace directory.
+    pub source_path: PathBuf,
+    /// Name of the adapter that manages this path.
+    pub adapter: String,
+    /// Per-file merge strategy override from the manifest, if any.
+    pub merge_override: Option<String>,
+}
+
+/// Output of `resolve_namespace`.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ResolutionResult {
+    /// Ordered chain from root ancestor to leaf (the namespace the user pinned).
+    pub chain: Vec<NamespaceId>,
+    /// All candidate artifacts gathered across the chain, in chain order.
+    pub candidates: Vec<Candidate>,
+}
+
+/// Errors specific to the resolution phase.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum ResolutionError {
+    /// A cycle was detected in the `extends` graph. The vec is the offending sub-chain.
+    Cycle(Vec<NamespaceId>),
+    /// A referenced namespace does not exist in the registry.
+    NamespaceNotFound(NamespaceId),
+    /// A manifest references an adapter that is not installed.
+    AdapterMissing(String),
+    /// A manifest could not be parsed or failed a consistency check.
+    ManifestInvalid {
+        /// The namespace whose manifest failed.
+        namespace: NamespaceId,
+        /// Human-readable explanation of the failure.
+        reason: String,
+    },
+    /// An I/O error occurred while reading the registry.
+    Io(String),
+}
+
+impl From<ResolutionError> for AenvError {
+    fn from(value: ResolutionError) -> Self {
+        match value {
+            ResolutionError::Cycle(chain) => {
+                let rendered = chain
+                    .iter()
+                    .map(|id| id.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" -> ");
+                AenvError::ExtendsCycle(rendered)
+            }
+            ResolutionError::NamespaceNotFound(id) => {
+                AenvError::NamespaceNotFound(id.as_str().to_owned())
+            }
+            ResolutionError::AdapterMissing(name) => AenvError::AdapterMissing(name),
+            ResolutionError::ManifestInvalid { namespace, reason } => {
+                AenvError::ManifestInvalid(format!("{namespace}: {reason}"))
+            }
+            ResolutionError::Io(msg) => AenvError::Io(std::io::Error::other(msg)),
+        }
+    }
+}
+
+/// Walk the `extends` chain starting from `leaf`, returning the full ordered
+/// chain (root → leaf) and all candidate artifacts gathered across it.
+///
+/// The walk is depth-first. Diamond inheritance is handled correctly: a node
+/// reached via two parents appears exactly once, in left-branch-first position.
+/// Cycles surface as `ResolutionError::Cycle`.
+pub fn resolve_namespace<F: Filesystem>(
+    fs: &F,
+    registry: &RegistryLayout,
+    adapters: &AdapterRegistry,
+    leaf: &NamespaceId,
+) -> Result<ResolutionResult, ResolutionError> {
+    let mut chain: Vec<NamespaceId> = Vec::new();
+    let mut visiting: Vec<NamespaceId> = Vec::new();
+    let mut visited: BTreeSet<NamespaceId> = BTreeSet::new();
+
+    walk(fs, registry, leaf, &mut chain, &mut visiting, &mut visited)?;
+
+    let mut candidates: Vec<Candidate> = Vec::new();
+    for ns in &chain {
+        let manifest = load_manifest(fs, registry, ns)?;
+        for adapter_name in manifest.adapters.keys() {
+            if adapters.get(adapter_name).is_none() {
+                return Err(ResolutionError::AdapterMissing(adapter_name.clone()));
+            }
+        }
+        gather_candidates(fs, registry, ns, &manifest, &mut candidates)?;
+    }
+    Ok(ResolutionResult { chain, candidates })
+}
+
+fn walk<F: Filesystem>(
+    fs: &F,
+    registry: &RegistryLayout,
+    current: &NamespaceId,
+    chain: &mut Vec<NamespaceId>,
+    visiting: &mut Vec<NamespaceId>,
+    visited: &mut BTreeSet<NamespaceId>,
+) -> Result<(), ResolutionError> {
+    if visited.contains(current) {
+        return Ok(());
+    }
+    if visiting.contains(current) {
+        let start = visiting.iter().position(|n| n == current).unwrap();
+        let mut cycle: Vec<NamespaceId> = visiting[start..].to_vec();
+        cycle.push(current.clone());
+        return Err(ResolutionError::Cycle(cycle));
+    }
+    visiting.push(current.clone());
+    let manifest = load_manifest(fs, registry, current)?;
+    for parent in &manifest.extends {
+        let parent_id = NamespaceId::new(parent.clone()).map_err(|e| {
+            ResolutionError::ManifestInvalid {
+                namespace: current.clone(),
+                reason: e.to_string(),
+            }
+        })?;
+        walk(fs, registry, &parent_id, chain, visiting, visited)?;
+    }
+    visiting.pop();
+    visited.insert(current.clone());
+    chain.push(current.clone());
+    Ok(())
+}
+
+fn load_manifest<F: Filesystem>(
+    fs: &F,
+    registry: &RegistryLayout,
+    ns: &NamespaceId,
+) -> Result<AenvManifest, ResolutionError> {
+    let path = registry.manifest_path(ns.as_str());
+    if !fs.exists(&path).map_err(|e| ResolutionError::Io(e.to_string()))? {
+        return Err(ResolutionError::NamespaceNotFound(ns.clone()));
+    }
+    let bytes = fs.read(&path).map_err(|e| ResolutionError::Io(e.to_string()))?;
+    let text = String::from_utf8(bytes).map_err(|e| ResolutionError::ManifestInvalid {
+        namespace: ns.clone(),
+        reason: format!("manifest is not valid UTF-8: {e}"),
+    })?;
+    let manifest: AenvManifest =
+        toml::from_str(&text).map_err(|e| ResolutionError::ManifestInvalid {
+            namespace: ns.clone(),
+            reason: format!("toml parse failure: {e}"),
+        })?;
+    if manifest.name != ns.as_str() {
+        return Err(ResolutionError::ManifestInvalid {
+            namespace: ns.clone(),
+            reason: format!(
+                "manifest name {:?} does not match directory name {:?}",
+                manifest.name,
+                ns.as_str()
+            ),
+        });
+    }
+    Ok(manifest)
+}
+
+fn gather_candidates<F: Filesystem>(
+    fs: &F,
+    registry: &RegistryLayout,
+    ns: &NamespaceId,
+    manifest: &AenvManifest,
+    out: &mut Vec<Candidate>,
+) -> Result<(), ResolutionError> {
+    let ns_root = registry.namespace_dir(ns.as_str());
+    for (adapter_name, entry) in &manifest.adapters {
+        for rel in &entry.files {
+            if rel.contains('*') {
+                expand_glob(fs, &ns_root, rel)
+                    .map_err(|e| ResolutionError::Io(e.to_string()))?
+                    .into_iter()
+                    .for_each(|literal| {
+                        out.push(Candidate {
+                            namespace: ns.clone(),
+                            path: PathBuf::from(&literal),
+                            source_path: ns_root.join(&literal),
+                            adapter: adapter_name.clone(),
+                            merge_override: entry
+                                .merge
+                                .as_ref()
+                                .and_then(|m| m.get(&literal).cloned()),
+                        })
+                    });
+            } else {
+                let source = ns_root.join(rel);
+                if !fs.exists(&source).map_err(|e| ResolutionError::Io(e.to_string()))? {
+                    continue;
+                }
+                out.push(Candidate {
+                    namespace: ns.clone(),
+                    path: PathBuf::from(rel),
+                    source_path: source,
+                    adapter: adapter_name.clone(),
+                    merge_override: entry.merge.as_ref().and_then(|m| m.get(rel).cloned()),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn expand_glob<F: Filesystem>(
+    fs: &F,
+    ns_root: &std::path::Path,
+    pattern: &str,
+) -> std::io::Result<Vec<String>> {
+    let mut out = Vec::new();
+    walk_dir(fs, ns_root, std::path::Path::new(""), &mut out)?;
+    Ok(out
+        .into_iter()
+        .filter(|rel| glob_match(pattern, rel))
+        .collect())
+}
+
+fn walk_dir<F: Filesystem>(
+    fs: &F,
+    abs_base: &std::path::Path,
+    rel_prefix: &std::path::Path,
+    out: &mut Vec<String>,
+) -> std::io::Result<()> {
+    let abs = abs_base.join(rel_prefix);
+    for entry in fs.list_dir(&abs)? {
+        let name = match entry.file_name() {
+            Some(n) => n.to_string_lossy().to_string(),
+            None => continue,
+        };
+        let child_rel = rel_prefix.join(&name);
+        let child_abs = abs_base.join(&child_rel);
+        let meta = fs.metadata(&child_abs)?;
+        if matches!(meta.kind, crate::fs::FileKind::Directory) {
+            walk_dir(fs, abs_base, &child_rel, out)?;
+        } else {
+            out.push(child_rel.to_string_lossy().to_string());
+        }
+    }
+    Ok(())
+}
+
+fn glob_match(pattern: &str, candidate: &str) -> bool {
+    if let Some(prefix) = pattern.strip_suffix("/**/*") {
+        candidate.starts_with(prefix) && candidate[prefix.len()..].starts_with('/')
+    } else if let Some(prefix) = pattern.strip_suffix("**/*") {
+        candidate.starts_with(prefix)
+    } else {
+        pattern == candidate
+    }
+}

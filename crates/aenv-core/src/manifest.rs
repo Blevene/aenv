@@ -25,11 +25,15 @@ pub struct AenvManifest {
 }
 
 /// Per-adapter manifest entry: which files the adapter manages for this namespace.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AdapterEntry {
     /// Project-relative paths the adapter manages.
     #[serde(default)]
     pub files: Vec<String>,
+    /// Per-file merge override. Key is relative path; value is one of:
+    /// "section", "deep", "last-wins", "symlink".
+    #[serde(default)]
+    pub merge: Option<std::collections::BTreeMap<String, String>>,
 }
 
 impl AenvManifest {
