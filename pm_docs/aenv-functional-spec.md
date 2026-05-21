@@ -327,7 +327,7 @@ Activating...
   + .claude/agents/code-reviewer.md            (from detailed-execution)
   + .cursorrules                                (from detailed-execution)
   + .mcp.json                                   (merged from base + detailed-execution)
-Backed up 1 file to .aenv/backup/2026-05-19T14-22-03/
+Backed up 1 file to .aenv-state/backup/2026-05-19T14-22-03/
   - CLAUDE.md (original preserved)
 ```
 
@@ -743,7 +743,7 @@ $ aenv status --json
   "backed_up": [
     {
       "path": "CLAUDE.md",
-      "backup": ".aenv/backup/2026-05-19T14-22-03/CLAUDE.md"
+      "backup": ".aenv-state/backup/2026-05-19T14-22-03/CLAUDE.md"
     }
   ]
 }
@@ -915,7 +915,7 @@ A few situations that don't fit cleanly into the EARS requirements but matter in
 
 **Editor reload.** When the user switches envs while Claude Code is already running, Claude won't see the new `CLAUDE.md` until it's restarted. The activator should print a hint: `Note: restart your agent to pick up the new harness.`
 
-**`.gitignore` for `.aenv/`.** Activation creates `.aenv/state.json` and `.aenv/backup/`. These are project-local state and should never be committed. The `aenv use` command should add `.aenv/` to `.gitignore` automatically (but not the `.aenv` pin file itself, which *is* committed).
+**`.gitignore` for `.aenv-state/`.** Activation creates `.aenv-state/state.json` and `.aenv-state/backup/`. These are project-local state and should never be committed. The `aenv use` command should add `.aenv-state/` to `.gitignore` automatically. The `.aenv` pin file itself *is* committed. The state directory is named `.aenv-state/` (rather than living under `.aenv/`) because `.aenv` is a regular file at the same path, and a file and a directory cannot share a name.
 
 **Nested projects.** If `~/code/monorepo/.aenv` says `detailed-execution` and `~/code/monorepo/experiments/.aenv` says `experiments`, then `cd`-ing into `experiments/` activates `experiments`, not `detailed-execution`. The nearest-ancestor `.aenv` wins.
 

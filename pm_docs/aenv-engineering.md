@@ -149,9 +149,9 @@ The library never reads `std::env::current_dir()` or environment variables. This
 
 PRD R-45 requires transactional rollback on activation failure. The implementation relies on `std::fs::rename` being atomic, which is true on Unix **only when source and destination are on the same filesystem**.
 
-The backup directory is therefore always inside the project (`.aenv/backup/`), not in a system temp directory. If a project happens to live on a filesystem boundary (e.g. project root on one mount, `.aenv/` symlinked elsewhere), rename silently degrades to copy+delete and atomicity is lost.
+The backup directory is therefore always inside the project (`.aenv-state/backup/`), not in a system temp directory. If a project happens to live on a filesystem boundary (e.g. project root on one mount, `.aenv-state/` symlinked elsewhere), rename silently degrades to copy+delete and atomicity is lost.
 
-**Mitigation:** at the start of activation, perform a probe rename in `.aenv/`. If it succeeds, proceed. If it crosses a filesystem boundary, abort with `ActivationConflict` and surface a clear message. This is cheap and protects R-45.
+**Mitigation:** at the start of activation, perform a probe rename in `.aenv-state/`. If it succeeds, proceed. If it crosses a filesystem boundary, abort with `ActivationConflict` and surface a clear message. This is cheap and protects R-45.
 
 ## 7.5 Namespace identity in the internal model
 
@@ -209,7 +209,7 @@ pub struct ResolvedArtifact {
 
 This is the data backing `aenv which` and JSON `shadows` arrays. The shadowed artifact's content is *not* discarded from `aenv`'s view of the namespace — the user can inspect it by looking at the parent namespace's directory directly, and `aenv diff base detailed-execution` can compute the structural difference.
 
-**Materialization is identity-erasing.** When `aenv` writes files to disk, it writes short names: `.claude/skills/write-tests/SKILL.md`, not `.claude/skills/detailed-execution::write-tests/SKILL.md`. Target tools have no namespace awareness; qualified names exist only in `aenv`'s internal state, the activation state file (`.aenv/state.json`), and machine output. This is a deliberate choice: namespaces are a *build-time* organizational concept, not a runtime concept the agent sees.
+**Materialization is identity-erasing.** When `aenv` writes files to disk, it writes short names: `.claude/skills/write-tests/SKILL.md`, not `.claude/skills/detailed-execution::write-tests/SKILL.md`. Target tools have no namespace awareness; qualified names exist only in `aenv`'s internal state, the activation state file (`.aenv-state/state.json`), and machine output. This is a deliberate choice: namespaces are a *build-time* organizational concept, not a runtime concept the agent sees.
 
 **Hash neutrality.** The resolved-namespace hash (PRD §5.15) is computed over the materialized file contents only. It does NOT incorporate qualified names, shadow chains, parameters, or policies. Two resolution chains that produce byte-identical materialized output share a hash — even if one used `base::write-tests` and the other used `detailed-execution::write-tests` with identical content. Downstream consumers that need to attribute behavior to a specific namespace (rather than to its materialized content) must record the namespace name and parameters separately, alongside the hash.
 
@@ -300,7 +300,7 @@ The shell hook runs synchronously on every `cd`. Target: **under 10ms** for the 
 
 This implies:
 
-- The state check should require reading at most one or two small files (`.aenv` pin, `.aenv/state.json`).
+- The state check should require reading at most one or two small files (`.aenv` pin, `.aenv-state/state.json`).
 - Resolved-env hashing happens only on activation, not on every hook invocation.
 - No git operations in the hook path. `aenv install` and `aenv sync` are explicit user actions.
 
@@ -335,7 +335,7 @@ The probe is skipped for commands that don't touch remotes — `activate`, `stat
 - **Semver.** Pre-1.0 means anything can change. Post-1.0, breaking the JSON schema, exit codes, hash algorithm, namespace separator (`::`), parameter separator (`.`), or `.aenv` file format is a major-version bump.
 - **Hash algorithm versioning.** Per PRD R-72, algorithm changes carry a version byte. We commit to emitting both old and new hashes for at least one major release after introducing a new algorithm.
 - **Namespace and parameter separators.** `::` and `.` are part of the public CLI and JSON contract. Changing either requires a major version bump and a deprecation window with both forms accepted.
-- **State file forward-compatibility.** `.aenv/state.json` includes a `schema_version` field. Older `aenv` reading a newer state file refuses to activate and prints an upgrade hint rather than silently mishandling fields it doesn't understand.
+- **State file forward-compatibility.** `.aenv-state/state.json` includes a `schema_version` field. Older `aenv` reading a newer state file refuses to activate and prints an upgrade hint rather than silently mishandling fields it doesn't understand.
 - **Git version.** Minimum supported `git` is 2.20. If we ever need a feature from a later version, that's a documented bump with a version probe at startup.
 
 ## 12. Open implementation questions

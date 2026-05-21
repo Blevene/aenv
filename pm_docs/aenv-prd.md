@@ -115,12 +115,12 @@ Skills are first-class because adapter research established that the meaningful 
 - **R-40 (State-driven)** While the shell hook is installed and the user changes directory into a project containing a `.aenv` file, the system shall activate the named namespace if it is not already active.
 - **R-41 (State-driven)** While the shell hook is installed and the user changes directory out of a project with an active namespace into a directory not covered by any `.aenv`, the system shall deactivate the namespace.
 - **R-42 (State-driven)** While the shell hook is installed and the user changes directory between two projects with different `.aenv` files, the system shall deactivate the first namespace and activate the second atomically.
-- **R-43 (Event)** When activation begins, the system shall write a state file (`.aenv/state.json`) recording the active namespace, the resolved file list with qualified identities, the shadow set, parameter values in effect, and the backup manifest.
+- **R-43 (Event)** When activation begins, the system shall write a state file (`.aenv-state/state.json`) recording the active namespace, the resolved file list with qualified identities, the shadow set, parameter values in effect, and the backup manifest. The state directory is `.aenv-state/` (not `.aenv/`) because `.aenv` is the pin file declared in R-33 and a regular file cannot coexist with a directory of the same name on a real filesystem.
 
 ### 5.8 File materialization and conflicts
 
 - **R-44 (Event)** When materializing a file that does not exist in the project, the system shall create a symlink from the project path to the namespace file.
-- **R-45 (Event)** When materializing a file whose project version differs from the namespace version and is not declared as merged, the system shall move the project file to `.aenv/backup/<timestamp>/` before symlinking.
+- **R-45 (Event)** When materializing a file whose project version differs from the namespace version and is not declared as merged, the system shall move the project file to `.aenv-state/backup/<timestamp>/` before symlinking.
 - **R-46 (Event)** When materializing a file whose project version is byte-identical to the namespace version, the system shall leave the project file in place and record it as managed.
 - **R-47 (Event)** When materializing a file declared with a deep-merge or section-merge strategy, the system shall compute the merged contents and write a regular (non-symlink) file, recording the source namespaces in state.
 - **R-48 (Event)** When deactivating, the system shall remove only files it materialized, restore backups, and leave any files created by the user during activation untouched.
