@@ -10,6 +10,7 @@
 
 pub mod activate;
 pub mod adapter;
+pub mod merge;
 pub mod adapters_builtin;
 pub mod atomicity;
 pub mod deactivate;
