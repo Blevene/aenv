@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust 1.85+ stable. New library deps: `serde_yaml = "0.9"` (workspace-pinned for YAML deep-merge), `pulldown-cmark = "0.10"` *(or equivalent — see Task 5)* for Markdown section parsing. Existing deps cover JSON (`serde_json`) and TOML (`toml`). No new `Filesystem` trait methods.
 
-**Plan structure:** 18 tasks. Tasks 1–2 build pure identity and resolution types (unit-testable, no fs). Task 3 implements the `extends`-chain resolver against `MockFilesystem`. Task 4 is strategy selection. Tasks 5–8 build the three merge primitives (one task each: section, JSON, YAML, TOML). Task 9 is shadow tracking. Tasks 10–11 wire composition into state and `activate`. Task 12 ships the six remaining adapters. Tasks 13–15 add the new CLI subcommands (`which`, `fork` for files, `fork <name>` for namespace creation). Task 16 upgrades `status`. Task 17 is the end-to-end integration test. Task 18 tags `phase-2-complete`. Estimated effort: 3–4 days of focused work.
+**Plan structure:** 19 tasks. Tasks 1–2 build pure identity and resolution types (unit-testable, no fs). Task 3 implements the `extends`-chain resolver against `MockFilesystem`. Task 4 is strategy selection. Tasks 5–8 build the three merge primitives (one task each: section, JSON, YAML, TOML). Task 9 is shadow tracking. Tasks 10–11 wire composition into state and `activate`. Task 12 ships the six remaining adapters. Tasks 13–15 add the new CLI subcommands (`which`, `fork` for files + `fork` whole-project, `fork <name>` for namespace creation — Task 14 covers single-file detach, Task 14b covers whole-project R-53). Task 16 upgrades `status`. Task 17 is the end-to-end integration test. Task 18 tags `phase-2-complete`. Estimated effort: 3–4 days of focused work.
 
 **Repository state at start:** Working tree clean. `main` at `7510238` (Phase 1 + .aenv-state/ doc reconciliation). 121 tests passing. CI green on local; `origin/main` 18 commits behind local (push held).
 
@@ -189,6 +189,13 @@ fn namespace_id_rejects_colon_chars() {
 }
 
 #[test]
+fn namespace_id_rejects_reserved_merged_synthetic() {
+    let err = NamespaceId::new("(merged)").unwrap_err();
+    assert!(err.to_string().contains("reserved"));
+    assert!(err.to_string().contains("merged"));
+}
+
+#[test]
 fn short_name_allows_path_separators() {
     // Short names can be paths (e.g. ".claude/skills/write-tests/SKILL.md").
     let sn = ShortName::new(".claude/skills/write-tests/SKILL.md").unwrap();
@@ -246,6 +253,12 @@ const SEPARATOR: &str = "::";
 pub struct NamespaceId(String);
 
 impl NamespaceId {
+    /// Reserved synthetic namespace used by `activate_namespace` to label
+    /// merged artifacts whose contributors span multiple real namespaces.
+    /// Rejected from user-facing construction so a real namespace can never
+    /// collide with the synthesizer's output.
+    pub const RESERVED_MERGED: &'static str = "(merged)";
+
     pub fn new(s: impl Into<String>) -> Result<Self, AenvError> {
         let s = s.into();
         if s.is_empty() {
@@ -258,7 +271,22 @@ impl NamespaceId {
                 "namespace name {s:?} cannot contain ':'"
             )));
         }
+        if s == Self::RESERVED_MERGED {
+            return Err(AenvError::ManifestInvalid(format!(
+                "namespace name {s:?} is reserved; aenv uses it internally to label \
+                 merged artifacts in state.json and 'aenv which' output. Pick a \
+                 different name (e.g. 'merged-base' or 'combined')."
+            )));
+        }
         Ok(Self(s))
+    }
+
+    /// Construct the reserved synthetic `(merged)` namespace. The single
+    /// intended caller is `aenv-core::activate::synthesize_merged_qn`. Test
+    /// helpers that need to construct a synthetic qualified name (e.g. test
+    /// fixtures comparing against state.json output) also call this.
+    pub fn merged_synthetic() -> Self {
+        Self(Self::RESERVED_MERGED.to_owned())
     }
 
     pub fn as_str(&self) -> &str {
@@ -399,10 +427,12 @@ use aenv_core::identity::{NamespaceId, QualifiedName, ShortName};
 use aenv_core::resolve::{MaterializeStrategy, ResolvedArtifact, ResolvedNamespace};
 
 fn qn(ns: &str, short: &str) -> QualifiedName {
-    QualifiedName::new(
-        NamespaceId::new(ns).unwrap(),
-        ShortName::new(short).unwrap(),
-    )
+    let nsid = if ns == NamespaceId::RESERVED_MERGED {
+        NamespaceId::merged_synthetic()
+    } else {
+        NamespaceId::new(ns).unwrap()
+    };
+    QualifiedName::new(nsid, ShortName::new(short).unwrap())
 }
 
 #[test]
@@ -461,7 +491,7 @@ fn merged_artifact_has_contributors_no_shadows() {
 }
 ```
 
-Note: `"(merged)"` is *not* a real NamespaceId — `QualifiedName` requires both halves to validate. Wait — `NamespaceId::new("(merged)")` will succeed because we only reject empty and `:`-containing names. That's fine; the type system isn't trying to forbid this synthetic placeholder. The convention is documented in §7.1 of the functional spec.
+Note: `"(merged)"` is the reserved synthetic namespace label for artifacts whose contributors span multiple real namespaces. `NamespaceId::new("(merged)")` *rejects* the string (Task 1 reserves it explicitly); only the internal constructor `NamespaceId::merged_synthetic()` produces it. The test helper `qn()` above special-cases the reserved string and routes to `merged_synthetic()` so tests can construct fixtures that match the on-disk state.json shape. The convention is documented in functional spec §7.1.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -2541,10 +2571,12 @@ fn cand(ns: &str, path: &str, adapter: &str) -> Candidate {
 }
 
 fn qn(ns: &str, short: &str) -> QualifiedName {
-    QualifiedName::new(
-        NamespaceId::new(ns).unwrap(),
-        ShortName::new(short).unwrap(),
-    )
+    let nsid = if ns == NamespaceId::RESERVED_MERGED {
+        NamespaceId::merged_synthetic()
+    } else {
+        NamespaceId::new(ns).unwrap()
+    };
+    QualifiedName::new(nsid, ShortName::new(short).unwrap())
 }
 
 fn cc_with_instructions() -> AdapterRegistry {
@@ -2734,10 +2766,12 @@ use aenv_core::resolve::MaterializeStrategy;
 use std::path::PathBuf;
 
 fn qn(ns: &str, short: &str) -> QualifiedName {
-    QualifiedName::new(
-        NamespaceId::new(ns).unwrap(),
-        ShortName::new(short).unwrap(),
-    )
+    let nsid = if ns == NamespaceId::RESERVED_MERGED {
+        NamespaceId::merged_synthetic()
+    } else {
+        NamespaceId::new(ns).unwrap()
+    };
+    QualifiedName::new(nsid, ShortName::new(short).unwrap())
 }
 
 #[test]
@@ -3455,9 +3489,11 @@ fn materialize_one<F: Filesystem>(
     Ok(())
 }
 
-fn synthesize_merged_qn(path: &Path) -> Result<crate::identity::QualifiedName> {
+pub(crate) fn synthesize_merged_qn(path: &Path) -> Result<crate::identity::QualifiedName> {
     Ok(crate::identity::QualifiedName::new(
-        crate::identity::NamespaceId::new("(merged)")?,
+        // merged_synthetic() bypasses the (merged) reservation check; this
+        // is the only callsite allowed to construct the synthetic namespace.
+        crate::identity::NamespaceId::merged_synthetic(),
         crate::identity::ShortName::new(path.to_string_lossy().to_string())?,
     ))
 }
@@ -4254,8 +4290,187 @@ already regular files on disk; forking them leaves the file untouched
 but stops aenv from regenerating them on subsequent activations.
 Unmanaged paths error.
 
-The CLI dispatcher distinguishes 'fork <file>' from 'fork <name>'
-(Task 15) by trying state.managed_files first.
+The CLI dispatcher distinguishes 'fork' (no arg, Task 14b),
+'fork <file>' (this task), and 'fork <name>' (Task 15) by inspecting
+state.managed_files.
+"
+```
+
+---
+
+### Task 14b: `aenv fork` (no argument) — whole-project detach (R-53)
+
+The bare `aenv fork` variant replaces *every* symlinked managed file with a regular copy, marks the project as detached, and removes the state file so subsequent activations and (when Phase 6 lands) shell-hook auto-activation skip it. The `.aenv` pin file is *kept* — the project still records "this was forked from X" via the pin, but activation is disabled until the user explicitly re-pins.
+
+**Files:**
+- Modify: `crates/aenv-core/src/activate.rs` (add `fork_project` library function)
+- Modify: `crates/aenv-cli/src/cmd/fork.rs` (add `run_project_detach`)
+- Modify: `crates/aenv-cli/src/main.rs` (route bare `Fork { target: None }` here)
+- Test: append to `crates/aenv-core/tests/fork.rs`
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `crates/aenv-core/tests/fork.rs`:
+
+```rust
+#[test]
+fn forking_whole_project_replaces_every_symlink_and_removes_state() {
+    let fs = MockFilesystem::default();
+    setup_activated_chain(&fs);
+
+    let skill = Path::new(&format!("{PROJ}/.claude/skills/X/SKILL.md"));
+    let claude = Path::new(&format!("{PROJ}/CLAUDE.md"));
+    let state_path = Path::new(&format!("{PROJ}/.aenv-state/state.json"));
+    assert!(matches!(
+        fs.symlink_metadata(skill).unwrap().kind,
+        aenv_core::fs::FileKind::Symlink
+    ));
+    assert!(fs.exists(state_path).unwrap());
+
+    aenv_core::activate::fork_project(&fs, Path::new(PROJ)).unwrap();
+
+    // Every symlinked file is now a regular file with its bytes inlined.
+    assert!(!matches!(
+        fs.symlink_metadata(skill).unwrap().kind,
+        aenv_core::fs::FileKind::Symlink
+    ));
+    assert_eq!(fs.read(skill).unwrap(), b"the skill body");
+
+    // Merged files are unchanged (they were already regular).
+    assert!(fs.exists(claude).unwrap());
+
+    // State is removed: no subsequent activation will manage these files.
+    assert!(!fs.exists(state_path).unwrap());
+
+    // Backups are also dropped — the user is committing to the detached state.
+    let backup_dir = Path::new(&format!("{PROJ}/.aenv-state/backup"));
+    assert!(!fs.exists(backup_dir).unwrap());
+}
+
+#[test]
+fn forking_whole_project_with_no_activation_is_a_clean_no_op() {
+    let fs = MockFilesystem::default();
+    // No prior activation, no state file.
+    let result = aenv_core::activate::fork_project(&fs, Path::new(PROJ));
+    // Idempotent: no error, no state to remove.
+    assert!(result.is_ok());
+}
+```
+
+- [ ] **Step 2: Implement `fork_project`**
+
+Append to `crates/aenv-core/src/activate.rs`:
+
+```rust
+/// Detach the entire project from namespace management.
+///
+/// For every managed file with strategy Symlink, read the resolved bytes
+/// through the symlink and replace it with a regular file. For merged
+/// strategies the file is already regular — leave it. Then remove
+/// `.aenv-state/` entirely (state.json + backup/) so subsequent
+/// activations and shell-hook auto-activation skip this project.
+///
+/// The `.aenv` pin file is intentionally *not* removed — the project
+/// retains its declaration of "I was forked from <namespace>" for human
+/// reference. Re-pin with `aenv use <name>` to re-enable activation.
+///
+/// Idempotent: a project with no state file returns Ok(()) without
+/// touching anything.
+pub fn fork_project<F: Filesystem>(
+    fs: &F,
+    project_root: &Path,
+) -> Result<()> {
+    let state_path = project_root.join(".aenv-state/state.json");
+    if !fs.exists(&state_path)? {
+        return Ok(());
+    }
+    let state: ActivationState = serde_json::from_slice(&fs.read(&state_path)?)
+        .map_err(|e| AenvError::ActivationConflict(format!("state read: {e}")))?;
+
+    for mf in &state.managed_files {
+        if matches!(mf.strategy, MaterializeStrategy::Symlink) {
+            let project_path = project_root.join(&mf.path);
+            let bytes = fs.read(&project_path)?;
+            fs.remove_file(&project_path)?;
+            fs.write(&project_path, &bytes)?;
+        }
+        // SectionMerge / DeepMerge / Identical / Copy / Merged: leave on disk.
+    }
+
+    // Clear .aenv-state/ entirely.
+    let state_dir = project_root.join(".aenv-state");
+    fs.remove_dir_all(&state_dir)?;
+    Ok(())
+}
+```
+
+- [ ] **Step 3: Wire into the CLI**
+
+Modify `crates/aenv-cli/src/cmd/fork.rs`:
+
+```rust
+pub fn run_project_detach(project_root: PathBuf) -> aenv_core::Result<()> {
+    aenv_core::activate::fork_project(
+        &aenv_core::fs::RealFilesystem,
+        &project_root,
+    )?;
+    println!("Forked project (detached from namespace management):");
+    println!("  - replaced every symlinked managed file with a regular copy");
+    println!("  - removed .aenv-state/ (state + backups)");
+    println!("  - .aenv pin retained for reference; re-pin to re-activate");
+    Ok(())
+}
+```
+
+Modify `crates/aenv-cli/src/main.rs`'s clap config: the `Fork` variant accepts an *optional* target. Dispatcher:
+
+```rust
+match target {
+    None => cmd::fork::run_project_detach(project_root),
+    Some(t) => {
+        // Try as a project-managed path first (fork <file>); fall back to
+        // namespace creation (fork <name>) only if the path is not managed
+        // *and* not present as a file in the project root.
+        let rel = PathBuf::from(&t);
+        let project_path = project_root.join(&rel);
+        let state_path = project_root.join(".aenv-state/state.json");
+        let is_managed = std::fs::read(&state_path)
+            .ok()
+            .and_then(|b| serde_json::from_slice::<aenv_core::state::ActivationState>(&b).ok())
+            .map(|s| s.managed_files.iter().any(|m| m.path == rel))
+            .unwrap_or(false);
+        if is_managed || project_path.exists() {
+            cmd::fork::run_file(project_root, rel)
+        } else {
+            cmd::fork::run_name(aenv_home, project_root, t)
+        }
+    }
+}
+```
+
+- [ ] **Step 4: Run the tests**
+
+Run: `cargo test -p aenv-core --test fork`
+Expected: 5 PASS (3 from Task 14 + 2 new).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add crates/aenv-core/src/activate.rs crates/aenv-cli/src/cmd/fork.rs \
+        crates/aenv-cli/src/main.rs crates/aenv-core/tests/fork.rs
+git commit -m "Add 'aenv fork' (no-arg) whole-project detach (R-53)
+
+fork_project walks state.managed_files, replaces every Symlink-strategy
+file with a regular copy of its resolved bytes, leaves merged files
+alone, and removes .aenv-state/ entirely so subsequent activations and
+shell-hook auto-activation (Phase 6) skip the project. The .aenv pin
+file is retained for human reference.
+
+Idempotent on a project with no prior activation (returns Ok without
+side-effects).
+
+CLI dispatcher: bare 'aenv fork' -> fork_project; 'aenv fork <target>'
+tries project-managed-file first, falls back to namespace-creation.
 "
 ```
 
@@ -4321,17 +4536,81 @@ files = [".mcp.json"]
 }
 ```
 
+- [ ] **Step 1b: Add a glob-walking test**
+
+Append a second test to verify glob entries get expanded by walking the project tree:
+
+```rust
+#[test]
+fn fork_name_walks_glob_directories_and_copies_every_file() {
+    use aenv_core::namespace::create_namespace_from_project;
+    use aenv_core::adapter::{Adapter, AdapterRegistry};
+    use aenv_core::home::RegistryLayout;
+    use std::path::{Path, PathBuf};
+    mod mfs { include!("mock_filesystem.rs"); }
+    let fs = mfs::MockFilesystem::default();
+
+    // Project has skills under .claude/skills/{a,b}/SKILL.md.
+    fs.write(Path::new("/p/.claude/skills/a/SKILL.md"), b"skill a").unwrap();
+    fs.write(Path::new("/p/.claude/skills/b/SKILL.md"), b"skill b").unwrap();
+    fs.write(Path::new("/p/CLAUDE.md"), b"# proj\n").unwrap();
+
+    // Adapter declares a literal file AND a glob.
+    let cc: Adapter = toml::from_str(r#"
+name = "claude-code"
+files = ["CLAUDE.md", ".claude/skills/**/*"]
+"#).unwrap();
+    let mut adapters = AdapterRegistry::default();
+    adapters.insert(cc);
+
+    let reg = RegistryLayout::new(PathBuf::from("/aenv"));
+    create_namespace_from_project(
+        &fs, &reg, &adapters, "forked", Path::new("/p"),
+    ).unwrap();
+
+    // Both skills made it.
+    assert_eq!(
+        fs.read(Path::new("/aenv/envs/forked/.claude/skills/a/SKILL.md")).unwrap(),
+        b"skill a",
+    );
+    assert_eq!(
+        fs.read(Path::new("/aenv/envs/forked/.claude/skills/b/SKILL.md")).unwrap(),
+        b"skill b",
+    );
+
+    // The new manifest lists the literal paths it found (NOT the glob pattern).
+    let body = fs.read(Path::new("/aenv/envs/forked/aenv.toml")).unwrap();
+    let m: aenv_core::manifest::AenvManifest =
+        toml::from_str(std::str::from_utf8(&body).unwrap()).unwrap();
+    let files = &m.adapters["claude-code"].files;
+    assert!(files.iter().any(|p| p == "CLAUDE.md"));
+    assert!(files.iter().any(|p| p == ".claude/skills/a/SKILL.md"));
+    assert!(files.iter().any(|p| p == ".claude/skills/b/SKILL.md"));
+    // The glob pattern itself does NOT appear — the manifest carries only
+    // resolved literal entries.
+    assert!(!files.iter().any(|p| p.contains('*')));
+}
+```
+
 - [ ] **Step 2: Implement `create_namespace_from_project`**
 
 Append to `crates/aenv-core/src/namespace.rs`:
 
 ```rust
-/// Create a new namespace by gathering every adapter-declared file that
-/// exists at the project root and copying it into the namespace dir.
+/// Create a new namespace by gathering every adapter-managed file at the
+/// project root and copying it into the namespace dir.
 ///
-/// Files that the adapter declares but the project lacks are silently
-/// skipped — this lets a user fork from a partial project without first
-/// creating placeholder files.
+/// For literal entries in `adapter.files`: copy if present, skip if absent.
+///
+/// For glob entries (containing `*`): derive the literal directory prefix
+/// (everything before the first `*` segment), walk the project tree under
+/// that prefix, and copy every regular file encountered. Symlinks are
+/// followed — the bytes captured represent the project's *effective*
+/// harness state at fork time (e.g. a symlink to `~/.aenv/envs/base/...`
+/// is materialized as a regular copy of base's content in the new namespace).
+///
+/// The new manifest carries the *resolved literal paths* it captured, not
+/// the source glob pattern.
 pub fn create_namespace_from_project<F: crate::fs::Filesystem>(
     fs: &F,
     registry: &crate::home::RegistryLayout,
@@ -4350,16 +4629,36 @@ pub fn create_namespace_from_project<F: crate::fs::Filesystem>(
     for (_, adapter) in adapters.iter() {
         let mut files: Vec<String> = Vec::new();
         for rel in &adapter.files {
-            // Skip glob entries in Phase 2 — Phase 4's full glob lands later.
-            if rel.contains('*') { continue; }
-            let proj_path = project_root.join(rel);
-            if fs.exists(&proj_path)? {
-                let bytes = fs.read(&proj_path)?;
-                let dest_path = dest.join(rel);
-                fs.write(&dest_path, &bytes)?;
-                files.push(rel.clone());
+            if rel.contains('*') {
+                // Glob entry: walk the project tree under the literal prefix.
+                let prefix = literal_prefix(rel);
+                let walk_root = project_root.join(prefix);
+                if fs.exists(&walk_root)? {
+                    let mut found: Vec<String> = Vec::new();
+                    walk_project_tree(fs, project_root, &walk_root, &mut found)?;
+                    for f in found {
+                        let proj_path = project_root.join(&f);
+                        // fs.read follows symlinks, capturing the resolved bytes.
+                        let bytes = fs.read(&proj_path)?;
+                        let dest_path = dest.join(&f);
+                        fs.write(&dest_path, &bytes)?;
+                        files.push(f);
+                    }
+                }
+            } else {
+                // Literal entry: copy if present.
+                let proj_path = project_root.join(rel);
+                if fs.exists(&proj_path)? {
+                    let bytes = fs.read(&proj_path)?;
+                    let dest_path = dest.join(rel);
+                    fs.write(&dest_path, &bytes)?;
+                    files.push(rel.clone());
+                }
             }
         }
+        // De-dup and sort for stable manifest output.
+        files.sort();
+        files.dedup();
         if !files.is_empty() {
             manifest_adapters.insert(
                 adapter.name.clone(),
@@ -4375,6 +4674,51 @@ pub fn create_namespace_from_project<F: crate::fs::Filesystem>(
     let body = toml::to_string_pretty(&manifest)
         .map_err(|e| crate::AenvError::ManifestInvalid(e.to_string()))?;
     fs.write(&registry.manifest_path(new_name), body.as_bytes())?;
+    Ok(())
+}
+
+/// Derive the literal directory prefix from a glob pattern.
+/// `".claude/skills/**/*"` -> `".claude/skills"`.
+/// `"foo/*.md"` -> `"foo"`.
+/// `"*"` -> `""` (project root).
+fn literal_prefix(pattern: &str) -> &str {
+    match pattern.find('*') {
+        Some(i) => {
+            // Trim back to the last path separator before the first glob char.
+            let candidate = &pattern[..i];
+            match candidate.rfind('/') {
+                Some(slash) => &pattern[..slash],
+                None => "",
+            }
+        }
+        None => pattern,
+    }
+}
+
+/// Walk the project tree under `walk_root`, pushing project-relative paths
+/// (as `String`s) into `out`. Skips `.aenv-state/` so we never capture
+/// activation state into a forked namespace.
+fn walk_project_tree<F: crate::fs::Filesystem>(
+    fs: &F,
+    project_root: &std::path::Path,
+    walk_root: &std::path::Path,
+    out: &mut Vec<String>,
+) -> Result<(), crate::AenvError> {
+    for entry in fs.list_dir(walk_root)? {
+        // Skip aenv's own state dir.
+        let name = entry.file_name().map(|n| n.to_string_lossy().to_string());
+        if name.as_deref() == Some(".aenv-state") { continue; }
+
+        let meta = fs.metadata(&entry)?;
+        if matches!(meta.kind, crate::fs::FileKind::Directory) {
+            walk_project_tree(fs, project_root, &entry, out)?;
+        } else {
+            // Project-relative form.
+            if let Ok(rel) = entry.strip_prefix(project_root) {
+                out.push(rel.to_string_lossy().to_string());
+            }
+        }
+    }
     Ok(())
 }
 ```
@@ -4410,10 +4754,11 @@ pub fn run_name(
 
 `load_adapter_registry` is a CLI helper added in Task 12's wiring.
 
-- [ ] **Step 4: Run the test**
+- [ ] **Step 4: Run the tests**
 
 Run: `cargo test -p aenv-core --test namespace`
-Expected: prior tests + the new `fork_name_*` test all pass.
+Expected: prior tests + both new `fork_name_*` tests (the literal-paths
+case and the glob-walking case) all pass.
 
 - [ ] **Step 5: Commit**
 
@@ -4422,14 +4767,20 @@ git add crates/aenv-core/src/namespace.rs crates/aenv-cli/src/cmd/fork.rs \
         crates/aenv-core/tests/namespace.rs
 git commit -m "Add 'aenv fork <name>' to create namespace from project
 
-create_namespace_from_project walks the registered adapters, copies
-every project-root file they declare (ones not present at the project
-are skipped), writes a manifest with no extends and only those
-adapters, and (via the CLI handler) updates the .aenv pin to the new
-namespace. The user can then 'aenv activate' to materialize.
+create_namespace_from_project walks the registered adapters. For each
+literal file the adapter declares, it copies bytes (if the file is
+present at the project root). For each glob entry, it derives the
+literal directory prefix and recursively walks the project tree under
+that prefix, capturing every regular file. Symlinks are followed -
+the bytes captured represent the project's effective harness state at
+fork time, so a project with a symlink-managed skill ends up with a
+real copy of the skill in the new namespace.
 
-Glob patterns in adapter file lists are skipped in Phase 2; full
-glob support lands in Phase 4 with the skill lifecycle.
+The new manifest carries the resolved literal paths it captured, not
+the source glob pattern, so subsequent activations are deterministic.
+
+CLI handler then updates the .aenv pin; the user can 'aenv activate'
+to materialize.
 "
 ```
 
@@ -5002,8 +5353,8 @@ Expected: the message rendered.
   - R-47 — deep-merge produces a regular file with recorded contributors. ✓ Tasks 6–8 + 11.
   - R-50 — `aenv status` prints chain + qualified provenance. ✓ Task 16. (Parameters deferred to Phase 3.)
   - R-52 — `aenv which <path>` reports qualified id + shadows. ✓ Task 13.
-  - R-53 — `aenv fork [<file>]` detaches a file. ✓ Task 14. Note: the bare-`aenv fork` whole-project-detach variant is deferred (not in Phase 2 scope).
-  - R-54 — `aenv fork <name>` creates namespace from project. ✓ Task 15. Note: glob-declared files are not copied; full directory walking is deferred to Phase 4 alongside the skill lifecycle.
+  - R-53 — `aenv fork` (no arg, whole-project detach) ✓ Task 14b. `aenv fork <file>` (per-file detach) ✓ Task 14.
+  - R-54 — `aenv fork <name>` creates namespace from project. ✓ Task 15. Glob-declared adapter entries are walked: the implementation derives the literal directory prefix from each pattern (e.g. `.claude/skills/**/*` → `.claude/skills/`) and copies every regular file underneath, following symlinks to capture the project's effective harness state. The new manifest carries resolved literal paths, not the source glob pattern.
 
 - **Placeholder scan:**
   - No "TBD" / "implement later" / "similar to Task N" abbreviations.
@@ -5029,11 +5380,13 @@ Expected: the message rendered.
   - `AdapterRegistry::iter()` yields `(&String, &Adapter)` tuples; destructure as `for (_, adapter) in adapters.iter()`.
   - `MergeError` carries an `impl From<MergeError> for AenvError` so `?` propagation works in `materialize_one`.
 
-- **Open items punted to the implementer or to a later phase:**
-  - `(merged)` synthetic namespace: documented as a Phase 2 convention. Future reservation (rejecting it from `NamespaceId::new` for user input) is deferred — there's no `aenv create` validation in Phase 2 either, so the guard would have one bypass.
+- **Open items punted to a later phase:**
+  - `(merged)` synthetic namespace: *reserved* in Phase 2. `NamespaceId::new("(merged)")` returns `ManifestInvalid` with a clear error message pointing at the conflict; the internal `NamespaceId::merged_synthetic()` is the only legal way to construct it (Task 11's `synthesize_merged_qn` is the only caller in production code).
   - Section-merge doubling of identical content: per-spec; flag for `aenv doctor` in Phase 4.
   - `<!-- aenv:replace -->` on the first namespace in the chain: silent no-op; one-line code comment in `merge_section.rs`.
-  - Windows symlink semantics (Task 14's `fork_file`): Phase 7 territory.
+  - Windows symlink semantics (Task 14's `fork_file`, Task 14b's `fork_project`): Phase 7 territory.
+  - `format_status`'s `→` separator (U+2192): Phase 7 may want an ASCII fallback for Windows consoles without UTF-8 codepage.
+  - `aenv status` re-resolves the chain on every call: divergence between resolved state and on-disk state surfaces only via Phase 5's `aenv diff`. Phase 2's status output trusts the registry at status time.
 
 ---
 
