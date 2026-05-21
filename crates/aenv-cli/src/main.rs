@@ -1,12 +1,10 @@
 //! `aenv` command-line entry point.
 
+use aenv_cli::{cmd, paths};
 use aenv_core::fs::RealFilesystem;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use std::process::ExitCode;
-
-mod cmd;
-mod paths;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -69,6 +67,13 @@ enum Command {
         #[command(subcommand)]
         action: AdapterAction,
     },
+    /// Show which namespace manages a given file path.
+    Which {
+        /// Project-relative path to query.
+        path: PathBuf,
+        #[arg(long)]
+        project: Option<PathBuf>,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -117,6 +122,10 @@ fn main() -> ExitCode {
                 AdapterAction::Add { path } => cmd::adapter::run_add(&fs, &layout, &path),
                 AdapterAction::List => cmd::adapter::run_list(&fs, &layout),
             },
+            Command::Which { path, project } => {
+                let project_root = paths::resolve_project_root(&fs, project)?;
+                cmd::which::run(project_root, path)
+            }
         }
     })();
 

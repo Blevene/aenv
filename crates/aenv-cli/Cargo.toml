@@ -12,6 +12,10 @@ description = "Command-line interface for aenv."
 name = "aenv"
 path = "src/main.rs"
 
+[lib]
+name = "aenv_cli"
+path = "src/lib.rs"
+
 [dependencies]
 aenv-core = { path = "../aenv-core" }
 clap = { workspace = true }
