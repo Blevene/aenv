@@ -5,6 +5,7 @@ use aenv_core::adapter::{Adapter, AdapterRegistry};
 use aenv_core::deactivate::deactivate_namespace;
 use aenv_core::fs::{Filesystem, MockFilesystem};
 use aenv_core::home::RegistryLayout;
+use aenv_core::identity::NamespaceId;
 use aenv_core::namespace::create_namespace;
 use std::path::PathBuf;
 
@@ -48,7 +49,7 @@ fn deactivate_removes_symlink_and_state() {
         &layout,
         &registry_with_claude(),
         &project,
-        "experiments",
+        &NamespaceId::new("experiments").unwrap(),
     )
     .unwrap();
 
@@ -71,7 +72,7 @@ fn deactivate_restores_backed_up_originals() {
         &layout,
         &registry_with_claude(),
         &project,
-        "experiments",
+        &NamespaceId::new("experiments").unwrap(),
     )
     .unwrap();
 
@@ -95,7 +96,7 @@ fn deactivate_leaves_unmanaged_files_alone() {
         &layout,
         &registry_with_claude(),
         &project,
-        "experiments",
+        &NamespaceId::new("experiments").unwrap(),
     )
     .unwrap();
 
@@ -138,7 +139,7 @@ fn deactivate_leaves_identical_file_in_place() {
         &layout,
         &registry_with_claude(),
         &project,
-        "experiments",
+        &NamespaceId::new("experiments").unwrap(),
     )
     .unwrap();
 

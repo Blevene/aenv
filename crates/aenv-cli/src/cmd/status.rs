@@ -11,6 +11,8 @@ fn strategy_label(s: MaterializeStrategy) -> &'static str {
         MaterializeStrategy::Copy => "copy",
         MaterializeStrategy::Identical => "identical",
         MaterializeStrategy::Merged => "merged",
+        MaterializeStrategy::SectionMerge => "section-merge",
+        MaterializeStrategy::DeepMerge(_) => "deep-merge",
     }
 }
 

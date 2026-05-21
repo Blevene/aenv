@@ -6,6 +6,7 @@ use aenv_core::activate::activate_namespace;
 use aenv_core::adapter::AdapterRegistry;
 use aenv_core::fs::Filesystem;
 use aenv_core::home::RegistryLayout;
+use aenv_core::identity::NamespaceId;
 use aenv_core::project::read_pin;
 use aenv_core::Result;
 use std::path::Path;
@@ -20,8 +21,10 @@ pub fn run<F: Filesystem>(
         Some(n) => n.to_string(),
         None => read_pin(fs, project_root)?,
     };
+    let leaf = NamespaceId::new(name.clone())
+        .map_err(|e| aenv_core::AenvError::ManifestInvalid(format!("namespace id: {e}")))?;
     let adapters = AdapterRegistry::load_from_dir(fs, &layout.adapters_dir())?;
-    let state = activate_namespace(fs, layout, &adapters, project_root, &name)?;
+    let state = activate_namespace(fs, layout, &adapters, project_root, &leaf)?;
     println!("Activated '{}' in {}", name, project_root.display());
     for file in &state.managed_files {
         println!("  + {} ({:?})", file.path.display(), file.strategy);

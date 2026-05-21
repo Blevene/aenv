@@ -7,6 +7,7 @@ use aenv_core::activate::activate_namespace;
 use aenv_core::adapter::{Adapter, AdapterRegistry};
 use aenv_core::fs::{Filesystem, MockFilesystem};
 use aenv_core::home::RegistryLayout;
+use aenv_core::identity::NamespaceId;
 use aenv_core::namespace::create_namespace;
 use aenv_core::state::{ActivationState, MaterializeStrategy};
 use std::path::PathBuf;
@@ -57,7 +58,7 @@ fn symlinks_new_file_into_project() {
         &layout,
         &registry_with_claude(),
         &project,
-        "experiments",
+        &NamespaceId::new("experiments").unwrap(),
     )
     .unwrap();
 
@@ -90,7 +91,7 @@ fn errors_when_namespace_does_not_exist() {
     let layout = layout();
     let project = PathBuf::from("/projects/p");
     fs.create_dir_all(&project).unwrap();
-    let err = activate_namespace(&fs, &layout, &registry_with_claude(), &project, "missing")
+    let err = activate_namespace(&fs, &layout, &registry_with_claude(), &project, &NamespaceId::new("missing").unwrap())
         .expect_err("must error");
     assert!(matches!(err, aenv_core::AenvError::NamespaceNotFound(_)));
     assert_eq!(err.exit_code(), 10);
@@ -113,7 +114,7 @@ fn errors_when_manifest_names_unknown_adapter() {
         &layout,
         &registry_with_claude(),
         &project,
-        "experiments",
+        &NamespaceId::new("experiments").unwrap(),
     )
     .expect_err("must error");
     assert!(matches!(err, aenv_core::AenvError::AdapterMissing(_)));
@@ -135,7 +136,7 @@ fn missing_adapter_file_is_skipped_silently() {
         &layout,
         &registry_with_claude(),
         &project,
-        "experiments",
+        &NamespaceId::new("experiments").unwrap(),
     )
     .unwrap();
     assert!(state.managed_files.is_empty());
@@ -160,7 +161,7 @@ fn backs_up_displaced_project_file() {
         &layout,
         &registry_with_claude(),
         &project,
-        "experiments",
+        &NamespaceId::new("experiments").unwrap(),
     )
     .unwrap();
 
@@ -189,7 +190,7 @@ fn byte_identical_file_is_managed_in_place_not_symlinked() {
         &layout,
         &registry_with_claude(),
         &project,
-        "experiments",
+        &NamespaceId::new("experiments").unwrap(),
     )
     .unwrap();
 
@@ -224,7 +225,7 @@ fn aenv_managed_symlink_pointing_at_same_target_is_left_alone() {
         &layout,
         &registry_with_claude(),
         &project,
-        "experiments",
+        &NamespaceId::new("experiments").unwrap(),
     )
     .unwrap();
 
@@ -257,7 +258,7 @@ fn stale_symlink_to_other_target_is_displaced() {
         &layout,
         &registry_with_claude(),
         &project,
-        "experiments",
+        &NamespaceId::new("experiments").unwrap(),
     )
     .unwrap();
 
@@ -293,7 +294,7 @@ fn rolls_back_when_state_write_fails_after_displacement() {
         &layout,
         &registry_with_claude(),
         &project,
-        "experiments",
+        &NamespaceId::new("experiments").unwrap(),
     )
     .expect_err("must error");
     assert!(matches!(

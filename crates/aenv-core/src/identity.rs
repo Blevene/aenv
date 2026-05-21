@@ -159,8 +159,16 @@ impl FromStr for QualifiedName {
         let (idx, _) = occurrences[0];
         let ns = &s[..idx];
         let short = &s[idx + SEPARATOR.len()..];
+        // Allow the reserved synthetic namespace through deserialization so
+        // that state.json files written with `(merged)::path` qualified names
+        // can be round-tripped back from disk.
+        let namespace = if ns == NamespaceId::RESERVED_MERGED {
+            NamespaceId::merged_synthetic()
+        } else {
+            NamespaceId::new(ns)?
+        };
         Ok(Self {
-            namespace: NamespaceId::new(ns)?,
+            namespace,
             short: ShortName::new(short)?,
         })
     }
