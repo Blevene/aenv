@@ -25,10 +25,11 @@ pub fn merge_yaml(inputs: &[Vec<u8>]) -> Result<Vec<u8>, MergeError> {
     }
     let mut acc: Option<JsonValue> = None;
     for bytes in inputs {
-        let yv: serde_yaml::Value = serde_yaml::from_slice(bytes).map_err(|e| MergeError::Parse {
-            kind: "yaml",
-            detail: e.to_string(),
-        })?;
+        let yv: serde_yaml::Value =
+            serde_yaml::from_slice(bytes).map_err(|e| MergeError::Parse {
+                kind: "yaml",
+                detail: e.to_string(),
+            })?;
         let jv: JsonValue = serde_json::to_value(&yv).map_err(|e| MergeError::Parse {
             kind: "yaml",
             detail: format!("yaml -> json conversion failed: {e}"),

@@ -71,8 +71,11 @@ pub(super) fn materialize_symlink<F: Filesystem>(
         super::ProjectPathState::Displaced => {
             // Refuse to clobber an existing backup file at the target.
             if fs.exists(backup_root)? {
-                let backup_for_file =
-                    backup_root.join(project_path.strip_prefix(project_root).unwrap_or(project_path));
+                let backup_for_file = backup_root.join(
+                    project_path
+                        .strip_prefix(project_root)
+                        .unwrap_or(project_path),
+                );
                 if fs.exists(&backup_for_file)? {
                     return Err(AenvError::ActivationConflict(format!(
                         "backup path already exists: {}",
@@ -80,8 +83,11 @@ pub(super) fn materialize_symlink<F: Filesystem>(
                     )));
                 }
             }
-            let backup_path =
-                backup_root.join(project_path.strip_prefix(project_root).unwrap_or(project_path));
+            let backup_path = backup_root.join(
+                project_path
+                    .strip_prefix(project_root)
+                    .unwrap_or(project_path),
+            );
             if let Some(parent) = backup_path.parent() {
                 fs.create_dir_all(parent)?;
             }

@@ -157,7 +157,10 @@ fn parse(input: &str) -> ParsedInput {
         }
     }
 
-    let preamble_end = headings.first().map(|(_, r)| r.start).unwrap_or(input.len());
+    let preamble_end = headings
+        .first()
+        .map(|(_, r)| r.start)
+        .unwrap_or(input.len());
     let preamble = input[..preamble_end].to_string();
     let mut sections = Vec::with_capacity(headings.len());
     for (i, (key, range)) in headings.iter().enumerate() {

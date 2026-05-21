@@ -37,7 +37,11 @@ pub fn format_status(state: &ActivationState, chain: &[NamespaceId]) -> String {
         out.push('\n');
         out.push_str("Backed-up originals:\n");
         for b in &state.backed_up {
-            out.push_str(&format!("  {} -> {}\n", b.original_path.display(), b.backup_path.display()));
+            out.push_str(&format!(
+                "  {} -> {}\n",
+                b.original_path.display(),
+                b.backup_path.display()
+            ));
         }
     }
     out
@@ -69,17 +73,17 @@ fn describe(mf: &ManagedFile) -> String {
                 DeepMergeFormat::Yaml => "yaml",
                 DeepMergeFormat::Toml => "toml",
             };
-            format!("merged (deep-merge {}) from {}", fmt_name, parts.join(" + "))
+            format!(
+                "merged (deep-merge {}) from {}",
+                fmt_name,
+                parts.join(" + ")
+            )
         }
         MaterializeStrategy::Merged => format!("merged (Phase 1 legacy) {}", mf.qualified_name),
     }
 }
 
-pub fn run<F: Filesystem>(
-    fs: &F,
-    project_root: &Path,
-    aenv_home: &Path,
-) -> Result<()> {
+pub fn run<F: Filesystem>(fs: &F, project_root: &Path, aenv_home: &Path) -> Result<()> {
     let state_path = project_root.join(".aenv-state/state.json");
     if !fs.exists(&state_path)? {
         println!("No active namespace in {}", project_root.display());
@@ -92,10 +96,8 @@ pub fn run<F: Filesystem>(
 
     // Re-resolve the chain
     let registry = aenv_core::home::RegistryLayout::new(aenv_home.to_path_buf());
-    let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
-        fs,
-        &registry.adapters_dir(),
-    )?;
+    let adapters =
+        aenv_core::adapter::AdapterRegistry::load_from_dir(fs, &registry.adapters_dir())?;
     let leaf = NamespaceId::new(state.active_namespace.as_str())?;
     let resolution = aenv_core::resolve::resolve_namespace(fs, &registry, &adapters, &leaf)?;
 

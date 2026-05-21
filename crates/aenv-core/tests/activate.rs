@@ -91,8 +91,14 @@ fn errors_when_namespace_does_not_exist() {
     let layout = layout();
     let project = PathBuf::from("/projects/p");
     fs.create_dir_all(&project).unwrap();
-    let err = activate_namespace(&fs, &layout, &registry_with_claude(), &project, &NamespaceId::new("missing").unwrap())
-        .expect_err("must error");
+    let err = activate_namespace(
+        &fs,
+        &layout,
+        &registry_with_claude(),
+        &project,
+        &NamespaceId::new("missing").unwrap(),
+    )
+    .expect_err("must error");
     assert!(matches!(err, aenv_core::AenvError::NamespaceNotFound(_)));
     assert_eq!(err.exit_code(), 10);
 }

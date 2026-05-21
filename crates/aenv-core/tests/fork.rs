@@ -75,10 +75,9 @@ fn forking_a_symlink_replaces_it_with_a_regular_file_with_same_bytes() {
 
     let state_json_str = format!("{PROJ}/.aenv-state/state.json");
     let state_body = fs.read(Path::new(&state_json_str)).unwrap();
-    let state: ActivationState = aenv_core::state::ActivationState::from_json(
-        std::str::from_utf8(&state_body).unwrap(),
-    )
-    .unwrap();
+    let state: ActivationState =
+        aenv_core::state::ActivationState::from_json(std::str::from_utf8(&state_body).unwrap())
+            .unwrap();
     assert!(state
         .managed_files
         .iter()

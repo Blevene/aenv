@@ -55,10 +55,7 @@ pub fn install_builtins<F: Filesystem>(fs: &F, adapters_dir: &Path) -> Result<()
 
 /// Write every built-in adapter to the registry's adapters dir if not already
 /// present. Existing files are left untouched so user edits stick.
-pub fn ensure_written<F: Filesystem>(
-    fs: &F,
-    adapters_dir: &Path,
-) -> Result<()> {
+pub fn ensure_written<F: Filesystem>(fs: &F, adapters_dir: &Path) -> Result<()> {
     fs.create_dir_all(adapters_dir)?;
     for (name, body) in ALL {
         let path = adapters_dir.join(format!("{name}.toml"));

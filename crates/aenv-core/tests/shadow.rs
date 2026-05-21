@@ -47,7 +47,10 @@ fn symlink_path_with_two_candidates_yields_one_shadow() {
     ];
     let strategy = MaterializeStrategy::Symlink;
     let shadows = compute_shadows(&candidates, strategy, &cc_with_instructions()).unwrap();
-    assert_eq!(shadows, vec![qn("base", ".claude/skills/write-tests/SKILL.md")]);
+    assert_eq!(
+        shadows,
+        vec![qn("base", ".claude/skills/write-tests/SKILL.md")]
+    );
 }
 
 #[test]
@@ -57,8 +60,12 @@ fn three_deep_chain_yields_two_shadows_in_root_to_near_order() {
         cand("b", "X", "claude-code"),
         cand("c", "X", "claude-code"),
     ];
-    let shadows =
-        compute_shadows(&candidates, MaterializeStrategy::Symlink, &cc_with_instructions()).unwrap();
+    let shadows = compute_shadows(
+        &candidates,
+        MaterializeStrategy::Symlink,
+        &cc_with_instructions(),
+    )
+    .unwrap();
     assert_eq!(shadows.len(), 2);
     assert_eq!(shadows[0].namespace().as_str(), "a");
     assert_eq!(shadows[1].namespace().as_str(), "b");

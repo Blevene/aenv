@@ -149,11 +149,9 @@ fn main() -> ExitCode {
                         let is_managed = std::fs::read(&state_path)
                             .ok()
                             .and_then(|b| {
-                                String::from_utf8(b)
-                                    .ok()
-                                    .and_then(|s| {
-                                        aenv_core::state::ActivationState::from_json(&s).ok()
-                                    })
+                                String::from_utf8(b).ok().and_then(|s| {
+                                    aenv_core::state::ActivationState::from_json(&s).ok()
+                                })
                             })
                             .map(|state| state.managed_files.iter().any(|m| m.path == rel))
                             .unwrap_or(false);

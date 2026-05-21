@@ -112,8 +112,14 @@ fn yaml_nested_objects_merge_recursively() {
     let b = b"servers:\n  b:\n    cmd: cmd-b\n";
     let out = merge_yaml(&[a.to_vec(), b.to_vec()]).unwrap();
     let v: serde_yaml::Value = serde_yaml::from_slice(&out).unwrap();
-    assert_eq!(v["servers"]["a"]["cmd"], serde_yaml::Value::String("cmd-a".into()));
-    assert_eq!(v["servers"]["b"]["cmd"], serde_yaml::Value::String("cmd-b".into()));
+    assert_eq!(
+        v["servers"]["a"]["cmd"],
+        serde_yaml::Value::String("cmd-a".into())
+    );
+    assert_eq!(
+        v["servers"]["b"]["cmd"],
+        serde_yaml::Value::String("cmd-b".into())
+    );
 }
 
 #[test]

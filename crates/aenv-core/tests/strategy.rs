@@ -48,8 +48,11 @@ fn registry() -> AdapterRegistry {
 
 #[test]
 fn single_candidate_is_symlink() {
-    let strat = decide_strategy(&[cand("base", "CLAUDE.md", "claude-code", None)], &registry())
-        .unwrap();
+    let strat = decide_strategy(
+        &[cand("base", "CLAUDE.md", "claude-code", None)],
+        &registry(),
+    )
+    .unwrap();
     assert!(matches!(strat, MaterializeStrategy::Symlink));
 }
 
@@ -80,7 +83,10 @@ fn default_merge_deep_picks_deepjson_for_dot_mcp_json() {
         cand("leaf", ".mcp.json", "mcp", None),
     ];
     let strat = decide_strategy(&candidates, &registry()).unwrap();
-    assert!(matches!(strat, MaterializeStrategy::DeepMerge(DeepMergeFormat::Json)));
+    assert!(matches!(
+        strat,
+        MaterializeStrategy::DeepMerge(DeepMergeFormat::Json)
+    ));
 }
 
 #[test]
@@ -92,7 +98,10 @@ fn deep_override_on_yaml_picks_yaml_format() {
     let mut reg = registry();
     reg.insert(toml::from_str(r#"name = "aider""#).unwrap());
     let strat = decide_strategy(&candidates, &reg).unwrap();
-    assert!(matches!(strat, MaterializeStrategy::DeepMerge(DeepMergeFormat::Yaml)));
+    assert!(matches!(
+        strat,
+        MaterializeStrategy::DeepMerge(DeepMergeFormat::Yaml)
+    ));
 }
 
 #[test]
@@ -104,7 +113,10 @@ fn deep_override_on_toml_picks_toml_format() {
     let mut reg = AdapterRegistry::default();
     reg.insert(toml::from_str(r#"name = "x""#).unwrap());
     let strat = decide_strategy(&candidates, &reg).unwrap();
-    assert!(matches!(strat, MaterializeStrategy::DeepMerge(DeepMergeFormat::Toml)));
+    assert!(matches!(
+        strat,
+        MaterializeStrategy::DeepMerge(DeepMergeFormat::Toml)
+    ));
 }
 
 #[test]
@@ -126,11 +138,13 @@ fn two_candidates_no_role_no_override_fall_back_to_last_wins() {
         cand("leaf", ".cursorrules", "cursor", None),
     ];
     let mut reg = registry();
-    reg.insert(toml::from_str(
-        r#"name = "cursor"
+    reg.insert(
+        toml::from_str(
+            r#"name = "cursor"
 files = [".cursorrules"]"#,
-    )
-    .unwrap());
+        )
+        .unwrap(),
+    );
     let strat = decide_strategy(&candidates, &reg).unwrap();
     assert!(matches!(strat, MaterializeStrategy::Symlink));
 }

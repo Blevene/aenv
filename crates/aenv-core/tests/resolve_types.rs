@@ -37,7 +37,10 @@ fn artifact_carries_qualified_name_and_strategy() {
         shadows: vec![qn("base", "write-tests")],
         contributors: vec![],
     };
-    assert_eq!(art.qualified_name.namespace().as_str(), "detailed-execution");
+    assert_eq!(
+        art.qualified_name.namespace().as_str(),
+        "detailed-execution"
+    );
     assert!(matches!(art.strategy, MaterializeStrategy::Symlink));
     assert_eq!(art.shadows.len(), 1);
 }

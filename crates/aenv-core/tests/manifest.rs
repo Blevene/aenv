@@ -110,7 +110,10 @@ merge = { ".mcp.json" = "deep" }
 "#;
     let m: aenv_core::manifest::AenvManifest = toml::from_str(toml).unwrap();
     let entry = m.adapters.get("claude-code").unwrap();
-    assert_eq!(entry.merge.as_ref().unwrap().get(".mcp.json").unwrap(), "deep");
+    assert_eq!(
+        entry.merge.as_ref().unwrap().get(".mcp.json").unwrap(),
+        "deep"
+    );
 }
 
 #[test]

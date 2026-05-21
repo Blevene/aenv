@@ -326,8 +326,7 @@ pub fn fork_file<F: Filesystem>(
     let state_path = project_root.join(".aenv-state/state.json");
     let body = fs.read(&state_path)?;
     let mut state = crate::state::ActivationState::from_json(
-        std::str::from_utf8(&body)
-            .map_err(|e| AenvError::ActivationConflict(e.to_string()))?,
+        std::str::from_utf8(&body).map_err(|e| AenvError::ActivationConflict(e.to_string()))?,
     )?;
     let pos = state
         .managed_files
@@ -369,18 +368,14 @@ pub fn fork_file<F: Filesystem>(
 ///
 /// Idempotent: a project with no state file returns `Ok(())` without
 /// touching anything.
-pub fn fork_project<F: Filesystem>(
-    fs: &F,
-    project_root: &Path,
-) -> crate::error::Result<()> {
+pub fn fork_project<F: Filesystem>(fs: &F, project_root: &Path) -> crate::error::Result<()> {
     let state_path = project_root.join(".aenv-state/state.json");
     if !fs.exists(&state_path)? {
         return Ok(());
     }
     let body = fs.read(&state_path)?;
     let state = crate::state::ActivationState::from_json(
-        std::str::from_utf8(&body)
-            .map_err(|e| AenvError::ActivationConflict(e.to_string()))?,
+        std::str::from_utf8(&body).map_err(|e| AenvError::ActivationConflict(e.to_string()))?,
     )?;
 
     for mf in &state.managed_files {

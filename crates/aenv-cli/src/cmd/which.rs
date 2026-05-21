@@ -22,7 +22,10 @@ pub fn format_which(state: &ActivationState, query: &Path) -> Result<String, Str
     let mut out = String::new();
     out.push_str(&format!("Qualified name:  {}\n", mf.qualified_name));
     out.push_str(&format!("Materialized at: ./{}\n", query.display()));
-    out.push_str(&format!("Strategy:        {}\n", render_strategy(mf.strategy)));
+    out.push_str(&format!(
+        "Strategy:        {}\n",
+        render_strategy(mf.strategy)
+    ));
     if !mf.contributors.is_empty() {
         out.push_str("Contributors:    ");
         for (i, q) in mf.contributors.iter().enumerate() {
@@ -43,9 +46,7 @@ pub fn format_which(state: &ActivationState, query: &Path) -> Result<String, Str
         }
         out.push('\n');
     } else if mf.contributors.is_empty() {
-        out.push_str(
-            "Shadows:         (nothing — no parent namespace defines this artifact)\n",
-        );
+        out.push_str("Shadows:         (nothing — no parent namespace defines this artifact)\n");
     }
     Ok(out)
 }
@@ -76,8 +77,7 @@ pub fn run(project_root: PathBuf, query: PathBuf) -> aenv_core::Result<()> {
     let text = String::from_utf8(body)
         .map_err(|e| aenv_core::AenvError::ManifestInvalid(format!("state.json: {e}")))?;
     let state = ActivationState::from_json(&text)?;
-    let out =
-        format_which(&state, &query).map_err(aenv_core::AenvError::ActivationConflict)?;
+    let out = format_which(&state, &query).map_err(aenv_core::AenvError::ActivationConflict)?;
     print!("{out}");
     Ok(())
 }

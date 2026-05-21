@@ -123,10 +123,7 @@ pub fn create_namespace_from_project<F: Filesystem>(
         if !files.is_empty() {
             manifest_adapters.insert(
                 adapter.name.clone(),
-                crate::manifest::AdapterEntry {
-                    files,
-                    merge: None,
-                },
+                crate::manifest::AdapterEntry { files, merge: None },
             );
         }
     }
@@ -135,8 +132,8 @@ pub fn create_namespace_from_project<F: Filesystem>(
         extends: vec![],
         adapters: manifest_adapters,
     };
-    let body = toml::to_string_pretty(&manifest)
-        .map_err(|e| AenvError::ManifestInvalid(e.to_string()))?;
+    let body =
+        toml::to_string_pretty(&manifest).map_err(|e| AenvError::ManifestInvalid(e.to_string()))?;
     fs.write(&registry.manifest_path(new_name), body.as_bytes())?;
     Ok(())
 }

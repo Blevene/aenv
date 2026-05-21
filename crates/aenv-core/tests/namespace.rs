@@ -91,13 +91,14 @@ fn delete_rejects_unknown_namespace() {
 
 #[test]
 fn fork_name_copies_managed_files_from_project_and_writes_manifest() {
-    use aenv_core::namespace::create_namespace_from_project;
     use aenv_core::adapter::{Adapter, AdapterRegistry};
+    use aenv_core::namespace::create_namespace_from_project;
     use std::path::Path;
 
     let fs = MockFilesystem::new();
 
-    fs.write(Path::new("/p/CLAUDE.md"), b"# project version\n").unwrap();
+    fs.write(Path::new("/p/CLAUDE.md"), b"# project version\n")
+        .unwrap();
     fs.write(Path::new("/p/.mcp.json"), b"{}").unwrap();
 
     let cc: Adapter = toml::from_str("name = \"claude-code\"\nfiles = [\"CLAUDE.md\"]\n").unwrap();
@@ -107,9 +108,7 @@ fn fork_name_copies_managed_files_from_project_and_writes_manifest() {
     adapters.insert(mcp);
 
     let reg = RegistryLayout::new(PathBuf::from("/aenv"));
-    create_namespace_from_project(
-        &fs, &reg, &adapters, "new-env", Path::new("/p"),
-    ).unwrap();
+    create_namespace_from_project(&fs, &reg, &adapters, "new-env", Path::new("/p")).unwrap();
 
     let manifest_bytes = fs.read(Path::new("/aenv/envs/new-env/aenv.toml")).unwrap();
     let m: aenv_core::manifest::AenvManifest =
@@ -126,32 +125,35 @@ fn fork_name_copies_managed_files_from_project_and_writes_manifest() {
 
 #[test]
 fn fork_name_walks_glob_directories_and_copies_every_file() {
-    use aenv_core::namespace::create_namespace_from_project;
     use aenv_core::adapter::{Adapter, AdapterRegistry};
+    use aenv_core::namespace::create_namespace_from_project;
     use std::path::Path;
 
     let fs = MockFilesystem::new();
-    fs.write(Path::new("/p/.claude/skills/a/SKILL.md"), b"skill a").unwrap();
-    fs.write(Path::new("/p/.claude/skills/b/SKILL.md"), b"skill b").unwrap();
+    fs.write(Path::new("/p/.claude/skills/a/SKILL.md"), b"skill a")
+        .unwrap();
+    fs.write(Path::new("/p/.claude/skills/b/SKILL.md"), b"skill b")
+        .unwrap();
     fs.write(Path::new("/p/CLAUDE.md"), b"# proj\n").unwrap();
 
     let cc: Adapter = toml::from_str(
-        "name = \"claude-code\"\nfiles = [\"CLAUDE.md\", \".claude/skills/**/*\"]\n"
-    ).unwrap();
+        "name = \"claude-code\"\nfiles = [\"CLAUDE.md\", \".claude/skills/**/*\"]\n",
+    )
+    .unwrap();
     let mut adapters = AdapterRegistry::default();
     adapters.insert(cc);
 
     let reg = RegistryLayout::new(PathBuf::from("/aenv"));
-    create_namespace_from_project(
-        &fs, &reg, &adapters, "forked", Path::new("/p"),
-    ).unwrap();
+    create_namespace_from_project(&fs, &reg, &adapters, "forked", Path::new("/p")).unwrap();
 
     assert_eq!(
-        fs.read(Path::new("/aenv/envs/forked/.claude/skills/a/SKILL.md")).unwrap(),
+        fs.read(Path::new("/aenv/envs/forked/.claude/skills/a/SKILL.md"))
+            .unwrap(),
         b"skill a",
     );
     assert_eq!(
-        fs.read(Path::new("/aenv/envs/forked/.claude/skills/b/SKILL.md")).unwrap(),
+        fs.read(Path::new("/aenv/envs/forked/.claude/skills/b/SKILL.md"))
+            .unwrap(),
         b"skill b",
     );
 

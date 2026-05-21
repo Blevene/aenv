@@ -83,8 +83,16 @@ fn composition_happy_path_two_namespace_chain_section_merges_claude_md() {
     let home = h.aenv_home();
 
     // Populate namespace files.
-    write_file(&home.join("envs/base"), "CLAUDE.md", b"# Build & Test\n\ncargo test\n");
-    write_file(&home.join("envs/leaf"), "CLAUDE.md", b"# Disposition\n\nbe terse\n");
+    write_file(
+        &home.join("envs/base"),
+        "CLAUDE.md",
+        b"# Build & Test\n\ncargo test\n",
+    );
+    write_file(
+        &home.join("envs/leaf"),
+        "CLAUDE.md",
+        b"# Disposition\n\nbe terse\n",
+    );
 
     // Write manifests. Both namespaces declare claude-code adapter for CLAUDE.md.
     // The claude-code built-in adapter marks CLAUDE.md role = "instructions" which
@@ -128,9 +136,15 @@ fn composition_happy_path_two_namespace_chain_section_merges_claude_md() {
     );
 
     let body = std::fs::read_to_string(&claude).unwrap();
-    assert!(body.contains("# Build & Test"), "missing base section heading");
+    assert!(
+        body.contains("# Build & Test"),
+        "missing base section heading"
+    );
     assert!(body.contains("cargo test"), "missing base content");
-    assert!(body.contains("# Disposition"), "missing leaf section heading");
+    assert!(
+        body.contains("# Disposition"),
+        "missing leaf section heading"
+    );
     assert!(body.contains("be terse"), "missing leaf content");
 
     // `which CLAUDE.md` should report section-merge and both contributors.
@@ -142,9 +156,18 @@ fn composition_happy_path_two_namespace_chain_section_merges_claude_md() {
         .unwrap();
     assert_success(&out, "which CLAUDE.md");
     let ws = stdout(&out);
-    assert!(ws.contains("section-merge"), "which: expected strategy 'section-merge'");
-    assert!(ws.contains("base::CLAUDE.md"), "which: missing base contributor");
-    assert!(ws.contains("leaf::CLAUDE.md"), "which: missing leaf contributor");
+    assert!(
+        ws.contains("section-merge"),
+        "which: expected strategy 'section-merge'"
+    );
+    assert!(
+        ws.contains("base::CLAUDE.md"),
+        "which: missing base contributor"
+    );
+    assert!(
+        ws.contains("leaf::CLAUDE.md"),
+        "which: missing leaf contributor"
+    );
 
     // `status` must show the resolution chain and describe the merge.
     let out = h
@@ -245,9 +268,15 @@ fn shadowed_skill_resolves_to_leaf_and_records_shadow() {
         .unwrap();
     assert_success(&out, "which skill");
     let ws = stdout(&out);
-    assert!(ws.contains("leaf::"), "which: should mention leaf namespace");
+    assert!(
+        ws.contains("leaf::"),
+        "which: should mention leaf namespace"
+    );
     assert!(ws.contains("Shadows:"), "which: should report a shadow");
-    assert!(ws.contains("base::"), "which: should mention base as shadowed");
+    assert!(
+        ws.contains("base::"),
+        "which: should mention base as shadowed"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -310,7 +339,10 @@ fn forking_a_managed_file_replaces_symlink_with_copy_and_drops_state() {
         "fork should replace symlink with a regular file"
     );
     let body = std::fs::read_to_string(&claude).unwrap();
-    assert_eq!(body, "# base\n", "forked file should contain original bytes");
+    assert_eq!(
+        body, "# base\n",
+        "forked file should contain original bytes"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -355,10 +387,7 @@ fn extends_cycle_is_rejected_with_exit_15() {
         .arg(h.project())
         .output()
         .unwrap();
-    assert!(
-        !out.status.success(),
-        "activation with a cycle should fail"
-    );
+    assert!(!out.status.success(), "activation with a cycle should fail");
     assert_eq!(
         out.status.code(),
         Some(15),

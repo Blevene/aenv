@@ -219,12 +219,11 @@ fn walk<F: Filesystem>(
     visiting.push(current.clone());
     let manifest = load_manifest(fs, registry, current)?;
     for parent in &manifest.extends {
-        let parent_id = NamespaceId::new(parent.clone()).map_err(|e| {
-            ResolutionError::ManifestInvalid {
+        let parent_id =
+            NamespaceId::new(parent.clone()).map_err(|e| ResolutionError::ManifestInvalid {
                 namespace: current.clone(),
                 reason: e.to_string(),
-            }
-        })?;
+            })?;
         walk(fs, registry, &parent_id, chain, visiting, visited)?;
     }
     visiting.pop();
@@ -239,10 +238,15 @@ fn load_manifest<F: Filesystem>(
     ns: &NamespaceId,
 ) -> Result<AenvManifest, ResolutionError> {
     let path = registry.manifest_path(ns.as_str());
-    if !fs.exists(&path).map_err(|e| ResolutionError::Io(e.to_string()))? {
+    if !fs
+        .exists(&path)
+        .map_err(|e| ResolutionError::Io(e.to_string()))?
+    {
         return Err(ResolutionError::NamespaceNotFound(ns.clone()));
     }
-    let bytes = fs.read(&path).map_err(|e| ResolutionError::Io(e.to_string()))?;
+    let bytes = fs
+        .read(&path)
+        .map_err(|e| ResolutionError::Io(e.to_string()))?;
     let text = String::from_utf8(bytes).map_err(|e| ResolutionError::ManifestInvalid {
         namespace: ns.clone(),
         reason: format!("manifest is not valid UTF-8: {e}"),
@@ -293,7 +297,10 @@ fn gather_candidates<F: Filesystem>(
                     });
             } else {
                 let source = ns_root.join(rel);
-                if !fs.exists(&source).map_err(|e| ResolutionError::Io(e.to_string()))? {
+                if !fs
+                    .exists(&source)
+                    .map_err(|e| ResolutionError::Io(e.to_string()))?
+                {
                     continue;
                 }
                 out.push(Candidate {

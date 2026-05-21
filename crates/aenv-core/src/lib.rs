@@ -10,7 +10,6 @@
 
 pub mod activate;
 pub mod adapter;
-pub mod merge;
 pub mod adapters_builtin;
 pub mod atomicity;
 pub mod deactivate;
@@ -19,6 +18,7 @@ pub mod fs;
 pub mod home;
 pub mod identity;
 pub mod manifest;
+pub mod merge;
 pub mod namespace;
 pub mod project;
 pub mod resolve;

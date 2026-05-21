@@ -185,6 +185,7 @@ impl Serialize for QualifiedName {
 impl<'de> Deserialize<'de> for QualifiedName {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         let raw = String::deserialize(d)?;
-        raw.parse::<QualifiedName>().map_err(serde::de::Error::custom)
+        raw.parse::<QualifiedName>()
+            .map_err(serde::de::Error::custom)
     }
 }

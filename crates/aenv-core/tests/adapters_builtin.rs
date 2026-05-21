@@ -9,17 +9,14 @@ use std::path::Path;
 fn all_seven_adapters_parse_cleanly() {
     assert_eq!(ALL.len(), 7);
     for (name, body) in ALL {
-        let parsed: Adapter = toml::from_str(body)
-            .unwrap_or_else(|e| panic!("adapter {name} failed to parse: {e}"));
+        let parsed: Adapter =
+            toml::from_str(body).unwrap_or_else(|e| panic!("adapter {name} failed to parse: {e}"));
         assert_eq!(
             parsed.name, *name,
             "adapter file {name} declares name = {:?}",
             parsed.name
         );
-        assert!(
-            !parsed.files.is_empty(),
-            "adapter {name} declares no files"
-        );
+        assert!(!parsed.files.is_empty(), "adapter {name} declares no files");
     }
 }
 

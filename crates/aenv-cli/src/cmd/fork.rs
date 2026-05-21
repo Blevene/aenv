@@ -9,11 +9,7 @@ use std::path::PathBuf;
 /// files on disk; forking them leaves the file untouched but stops aenv
 /// from regenerating them on subsequent activations.
 pub fn run_file(project_root: PathBuf, rel: PathBuf) -> aenv_core::Result<()> {
-    aenv_core::activate::fork_file(
-        &aenv_core::fs::RealFilesystem,
-        &project_root,
-        &rel,
-    )?;
+    aenv_core::activate::fork_file(&aenv_core::fs::RealFilesystem, &project_root, &rel)?;
     println!("Forked {}:", rel.display());
     println!("  - replaced symlink with a copy at ./{}", rel.display());
     println!("  - removed from namespace management for this project");
@@ -27,10 +23,7 @@ pub fn run_file(project_root: PathBuf, rel: PathBuf) -> aenv_core::Result<()> {
 /// `.aenv-state/` so subsequent activations skip the project. The `.aenv`
 /// pin is retained for human reference.
 pub fn run_project_detach(project_root: PathBuf) -> aenv_core::Result<()> {
-    aenv_core::activate::fork_project(
-        &aenv_core::fs::RealFilesystem,
-        &project_root,
-    )?;
+    aenv_core::activate::fork_project(&aenv_core::fs::RealFilesystem, &project_root)?;
     println!("Forked project (detached from namespace management):");
     println!("  - replaced every symlinked managed file with a regular copy");
     println!("  - removed .aenv-state/ (state + backups)");
@@ -57,11 +50,7 @@ pub fn run_name(
         &new_name,
         &project_root,
     )?;
-    aenv_core::project::write_pin(
-        &aenv_core::fs::RealFilesystem,
-        &project_root,
-        &new_name,
-    )?;
+    aenv_core::project::write_pin(&aenv_core::fs::RealFilesystem, &project_root, &new_name)?;
     println!("Forked project into new namespace '{new_name}'");
     println!("  - copied harness files into ~/.aenv/envs/{new_name}/");
     println!("  - updated .aenv pin");

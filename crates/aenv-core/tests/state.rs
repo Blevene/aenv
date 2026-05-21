@@ -117,9 +117,7 @@ fn managed_file_serializes_contributors_for_merged() {
     let mf = ManagedFile {
         path: PathBuf::from(".mcp.json"),
         qualified_name: qn("(merged)", ".mcp.json"),
-        strategy: MaterializeStrategy::DeepMerge(
-            aenv_core::resolve::DeepMergeFormat::Json,
-        ),
+        strategy: MaterializeStrategy::DeepMerge(aenv_core::resolve::DeepMergeFormat::Json),
         contributors: vec![qn("base", ".mcp.json"), qn("leaf", ".mcp.json")],
         shadows: vec![],
     };
