@@ -5,6 +5,7 @@ pub mod adapter;
 pub mod create;
 pub mod deactivate;
 pub mod delete;
+pub mod fork;
 pub mod list;
 pub mod restore;
 pub mod status;

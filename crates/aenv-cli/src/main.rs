@@ -74,6 +74,17 @@ enum Command {
         #[arg(long)]
         project: Option<PathBuf>,
     },
+    /// Detach a file (or whole project) from namespace management.
+    ///
+    /// With no argument: detach all managed files and remove .aenv-state/.
+    /// With a project-relative path: detach only that file.
+    /// With a namespace name: clone the namespace into a private fork (Task 15).
+    Fork {
+        /// File path or namespace name to fork (omit for whole-project detach).
+        target: Option<PathBuf>,
+        #[arg(long)]
+        project: Option<PathBuf>,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -125,6 +136,38 @@ fn main() -> ExitCode {
             Command::Which { path, project } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;
                 cmd::which::run(project_root, path)
+            }
+            Command::Fork { target, project } => {
+                let project_root = paths::resolve_project_root(&fs, project)?;
+                match target {
+                    None => cmd::fork::run_project_detach(project_root),
+                    Some(t) => {
+                        let rel = t.clone();
+                        let project_path = project_root.join(&rel);
+                        let state_path = project_root.join(".aenv-state/state.json");
+                        let is_managed = std::fs::read(&state_path)
+                            .ok()
+                            .and_then(|b| {
+                                String::from_utf8(b)
+                                    .ok()
+                                    .and_then(|s| {
+                                        aenv_core::state::ActivationState::from_json(&s).ok()
+                                    })
+                            })
+                            .map(|state| state.managed_files.iter().any(|m| m.path == rel))
+                            .unwrap_or(false);
+                        if is_managed || project_path.exists() {
+                            cmd::fork::run_file(project_root, rel)
+                        } else {
+                            let aenv_home = paths::resolve_aenv_home()?;
+                            cmd::fork::run_name(
+                                aenv_home,
+                                project_root,
+                                t.to_string_lossy().into_owned(),
+                            )
+                        }
+                    }
+                }
             }
         }
     })();

@@ -307,6 +307,94 @@ fn write_merged_regular<F: Filesystem>(
 }
 
 // --------------------------------------------------------------------------
+// Fork primitives
+// --------------------------------------------------------------------------
+
+/// Detach a single materialized file from namespace management.
+///
+/// For symlinks: replace with a regular copy of the target bytes. For merged
+/// files: leave on disk unchanged. In both cases: remove from
+/// `state.managed_files` so subsequent activations won't touch it.
+pub fn fork_file<F: Filesystem>(
+    fs: &F,
+    project_root: &Path,
+    rel_path: &Path,
+) -> crate::error::Result<()> {
+    let state_path = project_root.join(".aenv-state/state.json");
+    let body = fs.read(&state_path)?;
+    let mut state = crate::state::ActivationState::from_json(
+        std::str::from_utf8(&body)
+            .map_err(|e| AenvError::ActivationConflict(e.to_string()))?,
+    )?;
+    let pos = state
+        .managed_files
+        .iter()
+        .position(|m| m.path == rel_path)
+        .ok_or_else(|| {
+            AenvError::ActivationConflict(format!(
+                "{} is not managed by the active namespace",
+                rel_path.display()
+            ))
+        })?;
+    let project_path = project_root.join(rel_path);
+    if matches!(
+        state.managed_files[pos].strategy,
+        MaterializeStrategy::Symlink
+    ) {
+        // Read through the symlink to get the underlying bytes, then replace.
+        let bytes = fs.read(&project_path)?;
+        fs.remove_file(&project_path)?;
+        fs.write(&project_path, &bytes)?;
+    }
+    state.managed_files.remove(pos);
+    let new_body = state.to_json()?;
+    fs.write(&state_path, new_body.as_bytes())?;
+    Ok(())
+}
+
+/// Detach the entire project from namespace management.
+///
+/// For every managed file with strategy `Symlink`, reads the resolved bytes
+/// through the symlink and replaces it with a regular file. For merged
+/// strategies the file is already a regular file on disk — leave it. Then
+/// removes `.aenv-state/` entirely so subsequent activations and shell-hook
+/// auto-activation skip this project.
+///
+/// The `.aenv` pin file is intentionally NOT removed — the project retains
+/// its declaration of "I was forked from <namespace>" for human reference.
+/// Re-pin with `aenv use <name>` to re-enable activation.
+///
+/// Idempotent: a project with no state file returns `Ok(())` without
+/// touching anything.
+pub fn fork_project<F: Filesystem>(
+    fs: &F,
+    project_root: &Path,
+) -> crate::error::Result<()> {
+    let state_path = project_root.join(".aenv-state/state.json");
+    if !fs.exists(&state_path)? {
+        return Ok(());
+    }
+    let body = fs.read(&state_path)?;
+    let state = crate::state::ActivationState::from_json(
+        std::str::from_utf8(&body)
+            .map_err(|e| AenvError::ActivationConflict(e.to_string()))?,
+    )?;
+
+    for mf in &state.managed_files {
+        if matches!(mf.strategy, MaterializeStrategy::Symlink) {
+            let project_path = project_root.join(&mf.path);
+            let bytes = fs.read(&project_path)?;
+            fs.remove_file(&project_path)?;
+            fs.write(&project_path, &bytes)?;
+        }
+    }
+
+    let state_dir = project_root.join(".aenv-state");
+    fs.remove_dir_all(&state_dir)?;
+    Ok(())
+}
+
+// --------------------------------------------------------------------------
 // Phase 1 helpers kept for phase1.rs and the classify step
 // --------------------------------------------------------------------------
 
