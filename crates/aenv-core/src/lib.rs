@@ -16,6 +16,7 @@ pub mod deactivate;
 pub mod error;
 pub mod fs;
 pub mod home;
+pub mod identity;
 pub mod manifest;
 pub mod namespace;
 pub mod project;
