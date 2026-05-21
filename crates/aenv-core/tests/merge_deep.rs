@@ -82,3 +82,46 @@ fn output_is_stable_two_space_pretty() {
     let text = std::str::from_utf8(&out).unwrap();
     assert!(text.starts_with("{\n  \""));
 }
+
+use aenv_core::merge::deep_yaml::merge_yaml;
+
+#[test]
+fn yaml_merges_objects_union_of_keys() {
+    let a = b"a: 1\nb: 2\n";
+    let b = b"b: 20\nc: 3\n";
+    let out = merge_yaml(&[a.to_vec(), b.to_vec()]).unwrap();
+    let v: serde_yaml::Value = serde_yaml::from_slice(&out).unwrap();
+    assert_eq!(v["a"], serde_yaml::Value::Number(1.into()));
+    assert_eq!(v["b"], serde_yaml::Value::Number(20.into()));
+    assert_eq!(v["c"], serde_yaml::Value::Number(3.into()));
+}
+
+#[test]
+fn yaml_arrays_concatenate() {
+    let a = b"list:\n  - 1\n  - 2\n";
+    let b = b"list:\n  - 3\n";
+    let out = merge_yaml(&[a.to_vec(), b.to_vec()]).unwrap();
+    let v: serde_yaml::Value = serde_yaml::from_slice(&out).unwrap();
+    let arr = v["list"].as_sequence().unwrap();
+    assert_eq!(arr.len(), 3);
+}
+
+#[test]
+fn yaml_nested_objects_merge_recursively() {
+    let a = b"servers:\n  a:\n    cmd: cmd-a\n";
+    let b = b"servers:\n  b:\n    cmd: cmd-b\n";
+    let out = merge_yaml(&[a.to_vec(), b.to_vec()]).unwrap();
+    let v: serde_yaml::Value = serde_yaml::from_slice(&out).unwrap();
+    assert_eq!(v["servers"]["a"]["cmd"], serde_yaml::Value::String("cmd-a".into()));
+    assert_eq!(v["servers"]["b"]["cmd"], serde_yaml::Value::String("cmd-b".into()));
+}
+
+#[test]
+fn yaml_invalid_input_returns_parse_error() {
+    let a = b"[unclosed\n"; // definitely invalid
+    let err = merge_yaml(&[a.to_vec()]).unwrap_err();
+    assert!(matches!(
+        err,
+        aenv_core::merge::MergeError::Parse { kind: "yaml", .. }
+    ));
+}

@@ -8,6 +8,7 @@
 //! return the merged byte output. Errors are reported as `MergeError`.
 
 pub mod deep_json;
+pub mod deep_yaml;
 pub mod section;
 
 /// Errors produced by the merge algorithms.
