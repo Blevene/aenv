@@ -116,7 +116,7 @@ impl fmt::Display for ShortName {
 /// Qualified names are the identity of assets in aenv (e.g., `base::CLAUDE.md`
 /// identifies a specific file in a specific namespace). They are used as keys
 /// in state.json, in `aenv which` output, and in the public API.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct QualifiedName {
     namespace: NamespaceId,
     short: ShortName,
@@ -163,5 +163,20 @@ impl FromStr for QualifiedName {
             namespace: NamespaceId::new(ns)?,
             short: ShortName::new(short)?,
         })
+    }
+}
+
+/// Serialize as the canonical `"namespace::short"` string form.
+impl Serialize for QualifiedName {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(&self.to_string())
+    }
+}
+
+/// Deserialize from the canonical `"namespace::short"` string form.
+impl<'de> Deserialize<'de> for QualifiedName {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let raw = String::deserialize(d)?;
+        raw.parse::<QualifiedName>().map_err(serde::de::Error::custom)
     }
 }

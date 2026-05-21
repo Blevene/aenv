@@ -13,9 +13,8 @@ use crate::error::{AenvError, Result};
 use crate::fs::Filesystem;
 use crate::home::RegistryLayout;
 use crate::manifest::AenvManifest;
-use crate::state::{
-    ActivationState, BackedUpFile, ManagedFile, MaterializeStrategy, CURRENT_SCHEMA_VERSION,
-};
+use crate::identity::{NamespaceId, QualifiedName, ShortName};
+use crate::state::{ActivationState, BackedUpFile, ManagedFile, MaterializeStrategy, SCHEMA_VERSION};
 use std::path::{Path, PathBuf};
 
 /// Activate `namespace_name` into `project_root`. Writes a state file at
@@ -108,25 +107,25 @@ fn perform_activation<F: Filesystem>(
                     undo_log.push(UndoStep::RemoveSymlink {
                         link: project_path.clone(),
                     });
-                    managed_files.push(ManagedFile {
-                        path: PathBuf::from(&rel),
-                        strategy: MaterializeStrategy::Symlink,
-                        source: Some(source.clone()),
-                    });
+                    managed_files.push(make_managed_file(
+                        namespace_name,
+                        &rel,
+                        MaterializeStrategy::Symlink,
+                    )?);
                 }
                 ProjectPathState::AlreadyOurSymlink => {
-                    managed_files.push(ManagedFile {
-                        path: PathBuf::from(&rel),
-                        strategy: MaterializeStrategy::Symlink,
-                        source: Some(source.clone()),
-                    });
+                    managed_files.push(make_managed_file(
+                        namespace_name,
+                        &rel,
+                        MaterializeStrategy::Symlink,
+                    )?);
                 }
                 ProjectPathState::ByteIdenticalRegular => {
-                    managed_files.push(ManagedFile {
-                        path: PathBuf::from(&rel),
-                        strategy: MaterializeStrategy::Identical,
-                        source: None,
-                    });
+                    managed_files.push(make_managed_file(
+                        namespace_name,
+                        &rel,
+                        MaterializeStrategy::Identical,
+                    )?);
                 }
                 ProjectPathState::Displaced => {
                     let backup_rel =
@@ -157,18 +156,18 @@ fn perform_activation<F: Filesystem>(
                         original_path: PathBuf::from(&rel),
                         backup_path: backup_rel,
                     });
-                    managed_files.push(ManagedFile {
-                        path: PathBuf::from(&rel),
-                        strategy: MaterializeStrategy::Symlink,
-                        source: Some(source.clone()),
-                    });
+                    managed_files.push(make_managed_file(
+                        namespace_name,
+                        &rel,
+                        MaterializeStrategy::Symlink,
+                    )?);
                 }
             }
         }
     }
 
     let state = ActivationState {
-        schema_version: CURRENT_SCHEMA_VERSION,
+        schema_version: SCHEMA_VERSION,
         active_namespace: namespace_name.to_string(),
         project_root: project_root.to_path_buf(),
         managed_files,
@@ -273,4 +272,24 @@ fn file_under_prefix(file: &str, prefix: &str) -> bool {
         return false;
     }
     file.starts_with(prefix)
+}
+
+/// Build a Phase-1-compatible `ManagedFile` with a synthesized qualified name.
+/// Task 11 will replace all call sites with resolver-derived provenance.
+fn make_managed_file(
+    namespace_name: &str,
+    rel: &str,
+    strategy: MaterializeStrategy,
+) -> Result<ManagedFile> {
+    let ns = NamespaceId::new(namespace_name)
+        .map_err(|e| AenvError::ManifestInvalid(format!("namespace id: {e}")))?;
+    let short = ShortName::new(rel)
+        .map_err(|e| AenvError::ManifestInvalid(format!("short name: {e}")))?;
+    Ok(ManagedFile {
+        path: PathBuf::from(rel),
+        qualified_name: QualifiedName::new(ns, short),
+        strategy,
+        contributors: vec![],
+        shadows: vec![],
+    })
 }

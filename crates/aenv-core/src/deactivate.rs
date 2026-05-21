@@ -41,8 +41,10 @@ pub fn deactivate_namespace<F: Filesystem>(fs: &F, project_root: &Path) -> Resul
             MaterializeStrategy::Identical => {
                 // Leave in place: it's the user's file.
             }
-            MaterializeStrategy::Merged => {
-                // Phase 2; treat like Symlink for now.
+            MaterializeStrategy::Merged
+            | MaterializeStrategy::SectionMerge
+            | MaterializeStrategy::DeepMerge(_) => {
+                // Merged output is a regular file written by aenv; remove it.
                 let _ = fs.remove_file(&project_path);
             }
         }
