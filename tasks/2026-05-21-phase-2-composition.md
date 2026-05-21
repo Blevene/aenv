@@ -3905,7 +3905,12 @@ use aenv_core::resolve::MaterializeStrategy;
 use aenv_core::state::{ActivationState, ManagedFile};
 
 fn qn(ns: &str, short: &str) -> QualifiedName {
-    QualifiedName::new(NamespaceId::new(ns).unwrap(), ShortName::new(short).unwrap())
+    let nsid = if ns == NamespaceId::RESERVED_MERGED {
+        NamespaceId::merged_synthetic()
+    } else {
+        NamespaceId::new(ns).unwrap()
+    };
+    QualifiedName::new(nsid, ShortName::new(short).unwrap())
 }
 
 fn state_with(mf: ManagedFile) -> ActivationState {
@@ -4807,7 +4812,12 @@ use aenv_core::resolve::{DeepMergeFormat, MaterializeStrategy};
 use aenv_core::state::{ActivationState, ManagedFile};
 
 fn qn(ns: &str, short: &str) -> QualifiedName {
-    QualifiedName::new(NamespaceId::new(ns).unwrap(), ShortName::new(short).unwrap())
+    let nsid = if ns == NamespaceId::RESERVED_MERGED {
+        NamespaceId::merged_synthetic()
+    } else {
+        NamespaceId::new(ns).unwrap()
+    };
+    QualifiedName::new(nsid, ShortName::new(short).unwrap())
 }
 
 #[test]
