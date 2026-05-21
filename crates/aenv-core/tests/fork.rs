@@ -92,3 +92,36 @@ fn forking_an_unmanaged_path_errors() {
     let err = fork_file(&fs, Path::new(PROJ), Path::new("other.txt")).unwrap_err();
     assert!(err.to_string().contains("not managed"));
 }
+
+#[test]
+fn forking_whole_project_replaces_every_symlink_and_removes_state() {
+    let fs = MockFilesystem::new();
+    setup_activated_chain(&fs);
+
+    let skill_str = format!("{PROJ}/.claude/skills/X/SKILL.md");
+    let skill = Path::new(&skill_str);
+    let state_path_str = format!("{PROJ}/.aenv-state/state.json");
+    let state_path = Path::new(&state_path_str);
+
+    assert!(matches!(
+        fs.symlink_metadata(skill).unwrap().kind,
+        aenv_core::fs::FileKind::Symlink
+    ));
+    assert!(fs.exists(state_path).unwrap());
+
+    aenv_core::activate::fork_project(&fs, Path::new(PROJ)).unwrap();
+
+    assert!(!matches!(
+        fs.symlink_metadata(skill).unwrap().kind,
+        aenv_core::fs::FileKind::Symlink
+    ));
+    assert_eq!(fs.read(skill).unwrap(), b"the skill body");
+    assert!(!fs.exists(state_path).unwrap());
+}
+
+#[test]
+fn forking_whole_project_with_no_activation_is_a_clean_no_op() {
+    let fs = MockFilesystem::new();
+    let result = aenv_core::activate::fork_project(&fs, Path::new(PROJ));
+    assert!(result.is_ok());
+}
