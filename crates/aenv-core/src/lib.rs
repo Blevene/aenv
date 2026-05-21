@@ -23,6 +23,7 @@ pub mod namespace;
 pub mod project;
 pub mod resolve;
 pub mod restore;
+pub mod shadow;
 pub mod state;
 pub mod strategy;
 
