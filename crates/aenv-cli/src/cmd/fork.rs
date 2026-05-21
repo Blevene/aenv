@@ -38,13 +38,33 @@ pub fn run_project_detach(project_root: PathBuf) -> aenv_core::Result<()> {
     Ok(())
 }
 
-/// Stub for `aenv fork <name>` — lands in Task 15.
+/// Create a new namespace from the current project's managed files, then
+/// update the project pin to point at the new namespace.
 pub fn run_name(
-    _aenv_home: PathBuf,
-    _project_root: PathBuf,
-    _new_name: String,
+    aenv_home: PathBuf,
+    project_root: PathBuf,
+    new_name: String,
 ) -> aenv_core::Result<()> {
-    Err(aenv_core::AenvError::ManifestInvalid(
-        "fork <name> lands in Task 15".into(),
-    ))
+    let registry = aenv_core::home::RegistryLayout::new(aenv_home);
+    let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
+        &aenv_core::fs::RealFilesystem,
+        &registry.adapters_dir(),
+    )?;
+    aenv_core::namespace::create_namespace_from_project(
+        &aenv_core::fs::RealFilesystem,
+        &registry,
+        &adapters,
+        &new_name,
+        &project_root,
+    )?;
+    aenv_core::project::write_pin(
+        &aenv_core::fs::RealFilesystem,
+        &project_root,
+        &new_name,
+    )?;
+    println!("Forked project into new namespace '{new_name}'");
+    println!("  - copied harness files into ~/.aenv/envs/{new_name}/");
+    println!("  - updated .aenv pin");
+    println!("  - run 'aenv activate' to materialize");
+    Ok(())
 }

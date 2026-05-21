@@ -88,3 +88,79 @@ fn delete_rejects_unknown_namespace() {
     assert!(matches!(err, AenvError::NamespaceNotFound(_)));
     assert_eq!(err.exit_code(), 10);
 }
+
+#[test]
+fn fork_name_copies_managed_files_from_project_and_writes_manifest() {
+    use aenv_core::namespace::create_namespace_from_project;
+    use aenv_core::adapter::{Adapter, AdapterRegistry};
+    use std::path::Path;
+
+    let fs = MockFilesystem::new();
+
+    fs.write(Path::new("/p/CLAUDE.md"), b"# project version\n").unwrap();
+    fs.write(Path::new("/p/.mcp.json"), b"{}").unwrap();
+
+    let cc: Adapter = toml::from_str("name = \"claude-code\"\nfiles = [\"CLAUDE.md\"]\n").unwrap();
+    let mcp: Adapter = toml::from_str("name = \"mcp\"\nfiles = [\".mcp.json\"]\n").unwrap();
+    let mut adapters = AdapterRegistry::default();
+    adapters.insert(cc);
+    adapters.insert(mcp);
+
+    let reg = RegistryLayout::new(PathBuf::from("/aenv"));
+    create_namespace_from_project(
+        &fs, &reg, &adapters, "new-env", Path::new("/p"),
+    ).unwrap();
+
+    let manifest_bytes = fs.read(Path::new("/aenv/envs/new-env/aenv.toml")).unwrap();
+    let m: aenv_core::manifest::AenvManifest =
+        toml::from_str(std::str::from_utf8(&manifest_bytes).unwrap()).unwrap();
+    assert_eq!(m.name, "new-env");
+    assert!(m.adapters.contains_key("claude-code"));
+    assert!(m.adapters.contains_key("mcp"));
+
+    let copied_claude = fs.read(Path::new("/aenv/envs/new-env/CLAUDE.md")).unwrap();
+    assert_eq!(copied_claude, b"# project version\n");
+    let copied_mcp = fs.read(Path::new("/aenv/envs/new-env/.mcp.json")).unwrap();
+    assert_eq!(copied_mcp, b"{}");
+}
+
+#[test]
+fn fork_name_walks_glob_directories_and_copies_every_file() {
+    use aenv_core::namespace::create_namespace_from_project;
+    use aenv_core::adapter::{Adapter, AdapterRegistry};
+    use std::path::Path;
+
+    let fs = MockFilesystem::new();
+    fs.write(Path::new("/p/.claude/skills/a/SKILL.md"), b"skill a").unwrap();
+    fs.write(Path::new("/p/.claude/skills/b/SKILL.md"), b"skill b").unwrap();
+    fs.write(Path::new("/p/CLAUDE.md"), b"# proj\n").unwrap();
+
+    let cc: Adapter = toml::from_str(
+        "name = \"claude-code\"\nfiles = [\"CLAUDE.md\", \".claude/skills/**/*\"]\n"
+    ).unwrap();
+    let mut adapters = AdapterRegistry::default();
+    adapters.insert(cc);
+
+    let reg = RegistryLayout::new(PathBuf::from("/aenv"));
+    create_namespace_from_project(
+        &fs, &reg, &adapters, "forked", Path::new("/p"),
+    ).unwrap();
+
+    assert_eq!(
+        fs.read(Path::new("/aenv/envs/forked/.claude/skills/a/SKILL.md")).unwrap(),
+        b"skill a",
+    );
+    assert_eq!(
+        fs.read(Path::new("/aenv/envs/forked/.claude/skills/b/SKILL.md")).unwrap(),
+        b"skill b",
+    );
+
+    let body = fs.read(Path::new("/aenv/envs/forked/aenv.toml")).unwrap();
+    let m: aenv_core::manifest::AenvManifest =
+        toml::from_str(std::str::from_utf8(&body).unwrap()).unwrap();
+    let files = &m.adapters["claude-code"].files;
+    assert!(files.iter().any(|p| p == "CLAUDE.md"));
+    assert!(files.iter().any(|p| p == ".claude/skills/a/SKILL.md"));
+    assert!(files.iter().any(|p| p == ".claude/skills/b/SKILL.md"));
+    assert!(!files.iter().any(|p| p.contains('*')));
+}
