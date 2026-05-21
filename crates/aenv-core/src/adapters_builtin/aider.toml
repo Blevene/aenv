@@ -1,0 +1,5 @@
+name = "aider"
+files = [".aider.conf.yml", ".aiderignore"]
+
+[default_merge]
+".aider.conf.yml" = "deep"

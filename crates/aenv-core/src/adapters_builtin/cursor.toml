@@ -1,0 +1,5 @@
+name = "cursor"
+files = [".cursorrules", ".cursor/**/*"]
+
+[roles]
+".cursorrules" = "instructions"

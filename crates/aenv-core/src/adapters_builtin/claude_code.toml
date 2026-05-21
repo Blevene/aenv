@@ -1,2 +1,5 @@
 name = "claude-code"
 files = ["CLAUDE.md", ".claude/"]
+
+[roles]
+"CLAUDE.md" = "instructions"

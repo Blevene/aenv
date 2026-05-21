@@ -1,0 +1,5 @@
+name = "cline"
+files = [".clinerules"]
+
+[roles]
+".clinerules" = "instructions"

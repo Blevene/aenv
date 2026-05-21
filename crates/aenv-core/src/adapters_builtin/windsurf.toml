@@ -1,0 +1,5 @@
+name = "windsurf"
+files = [".windsurfrules"]
+
+[roles]
+".windsurfrules" = "instructions"

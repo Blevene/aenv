@@ -88,6 +88,7 @@ fn main() -> ExitCode {
 
     let result = (|| -> aenv_core::Result<()> {
         let layout = aenv_core::home::RegistryLayout::new(paths::resolve_aenv_home()?);
+        aenv_core::adapters_builtin::ensure_written(&fs, &layout.adapters_dir())?;
         match cli.command {
             Command::Create { name } => cmd::create::run(&fs, &layout, &name),
             Command::List => cmd::list::run(&fs, &layout),

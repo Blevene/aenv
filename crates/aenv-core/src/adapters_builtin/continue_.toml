@@ -1,0 +1,5 @@
+name = "continue"
+files = [".continue/config.json"]
+
+[default_merge]
+".continue/config.json" = "deep"
