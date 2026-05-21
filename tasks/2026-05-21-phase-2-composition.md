@@ -512,25 +512,41 @@ pub struct ResolvedArtifact {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum MaterializeStrategy {
     /// Standard case: project file is a symlink to the namespace file.
+    /// Serializes as `"symlink"` (matches Phase 1's lowercase form).
     Symlink,
     /// Project file already byte-identical to the namespace file — no symlink, no backup.
     Identical,
     /// Merged Markdown by `##` section.
     SectionMerge,
     /// Merged structured data in one of three formats.
+    /// Serializes as `{"deep-merge": "json"}` etc.
     DeepMerge(DeepMergeFormat),
     /// Project file copied (Windows fallback, Phase 7); listed here for parity with state.rs.
     Copy,
+    /// Phase 1 legacy variant. Accepted on read so old state files load; never
+    /// emitted by Phase 2 code (which writes SectionMerge / DeepMerge instead).
+    /// Phase 2's custom Deserialize for ManagedFile (Task 10) maps this to
+    /// `SectionMerge` if encountered on a schema-1 state file.
+    #[serde(rename = "merged")]
+    Merged,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum DeepMergeFormat {
     Json,
     Yaml,
     Toml,
 }
+
+// Note: Phase 1's `state.rs` defines its own `MaterializeStrategy` with
+// `#[serde(rename_all = "lowercase")]`. Task 10 deletes that definition and
+// re-exports this one. The kebab-case + alias combination above preserves
+// schema-1 compatibility: existing on-disk state files store `"symlink"` and
+// `"merged"`, both of which the new enum accepts.
 ```
 
 - [ ] **Step 4: Wire the module**
@@ -564,7 +580,7 @@ DeepMerge(format) to the Phase 1 set (Symlink, Identical, Copy).
 
 ### Task 3: Extends-chain resolver with cycle detection
 
-The conceptual centerpiece. Given a leaf namespace id, walk `extends` depth-first, build the chain, detect cycles, gather candidate artifacts (without merging — that comes in Task 11). Pure library; takes `&dyn Filesystem` + `RegistryLayout` + leaf `NamespaceId`.
+The conceptual centerpiece. Given a leaf namespace id, walk `extends` depth-first, build the chain, detect cycles, gather candidate artifacts (without merging — that comes in Task 11). Pure library; uses the workspace's existing `<F: Filesystem>` generic shape (NOT trait objects — `AdapterRegistry::load_from_dir<F>` and `probe_rename_atomicity<F>` require the concrete type).
 
 **Why no merging yet:** This task produces the resolution chain and the *candidate set* (per-namespace, per-path lists). Strategy selection (Task 4) and the actual merge (Tasks 5–8, 11) are layered on top. Keeping resolution and merging separate lets us test each in isolation, and lets shadow tracking (Task 9) operate over the candidate set without needing merge results.
 
@@ -595,7 +611,7 @@ use mock_filesystem::MockFilesystem;
 const REG: &str = "/aenv";
 
 fn registry() -> RegistryLayout {
-    RegistryLayout::from_root(Path::new(REG))
+    RegistryLayout::new(PathBuf::from(REG))
 }
 
 fn write_manifest(fs: &MockFilesystem, name: &str, body: &str) {
@@ -741,8 +757,8 @@ Append to `crates/aenv-core/src/resolve.rs`:
 /// Cycles surface as `ResolutionError::Cycle(stack)`. Missing namespaces or
 /// adapters surface with the offending name. Manifests that fail TOML parse
 /// surface as `ManifestInvalid`.
-pub fn resolve_namespace(
-    fs: &dyn Filesystem,
+pub fn resolve_namespace<F: Filesystem>(
+    fs: &F,
     registry: &RegistryLayout,
     adapters: &AdapterRegistry,
     leaf: &NamespaceId,
@@ -768,8 +784,8 @@ pub fn resolve_namespace(
     Ok(ResolutionResult { chain, candidates })
 }
 
-fn walk(
-    fs: &dyn Filesystem,
+fn walk<F: Filesystem>(
+    fs: &F,
     registry: &RegistryLayout,
     current: &NamespaceId,
     chain: &mut Vec<NamespaceId>,
@@ -806,8 +822,8 @@ fn walk(
     Ok(())
 }
 
-fn load_manifest(
-    fs: &dyn Filesystem,
+fn load_manifest<F: Filesystem>(
+    fs: &F,
     registry: &RegistryLayout,
     ns: &NamespaceId,
 ) -> Result<AenvManifest, ResolutionError> {
@@ -838,8 +854,8 @@ fn load_manifest(
     Ok(manifest)
 }
 
-fn gather_candidates(
-    fs: &dyn Filesystem,
+fn gather_candidates<F: Filesystem>(
+    fs: &F,
     registry: &RegistryLayout,
     ns: &NamespaceId,
     manifest: &AenvManifest,
@@ -892,15 +908,13 @@ fn gather_candidates(
 }
 
 /// Minimal glob: walk ns_root, return relative paths matching the pattern.
-/// Supports `**/*` and `*` only — full globbing lands in Phase 4.
-fn expand_glob(
-    fs: &dyn Filesystem,
+/// Phase 2 restricts patterns to literal paths plus a trailing `**/*` suffix;
+/// no `regex` dependency. Full globbing lands in Phase 4 with skill imports.
+fn expand_glob<F: Filesystem>(
+    fs: &F,
     ns_root: &Path,
     pattern: &str,
 ) -> std::io::Result<Vec<String>> {
-    // Implementation: walk the tree from ns_root, return relative paths
-    // matching the pattern. Use `glob`-style matcher; for Phase 2 we hand-roll
-    // a minimal one (see merge_section.rs's section parser for the same pattern).
     let mut out = Vec::new();
     walk_dir(fs, ns_root, Path::new(""), &mut out)?;
     Ok(out
@@ -909,19 +923,24 @@ fn expand_glob(
         .collect())
 }
 
-fn walk_dir(
-    fs: &dyn Filesystem,
+fn walk_dir<F: Filesystem>(
+    fs: &F,
     abs_base: &Path,
     rel_prefix: &Path,
     out: &mut Vec<String>,
 ) -> std::io::Result<()> {
     let abs = abs_base.join(rel_prefix);
+    // Filesystem::list_dir returns io::Result<Vec<PathBuf>>; each entry is the
+    // absolute child path. Derive the relative name via Path::file_name().
     for entry in fs.list_dir(&abs)? {
-        let name = entry.file_name().to_string_lossy().to_string();
+        let name = match entry.file_name() {
+            Some(n) => n.to_string_lossy().to_string(),
+            None => continue, // root-like entries with no file name component
+        };
         let child_rel = rel_prefix.join(&name);
         let child_abs = abs_base.join(&child_rel);
         let meta = fs.metadata(&child_abs)?;
-        if meta.is_dir() {
+        if matches!(meta.kind, crate::fs::FileKind::Directory) {
             walk_dir(fs, abs_base, &child_rel, out)?;
         } else {
             out.push(child_rel.to_string_lossy().to_string());
@@ -930,29 +949,8 @@ fn walk_dir(
     Ok(())
 }
 
-/// Trivial glob: supports `**/*` (any depth) and `*` (any non-slash run).
-/// Replaceable with `globset` in Phase 4 when adapters get richer patterns.
-fn glob_match(pattern: &str, candidate: &str) -> bool {
-    let pat = pattern.replace("**/*", "*<<DEEP>>*");
-    let regex_src = pat
-        .chars()
-        .map(|c| match c {
-            '*' => ".*".to_string(),
-            '<' | '>' | 'D' | 'E' | 'P' => c.to_string(),
-            c if c.is_ascii_alphanumeric() => c.to_string(),
-            c => regex::escape(&c.to_string()),
-        })
-        .collect::<String>()
-        .replace("*<<DEEP>>*", ".*");
-    regex::Regex::new(&format!("^{regex_src}$"))
-        .map(|r| r.is_match(candidate))
-        .unwrap_or(false)
-}
-```
-
-Note: pulling in `regex` for the trivial glob is overkill — Task 3 can ship with a hand-rolled matcher; the `regex` crate is reserved for Phase 4 globbing. For Phase 2, restrict patterns to literal paths + the single suffix `**/*`. Rewrite `glob_match` as:
-
-```rust
+/// Trivial glob: supports a trailing `**/*` (any depth) and exact literals.
+/// No `regex` crate; full globbing lands in Phase 4 with skill imports.
 fn glob_match(pattern: &str, candidate: &str) -> bool {
     if let Some(prefix) = pattern.strip_suffix("/**/*") {
         candidate.starts_with(prefix) && candidate[prefix.len()..].starts_with('/')
@@ -964,7 +962,7 @@ fn glob_match(pattern: &str, candidate: &str) -> bool {
 }
 ```
 
-Use that. No new dep, behavior is enough for the seven built-in adapters.
+The matcher is intentionally tiny — the seven Phase 2 adapter TOMLs use at most one trailing `**/*` per `files` entry. No `regex` dependency is added.
 
 - [ ] **Step 5: Extend `AdapterEntry` to support per-file overrides**
 
@@ -1821,7 +1819,7 @@ Create `crates/aenv-core/src/merge/section.rs`:
 //! Headings are matched by their literal text (trimmed). Different heading
 //! depths with the same text are distinct sections.
 
-use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag};
+use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
 const REPLACE_MARKER: &str = "<!-- aenv:replace -->";
 
@@ -1945,13 +1943,18 @@ pub fn merge_sections(inputs: &[String]) -> String {
 fn parse(input: &str) -> ParsedInput {
     // Strategy: walk parser events, track heading boundaries by byte offset,
     // and slice the original source between boundaries to preserve formatting.
-    let parser = Parser::new_ext(input, Options::all()).into_offset_iter();
+    //
+    // pulldown-cmark 0.10 changed `Tag::Heading` to a struct variant and
+    // introduced `TagEnd` for the End event. Pin Options::empty() so we don't
+    // pull in tables/footnotes/strikethrough which would inflate the event
+    // stream and complicate heading detection.
+    let parser = Parser::new_ext(input, Options::empty()).into_offset_iter();
     let mut headings: Vec<(SectionKey, std::ops::Range<usize>)> = Vec::new();
     let mut current_heading: Option<(SectionKey, usize, usize)> = None; // (key, start, end)
 
     for (event, range) in parser {
         match event {
-            Event::Start(Tag::Heading(level, _, _)) => {
+            Event::Start(Tag::Heading { level, .. }) => {
                 current_heading = Some((
                     SectionKey {
                         depth: HeadingDepth::from(level),
@@ -1966,7 +1969,7 @@ fn parse(input: &str) -> ParsedInput {
                     k.title.push_str(&t);
                 }
             }
-            Event::End(Tag::Heading(_, _, _)) => {
+            Event::End(TagEnd::Heading(_)) => {
                 if let Some((key, start, end)) = current_heading.take() {
                     headings.push((
                         SectionKey {
@@ -2403,7 +2406,7 @@ fn toml_merges_tables_union_of_keys() {
     let a = b"a = 1\nb = 2\n";
     let b = b"b = 20\nc = 3\n";
     let out = merge_toml(&[a.to_vec(), b.to_vec()]).unwrap();
-    let v: toml::Value = toml::from_slice(&out).unwrap();
+    let v: toml::Value = toml::from_str(std::str::from_utf8(&out).unwrap()).unwrap();
     assert_eq!(v["a"].as_integer().unwrap(), 1);
     assert_eq!(v["b"].as_integer().unwrap(), 20);
     assert_eq!(v["c"].as_integer().unwrap(), 3);
@@ -2414,7 +2417,7 @@ fn toml_arrays_concatenate() {
     let a = b"list = [1, 2]\n";
     let b = b"list = [3]\n";
     let out = merge_toml(&[a.to_vec(), b.to_vec()]).unwrap();
-    let v: toml::Value = toml::from_slice(&out).unwrap();
+    let v: toml::Value = toml::from_str(std::str::from_utf8(&out).unwrap()).unwrap();
     assert_eq!(v["list"].as_array().unwrap().len(), 3);
 }
 
@@ -2423,7 +2426,7 @@ fn toml_nested_tables_merge_recursively() {
     let a = b"[adapters.cc]\nfiles = [\"a\"]\n";
     let b = b"[adapters.cursor]\nfiles = [\"b\"]\n";
     let out = merge_toml(&[a.to_vec(), b.to_vec()]).unwrap();
-    let v: toml::Value = toml::from_slice(&out).unwrap();
+    let v: toml::Value = toml::from_str(std::str::from_utf8(&out).unwrap()).unwrap();
     assert!(v["adapters"]["cc"]["files"].is_array());
     assert!(v["adapters"]["cursor"]["files"].is_array());
 }
@@ -2567,7 +2570,7 @@ fn symlink_path_with_two_candidates_yields_one_shadow() {
         cand("leaf", ".claude/skills/write-tests/SKILL.md", "claude-code"),
     ];
     let strategy = MaterializeStrategy::Symlink;
-    let shadows = compute_shadows(&candidates, strategy, &cc_with_instructions());
+    let shadows = compute_shadows(&candidates, strategy, &cc_with_instructions()).unwrap();
     assert_eq!(shadows, vec![qn("base", ".claude/skills/write-tests/SKILL.md")]);
 }
 
@@ -2582,7 +2585,7 @@ fn three_deep_chain_yields_two_shadows_in_root_to_near_order() {
         &candidates,
         MaterializeStrategy::Symlink,
         &cc_with_instructions(),
-    );
+    ).unwrap();
     assert_eq!(shadows.len(), 2);
     // Ordered chronologically (root-first): a precedes b.
     assert_eq!(shadows[0].namespace().as_str(), "a");
@@ -2598,7 +2601,7 @@ fn merged_path_has_no_shadows() {
     let shadows =
         compute_shadows(&candidates, MaterializeStrategy::DeepMerge(
             aenv_core::resolve::DeepMergeFormat::Json,
-        ), &cc_with_instructions());
+        ), &cc_with_instructions()).unwrap();
     assert!(shadows.is_empty(), "merged files have contributors, not shadows");
 }
 
@@ -2612,7 +2615,7 @@ fn section_merged_path_has_no_shadows() {
         &candidates,
         MaterializeStrategy::SectionMerge,
         &cc_with_instructions(),
-    );
+    ).unwrap();
     assert!(shadows.is_empty());
 }
 
@@ -2622,7 +2625,7 @@ fn single_candidate_has_no_shadows() {
         &[cand("base", "CLAUDE.md", "claude-code")],
         MaterializeStrategy::Symlink,
         &cc_with_instructions(),
-    );
+    ).unwrap();
     assert!(shadows.is_empty());
 }
 ```
@@ -2655,28 +2658,35 @@ pub fn compute_shadows(
     candidates: &[Candidate],
     strategy: MaterializeStrategy,
     _adapters: &AdapterRegistry,
-) -> Vec<QualifiedName> {
+) -> crate::Result<Vec<QualifiedName>> {
     if candidates.len() < 2 {
-        return Vec::new();
+        return Ok(Vec::new());
     }
     match strategy {
-        MaterializeStrategy::SectionMerge | MaterializeStrategy::DeepMerge(_) => Vec::new(),
-        MaterializeStrategy::Symlink | MaterializeStrategy::Copy | MaterializeStrategy::Identical => {
+        MaterializeStrategy::SectionMerge | MaterializeStrategy::DeepMerge(_) => Ok(Vec::new()),
+        MaterializeStrategy::Symlink
+        | MaterializeStrategy::Copy
+        | MaterializeStrategy::Identical
+        | MaterializeStrategy::Merged => {
             // Everything except the last candidate is shadowed.
             candidates[..candidates.len() - 1]
                 .iter()
-                .map(|c| qualified_from_candidate(c))
+                .map(qualified_from_candidate)
                 .collect()
         }
     }
 }
 
-pub(crate) fn qualified_from_candidate(c: &Candidate) -> QualifiedName {
-    // Phase 2: short name == path-as-string. Skills get parent-dir short
-    // names in Phase 4 (R-15 onward).
-    let short = ShortName::new(c.path.to_string_lossy().to_string())
-        .expect("candidate path validated upstream");
-    QualifiedName::new(c.namespace.clone(), short)
+/// Compute the QualifiedName for a candidate's contribution.
+///
+/// Returns `Err` if the candidate's path contains the `::` separator (which
+/// is invalid as a short name). A well-formed manifest can never declare such
+/// a file, so this is effectively unreachable — but it surfaces as a clean
+/// `ManifestInvalid` rather than a panic if someone hand-crafts a malicious
+/// manifest.
+pub(crate) fn qualified_from_candidate(c: &Candidate) -> crate::Result<QualifiedName> {
+    let short = ShortName::new(c.path.to_string_lossy().to_string())?;
+    Ok(QualifiedName::new(c.namespace.clone(), short))
 }
 ```
 
@@ -2877,7 +2887,7 @@ impl<'de> serde::Deserialize<'de> for ActivationState {
         }
         let mut raw = Raw::deserialize(d)?;
         if raw.schema_version == 1 {
-            let ns = crate::identity::NamespaceId::new(&raw.active_namespace)
+            let ns = crate::identity::NamespaceId::new(raw.active_namespace.as_str())
                 .map_err(serde::de::Error::custom)?;
             for mf in &mut raw.managed_files {
                 if mf.qualified_name.namespace().as_str() == "__schema_1__" {
@@ -2968,7 +2978,7 @@ const REG: &str = "/aenv";
 const PROJ: &str = "/proj";
 
 fn registry() -> RegistryLayout {
-    RegistryLayout::from_root(Path::new(REG))
+    RegistryLayout::new(PathBuf::from(REG))
 }
 
 fn cc() -> Adapter {
@@ -3037,8 +3047,8 @@ files = ["CLAUDE.md"]
         &fs,
         &registry(),
         &adapters(),
-        &NamespaceId::new("leaf").unwrap(),
         Path::new(PROJ),
+        &NamespaceId::new("leaf").unwrap(),
     )
     .unwrap();
 
@@ -3049,8 +3059,10 @@ files = ["CLAUDE.md"]
     assert!(merged.contains("be terse"));
 
     // Merged file is a regular file (not a symlink).
-    assert!(!fs.symlink_metadata(Path::new(&format!("{PROJ}/CLAUDE.md")))
-        .unwrap().is_symlink());
+    let meta = fs
+        .symlink_metadata(Path::new(&format!("{PROJ}/CLAUDE.md")))
+        .unwrap();
+    assert!(!matches!(meta.kind, aenv_core::fs::FileKind::Symlink));
 
     // State records section-merge strategy + contributors.
     let state: ActivationState = serde_json::from_slice(
@@ -3089,8 +3101,8 @@ files = [".mcp.json"]
         &fs,
         &registry(),
         &adapters(),
-        &NamespaceId::new("leaf").unwrap(),
         Path::new(PROJ),
+        &NamespaceId::new("leaf").unwrap(),
     )
     .unwrap();
 
@@ -3132,8 +3144,8 @@ files = [".claude/skills/write-tests/SKILL.md"]
 
     activate_namespace(
         &fs, &registry(), &adapters,
-        &NamespaceId::new("leaf").unwrap(),
         Path::new(PROJ),
+        &NamespaceId::new("leaf").unwrap(),
     ).unwrap();
 
     let body = read(&fs, &format!("{PROJ}/.claude/skills/write-tests/SKILL.md"));
@@ -3150,11 +3162,14 @@ files = [".claude/skills/write-tests/SKILL.md"]
 }
 
 #[test]
-fn rollback_removes_merged_file_on_partial_failure() {
-    // Failure injection on the second file write triggers rollback;
-    // the first (merged) file must be removed.
+fn rollback_removes_prior_materialized_file_on_partial_failure() {
+    // by_path iterates lexicographically: ".mcp.json" (0x2E) sorts before
+    // "CLAUDE.md" (0x43). So .mcp.json materializes first. Inject the failure
+    // on CLAUDE.md so that .mcp.json has *already been written* when the
+    // failure fires — the rollback assertion then meaningfully exercises the
+    // RemoveRegularFile undo step.
     let fs = MockFilesystem::default();
-    fs.fail_writes_to(Path::new(&format!("{PROJ}/.mcp.json")));
+    fs.fail_writes_to(Path::new(&format!("{PROJ}/CLAUDE.md")));
     write(&fs, &format!("{REG}/envs/leaf/aenv.toml"),
         r#"
 name = "leaf"
@@ -3168,13 +3183,17 @@ files = [".mcp.json"]
 
     let err = activate_namespace(
         &fs, &registry(), &adapters(),
-        &NamespaceId::new("leaf").unwrap(),
         Path::new(PROJ),
+        &NamespaceId::new("leaf").unwrap(),
     ).unwrap_err();
     assert!(matches!(err, aenv_core::AenvError::ActivationConflict(_)));
 
-    // CLAUDE.md (the first to materialize) was rolled back.
+    // .mcp.json (the first to materialize) was rolled back by RemoveRegularFile.
+    assert!(!fs.exists(Path::new(&format!("{PROJ}/.mcp.json"))).unwrap());
+    // CLAUDE.md never made it to disk because its write was the one that failed.
     assert!(!fs.exists(Path::new(&format!("{PROJ}/CLAUDE.md"))).unwrap());
+    // state.json was never written.
+    assert!(!fs.exists(Path::new(&format!("{PROJ}/.aenv-state/state.json"))).unwrap());
 }
 ```
 
@@ -3183,24 +3202,111 @@ files = [".mcp.json"]
 Run: `cargo test -p aenv-core --test composition`
 Expected: tests fail — `activate_namespace` still calls Phase 1's single-namespace path and doesn't produce merged files or shadow records.
 
-- [ ] **Step 3: Refactor `activate.rs`**
+- [ ] **Step 3a: Prepare the activate module for a `phase1` submodule**
 
-The Phase 1 `activate_namespace` signature took `(&dyn Filesystem, &RegistryLayout, &AdapterRegistry, &str, &Path)`. The body loaded one manifest, walked its adapters, materialized each declared file. Replace with:
+`crates/aenv-core/src/activate.rs` becomes a parent that declares `mod phase1;`. The Phase 1 inline symlink path (currently lives in `perform_activation`'s `match ProjectPathState { Absent | AlreadyOurSymlink | ByteIdenticalRegular | Displaced }` body) is *extracted* into a `phase1::materialize_symlink` helper. The existing `UndoStep` enum (`enum UndoStep { RemoveSymlink { link }, RestoreBackup { original, backup } }`) gains one new variant for the regular-file rollback case:
 
 ```rust
-pub fn activate_namespace(
-    fs: &dyn Filesystem,
-    registry: &RegistryLayout,
-    adapters: &AdapterRegistry,
-    leaf: &NamespaceId,
+// crates/aenv-core/src/activate.rs (top of file, after imports)
+mod phase1;
+```
+
+Then in the same file, extend the existing enum (do not rename it — Phase 1 calls it `UndoStep` everywhere):
+
+```rust
+enum UndoStep {
+    /// Created a symlink at `link`; undo by removing it.
+    RemoveSymlink { link: PathBuf },
+    /// Backed up `original` to `backup`; undo by renaming `backup` -> `original`.
+    RestoreBackup { original: PathBuf, backup: PathBuf },
+    /// Wrote a regular file at `path` (Phase 2 merge output); undo by removing it.
+    RemoveRegularFile { path: PathBuf },
+}
+```
+
+Update the existing `fn undo<F: Filesystem>(fs: &F, log: Vec<UndoStep>)` to handle the new variant:
+
+```rust
+UndoStep::RemoveRegularFile { path } => {
+    let _ = fs.remove_file(&path);
+}
+```
+
+Reverse-iteration order is already correct in the Phase 1 implementation (`for step in log.into_iter().rev()`). The `RemoveRegularFile` for a merged file is pushed *after* its `RestoreBackup` (if any), so on rollback the regular file is removed first and the backup is renamed back in second.
+
+- [ ] **Step 3b: Extract `phase1::materialize_symlink`**
+
+Create `crates/aenv-core/src/activate/phase1.rs`. Move the per-state-arm symlink logic (the four match arms in `perform_activation`) into a single helper. Its signature uses the workspace's generic shape — `<F: Filesystem>`, *not* `&dyn Filesystem` (Phase 1's `AdapterRegistry::load_from_dir<F>` and friends require the concrete type, so the trait-object form breaks downstream calls):
+
+```rust
+//! Phase 1 symlink materialization, extracted so Phase 2's composing
+//! `activate_namespace` can reuse it for last-wins / single-candidate paths.
+
+use std::path::Path;
+
+use crate::fs::Filesystem;
+use crate::state::{BackedUpFile, ManagedFile, MaterializeStrategy};
+use crate::{AenvError, Result};
+
+use super::{backup_dir_for_this_run, classify_project_path, UndoStep};
+// `backup_dir_for_this_run` and `classify_project_path` are the existing
+// Phase 1 private helpers in activate.rs; keep them at parent-module scope
+// so this submodule can `use super::*` them. If the parent function names
+// differ in the current code, rename here accordingly.
+
+/// Materialize one candidate as a symlink (or no-op for byte-identical).
+///
+/// Pushes any backups to `backed_up`, records undo steps on `undo`, and
+/// appends one `ManagedFile` entry per call (the caller does NOT push its
+/// own entry — this helper owns the strategy decision between `Symlink`
+/// and `Identical`).
+#[allow(clippy::too_many_arguments)]
+pub(super) fn materialize_symlink<F: Filesystem>(
+    fs: &F,
     project_root: &Path,
-) -> Result<ActivationState, AenvError> {
+    backup_root: &Path,
+    project_path: &Path,
+    source_path: &Path,
+    namespace: &crate::identity::NamespaceId,
+    short: &crate::identity::ShortName,
+    relative_path: &Path,
+    shadows: Vec<crate::identity::QualifiedName>,
+    undo: &mut Vec<UndoStep>,
+    managed: &mut Vec<ManagedFile>,
+    backed_up: &mut Vec<BackedUpFile>,
+) -> Result<()> {
+    // The implementation is the lift-and-shift of the four-arm `match
+    // classify_project_path(...)` body from the current `perform_activation`,
+    // adapted to push ManagedFile + UndoStep + BackedUpFile through &mut Vecs
+    // rather than building them inline. The recorded `strategy` is `Identical`
+    // when classification returned `ByteIdenticalRegular`, and `Symlink`
+    // otherwise.
+    // (See crates/aenv-core/src/activate.rs in the Phase 1 codebase for the
+    // exact body to migrate.)
+    todo!("lift from current perform_activation; preserve all error paths")
+}
+```
+
+Note that this is the *only* helper this submodule exports. It does NOT take a generic adapter list — composition concerns belong in the parent module.
+
+- [ ] **Step 3c: Rewrite `activate_namespace` in `activate.rs`**
+
+The Phase 1 signature is `activate_namespace<F: Filesystem>(fs: &F, layout: &RegistryLayout, adapters: &AdapterRegistry, project_root: &Path, namespace_name: &str) -> Result<ActivationState>`. Phase 2 keeps the generic shape and the `(layout, adapters, project_root)` order but changes the final parameter from `&str` to `&NamespaceId`:
+
+```rust
+pub fn activate_namespace<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    adapters: &AdapterRegistry,
+    project_root: &Path,
+    leaf: &crate::identity::NamespaceId,
+) -> Result<ActivationState> {
     // 1. Run probe to ensure .aenv-state/ is on the same fs as the project.
-    crate::atomicity::probe_rename(fs, project_root)?;
+    crate::atomicity::probe_rename_atomicity(fs, project_root)?;
 
     // 2. Resolve the chain.
     let resolution =
-        crate::resolve::resolve_namespace(fs, registry, adapters, leaf)?;
+        crate::resolve::resolve_namespace(fs, layout, adapters, leaf)?;
 
     // 3. Group candidates by path; each group becomes one materialized artifact.
     let mut by_path: std::collections::BTreeMap<PathBuf, Vec<crate::resolve::Candidate>> =
@@ -3210,12 +3316,12 @@ pub fn activate_namespace(
     }
 
     // 4. Decide strategy + materialize, with an undo log per artifact.
-    let mut undo: Vec<UndoAction> = Vec::new();
+    let mut undo: Vec<UndoStep> = Vec::new();
     let mut managed: Vec<ManagedFile> = Vec::new();
     let mut backed_up: Vec<BackedUpFile> = Vec::new();
     let backup_root = backup_dir_for_this_run(project_root);
 
-    let result: Result<(), AenvError> = (|| {
+    let result: Result<()> = (|| {
         for (path, candidates) in by_path {
             let strategy = crate::strategy::decide_strategy(&candidates, adapters)?;
             materialize_one(
@@ -3235,13 +3341,13 @@ pub fn activate_namespace(
     })();
 
     if let Err(e) = result {
-        rollback(fs, &undo);
+        undo(fs, std::mem::take(&mut undo));
         return Err(e);
     }
 
     // 5. Write state.json.
     let state = ActivationState {
-        schema_version: SCHEMA_VERSION,
+        schema_version: crate::state::SCHEMA_VERSION,
         active_namespace: leaf.as_str().to_owned(),
         project_root: project_root.to_path_buf(),
         managed_files: managed,
@@ -3254,35 +3360,41 @@ pub fn activate_namespace(
     Ok(state)
 }
 
-fn materialize_one(
-    fs: &dyn Filesystem,
+fn materialize_one<F: Filesystem>(
+    fs: &F,
     adapters: &AdapterRegistry,
     project_root: &Path,
     backup_root: &Path,
     path: &Path,
     candidates: &[crate::resolve::Candidate],
     strategy: MaterializeStrategy,
-    undo: &mut Vec<UndoAction>,
+    undo: &mut Vec<UndoStep>,
     managed: &mut Vec<ManagedFile>,
     backed_up: &mut Vec<BackedUpFile>,
-) -> Result<(), AenvError> {
+) -> Result<()> {
     let project_path = project_root.join(path);
     match strategy {
-        MaterializeStrategy::Symlink => {
+        MaterializeStrategy::Symlink | MaterializeStrategy::Identical => {
             let latest = candidates.last().expect("non-empty");
-            // Phase 1's three-way classification: Absent / AlreadyOurSymlink /
-            // ByteIdenticalRegular / Displaced. Reuse the Phase 1 helper.
-            crate::activate::phase1::materialize_symlink(
-                fs, project_root, backup_root, &project_path,
-                &latest.source_path, undo, backed_up,
+            // The Phase 1 helper decides Symlink vs Identical internally
+            // based on classify_project_path and pushes a ManagedFile entry
+            // with the correct strategy. The caller does NOT push.
+            let shadows = crate::shadow::compute_shadows(candidates, strategy, adapters)?;
+            let qn = crate::shadow::qualified_from_candidate(latest)?;
+            phase1::materialize_symlink(
+                fs,
+                project_root,
+                backup_root,
+                &project_path,
+                &latest.source_path,
+                qn.namespace(),
+                qn.short(),
+                path,
+                shadows,
+                undo,
+                managed,
+                backed_up,
             )?;
-            managed.push(ManagedFile {
-                path: path.to_path_buf(),
-                qualified_name: crate::shadow::qualified_from_candidate(latest),
-                strategy,
-                contributors: vec![],
-                shadows: crate::shadow::compute_shadows(candidates, strategy, adapters),
-            });
         }
         MaterializeStrategy::SectionMerge => {
             let bodies = read_all_as_strings(fs, candidates)?;
@@ -3293,11 +3405,11 @@ fn materialize_one(
             )?;
             managed.push(ManagedFile {
                 path: path.to_path_buf(),
-                qualified_name: synthesize_merged_qn(path),
+                qualified_name: synthesize_merged_qn(path)?,
                 strategy,
                 contributors: candidates.iter()
                     .map(crate::shadow::qualified_from_candidate)
-                    .collect(),
+                    .collect::<Result<Vec<_>>>()?,
                 shadows: vec![],
             });
         }
@@ -3305,11 +3417,11 @@ fn materialize_one(
             let bodies = read_all_as_bytes(fs, candidates)?;
             let merged = match format {
                 crate::resolve::DeepMergeFormat::Json =>
-                    crate::merge::deep_json::merge_json(&bodies)?,
+                    crate::merge::deep_json::merge_json(&bodies).map_err(AenvError::from)?,
                 crate::resolve::DeepMergeFormat::Yaml =>
-                    crate::merge::deep_yaml::merge_yaml(&bodies)?,
+                    crate::merge::deep_yaml::merge_yaml(&bodies).map_err(AenvError::from)?,
                 crate::resolve::DeepMergeFormat::Toml =>
-                    crate::merge::deep_toml::merge_toml(&bodies)?,
+                    crate::merge::deep_toml::merge_toml(&bodies).map_err(AenvError::from)?,
             };
             write_merged_regular(
                 fs, project_root, backup_root, &project_path,
@@ -3317,44 +3429,50 @@ fn materialize_one(
             )?;
             managed.push(ManagedFile {
                 path: path.to_path_buf(),
-                qualified_name: synthesize_merged_qn(path),
+                qualified_name: synthesize_merged_qn(path)?,
                 strategy,
                 contributors: candidates.iter()
                     .map(crate::shadow::qualified_from_candidate)
-                    .collect(),
+                    .collect::<Result<Vec<_>>>()?,
                 shadows: vec![],
             });
         }
-        MaterializeStrategy::Identical | MaterializeStrategy::Copy => {
-            // Unreachable in Phase 2 — Identical is computed inside symlink path;
-            // Copy is Phase 7.
-            return Err(AenvError::ActivationConflict(format!(
-                "strategy {strategy:?} not implementable in Phase 2"
-            )));
+        MaterializeStrategy::Copy => {
+            // Windows fallback — Phase 7. Surface a clean error rather than
+            // silently degrading.
+            return Err(AenvError::ActivationConflict(
+                "Copy strategy is Phase 7 (Windows fallback); not supported in Phase 2".into()
+            ));
+        }
+        MaterializeStrategy::Merged => {
+            // Phase 1 legacy variant — should never be produced by Phase 2's
+            // decide_strategy. Unreachable in practice; defensive arm.
+            return Err(AenvError::ActivationConflict(
+                "Phase 1 'Merged' variant should not be produced by Phase 2".into()
+            ));
         }
     }
     Ok(())
 }
 
-fn synthesize_merged_qn(path: &Path) -> crate::identity::QualifiedName {
-    crate::identity::QualifiedName::new(
-        crate::identity::NamespaceId::new("(merged)").expect("static"),
-        crate::identity::ShortName::new(path.to_string_lossy().to_string())
-            .expect("path validated"),
-    )
+fn synthesize_merged_qn(path: &Path) -> Result<crate::identity::QualifiedName> {
+    Ok(crate::identity::QualifiedName::new(
+        crate::identity::NamespaceId::new("(merged)")?,
+        crate::identity::ShortName::new(path.to_string_lossy().to_string())?,
+    ))
 }
 
-fn read_all_as_bytes(
-    fs: &dyn Filesystem,
+fn read_all_as_bytes<F: Filesystem>(
+    fs: &F,
     candidates: &[crate::resolve::Candidate],
-) -> Result<Vec<Vec<u8>>, AenvError> {
+) -> Result<Vec<Vec<u8>>> {
     candidates.iter().map(|c| fs.read(&c.source_path).map_err(AenvError::from)).collect()
 }
 
-fn read_all_as_strings(
-    fs: &dyn Filesystem,
+fn read_all_as_strings<F: Filesystem>(
+    fs: &F,
     candidates: &[crate::resolve::Candidate],
-) -> Result<Vec<String>, AenvError> {
+) -> Result<Vec<String>> {
     candidates.iter().map(|c| {
         let bytes = fs.read(&c.source_path)?;
         String::from_utf8(bytes).map_err(|e| AenvError::ActivationConflict(
@@ -3365,53 +3483,87 @@ fn read_all_as_strings(
 
 /// Write a regular (non-symlink) file, backing up any displaced project file,
 /// recording the action in the undo log.
-fn write_merged_regular(
-    fs: &dyn Filesystem,
+///
+/// The undo-log push order matters: `RestoreBackup` is pushed *before*
+/// `RemoveRegularFile` so that on reverse replay, the regular file is
+/// removed first and then the backup is renamed back into place.
+fn write_merged_regular<F: Filesystem>(
+    fs: &F,
     project_root: &Path,
     backup_root: &Path,
     project_path: &Path,
     contents: &[u8],
-    undo: &mut Vec<UndoAction>,
+    undo: &mut Vec<UndoStep>,
     backed_up: &mut Vec<BackedUpFile>,
-) -> Result<(), AenvError> {
+) -> Result<()> {
     let existed = fs.exists(project_path)?;
     if existed {
         let backup_path = backup_root.join(project_path.strip_prefix(project_root)
             .unwrap_or(project_path));
-        fs.create_dir_all(backup_path.parent().unwrap())?;
+        if let Some(parent) = backup_path.parent() {
+            fs.create_dir_all(parent)?;
+        }
         fs.rename(project_path, &backup_path)?;
-        undo.push(UndoAction::RestoreFile {
-            from: backup_path.clone(),
-            to: project_path.to_path_buf(),
+        undo.push(UndoStep::RestoreBackup {
+            original: project_path.to_path_buf(),
+            backup: backup_path.clone(),
         });
         backed_up.push(BackedUpFile {
-            path: project_path.strip_prefix(project_root)
+            original_path: project_path.strip_prefix(project_root)
                 .unwrap_or(project_path).to_path_buf(),
-            backup: backup_path,
+            backup_path,
         });
     }
     fs.write(project_path, contents)?;
-    undo.push(UndoAction::RemoveFile(project_path.to_path_buf()));
+    undo.push(UndoStep::RemoveRegularFile { path: project_path.to_path_buf() });
     Ok(())
 }
 ```
 
-The Phase 1 `materialize_symlink` helper moves into a `phase1` submodule (`crates/aenv-core/src/activate/phase1.rs`) so the new top-level activate can call into it without a name clash. The undo-log enum gains a `RemoveFile` variant if it doesn't have one already.
+Add the `impl From<MergeError> for AenvError` to `crate::merge::mod.rs` (it was sketched in Task 5; verify it's there). Parse errors map to `ManifestInvalid` (exit 12), type mismatches and UTF-8 to `ActivationConflict` (exit 13):
 
-This is a substantial refactor of activate.rs. The implementer should plan to spend the bulk of Task 11's effort on this single function. Do not attempt to keep both the old and new code paths simultaneously — delete the Phase 1 single-namespace path entirely; it's covered by the new code (single namespace = chain of length 1).
+```rust
+// In crates/aenv-core/src/merge/mod.rs — refine the From impl:
+impl From<MergeError> for crate::AenvError {
+    fn from(value: MergeError) -> Self {
+        match value {
+            MergeError::Parse { .. } => crate::AenvError::ManifestInvalid(value.to_string()),
+            MergeError::TypeMismatch { .. } | MergeError::Utf8(_) => {
+                crate::AenvError::ActivationConflict(value.to_string())
+            }
+        }
+    }
+}
+```
+
+This is a substantial refactor of activate.rs. The implementer should plan to spend the bulk of Task 11's effort on Steps 3a–3c. Do not keep both the old and new code paths — delete the Phase 1 single-namespace `perform_activation` body once `phase1::materialize_symlink` is extracted.
 
 - [ ] **Step 4: Update Phase 1's activate tests for the new shape**
 
-Several Phase 1 tests in `crates/aenv-core/tests/activate.rs` rely on the old call signature `activate_namespace(&fs, &registry, &adapters, "name", &path)` — strings, not `NamespaceId`. Replace each call site:
+Several Phase 1 tests in `crates/aenv-core/tests/activate.rs` use the old call signature `activate_namespace(&fs, &layout, &adapters, project, "base")` — bare `&str`, not `NamespaceId`. Replace each call site (only the last argument changes; the order is preserved):
 
 ```rust
 // Before
-activate_namespace(&fs, &reg, &adapters, "base", project)
+activate_namespace(&fs, &layout, &adapters, project, "base")
 // After
-activate_namespace(&fs, &reg, &adapters, &NamespaceId::new("base").unwrap(), project)
+activate_namespace(&fs, &layout, &adapters, project, &NamespaceId::new("base").unwrap())
 ```
 
 The behavior is identical for single-namespace activations because the resolver produces a chain of length 1.
+
+- [ ] **Step 4b: Update the CLI caller**
+
+`crates/aenv-cli/src/cmd/activate.rs` calls `activate_namespace` with `&str`. Switch to `&NamespaceId`:
+
+```rust
+// In cmd::activate::run, where the namespace name is passed in:
+let leaf = aenv_core::identity::NamespaceId::new(namespace_name.clone())?;
+let state = aenv_core::activate::activate_namespace(
+    &fs, &layout, &adapters, &project_root, &leaf,
+)?;
+```
+
+Same edit pattern applies to any other Phase 1 CLI command that hard-codes the bare-string signature — grep `crates/aenv-cli/src/cmd/` for `activate_namespace` to find them all.
 
 - [ ] **Step 5: Run the full test suite**
 
@@ -3548,8 +3700,8 @@ pub const ALL: &[(&str, &str)] = &[
 
 /// Write every built-in adapter to the registry's adapters dir if not already
 /// present. Existing files are left untouched so user edits stick.
-pub fn ensure_written(
-    fs: &dyn crate::fs::Filesystem,
+pub fn ensure_written<F: crate::fs::Filesystem>(
+    fs: &F,
     adapters_dir: &std::path::Path,
 ) -> std::io::Result<()> {
     for (name, body) in ALL {
@@ -3640,9 +3792,27 @@ fn ensure_written_leaves_existing_files_untouched() {
 }
 ```
 
-- [ ] **Step 5: Wire `ensure_written` into the CLI startup**
+- [ ] **Step 5: Wire `ensure_written` into the CLI startup (new code path)**
 
-Modify `crates/aenv-cli/src/main.rs` so that every command path calls `ensure_written` against the resolved adapters dir before dispatching. (This is a one-line addition to the existing init path; Phase 1 already wrote `claude_code.toml` on first run via a similar mechanism — extend it.)
+Phase 1's CLI does NOT call `ensure_written` (or any init helper) — `crates/aenv-cli/src/main.rs` and `cmd/*.rs` have no references to `adapters_builtin`. This step *creates* the init call; it does not extend an existing mechanism.
+
+In `crates/aenv-cli/src/main.rs`, after resolving `AENV_HOME` but before dispatching to any subcommand handler:
+
+```rust
+let aenv_home = aenv_cli::paths::resolve_aenv_home()?;
+let layout = aenv_core::home::RegistryLayout::new(aenv_home.clone());
+// Phase 2: write built-in adapter TOMLs to the registry on every startup.
+// No-ops once the files exist; respects user customization (ensure_written
+// skips paths that already exist).
+let _ = aenv_core::fs::RealFilesystem;
+aenv_core::adapters_builtin::ensure_written(
+    &aenv_core::fs::RealFilesystem,
+    &layout.adapters_dir(),
+)?;
+// then dispatch as before...
+```
+
+Without this step, `aenv create + activate` on a fresh `AENV_HOME` fails with `AdapterMissing("claude-code")` because the resolver's adapter-registry validation can't find any adapter on disk.
 
 - [ ] **Step 6: Run all tests**
 
@@ -3810,14 +3980,22 @@ fn render_strategy(s: MaterializeStrategy) -> String {
         MaterializeStrategy::DeepMerge(DeepMergeFormat::Json) => "deep-merge (json)".into(),
         MaterializeStrategy::DeepMerge(DeepMergeFormat::Yaml) => "deep-merge (yaml)".into(),
         MaterializeStrategy::DeepMerge(DeepMergeFormat::Toml) => "deep-merge (toml)".into(),
+        MaterializeStrategy::Merged => "merged (Phase 1 legacy)".into(),
     }
 }
 
 pub fn run(project_root: PathBuf, query: PathBuf) -> aenv_core::Result<()> {
     let state_path = project_root.join(".aenv-state/state.json");
-    let body = std::fs::read(&state_path).map_err(|e| {
-        aenv_core::AenvError::ProjectNotPinned
-    })?;
+    let body = match std::fs::read(&state_path) {
+        Ok(b) => b,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            // No state file -> not activated. Distinct from "not pinned"
+            // (which is no .aenv file at all). Phase 2 reuses ProjectNotPinned
+            // (exit 20); Phase 5 may add a dedicated NotActivated variant.
+            return Err(aenv_core::AenvError::ProjectNotPinned);
+        }
+        Err(e) => return Err(aenv_core::AenvError::from(e)),
+    };
     let state: ActivationState = serde_json::from_slice(&body)
         .map_err(|e| aenv_core::AenvError::ActivationConflict(e.to_string()))?;
     let out = format_which(&state, &query)
@@ -3909,7 +4087,7 @@ const REG: &str = "/aenv";
 const PROJ: &str = "/proj";
 
 fn registry() -> RegistryLayout {
-    RegistryLayout::from_root(Path::new(REG))
+    RegistryLayout::new(PathBuf::from(REG))
 }
 
 fn setup_activated_chain(fs: &MockFilesystem) {
@@ -3937,7 +4115,7 @@ files = [".claude/skills/X/SKILL.md", "CLAUDE.md"]
 
     aenv_core::activate::activate_namespace(
         fs, &registry(), &adapters,
-        &NamespaceId::new("leaf").unwrap(), Path::new(PROJ),
+        Path::new(PROJ), &NamespaceId::new("leaf").unwrap(),
     ).unwrap();
 }
 
@@ -3947,11 +4125,17 @@ fn forking_a_symlink_replaces_it_with_a_regular_file_with_same_bytes() {
     setup_activated_chain(&fs);
 
     let skill = Path::new(&format!("{PROJ}/.claude/skills/X/SKILL.md"));
-    assert!(fs.symlink_metadata(skill).unwrap().is_symlink());
+    assert!(matches!(
+        fs.symlink_metadata(skill).unwrap().kind,
+        aenv_core::fs::FileKind::Symlink
+    ));
 
     fork_file(&fs, Path::new(PROJ), Path::new(".claude/skills/X/SKILL.md")).unwrap();
 
-    assert!(!fs.symlink_metadata(skill).unwrap().is_symlink());
+    assert!(!matches!(
+        fs.symlink_metadata(skill).unwrap().kind,
+        aenv_core::fs::FileKind::Symlink
+    ));
     assert_eq!(fs.read(skill).unwrap(), b"the skill body");
 
     // No longer in managed_files.
@@ -3998,8 +4182,8 @@ Append to `crates/aenv-core/src/activate.rs`:
 /// For symlinks: replace with a regular copy of the target. For merged
 /// files: leave on disk unchanged. In both cases: remove from
 /// state.managed_files so subsequent activations won't touch it.
-pub fn fork_file(
-    fs: &dyn Filesystem,
+pub fn fork_file<F: Filesystem>(
+    fs: &F,
     project_root: &Path,
     rel_path: &Path,
 ) -> Result<(), AenvError> {
@@ -4116,7 +4300,7 @@ files = [".mcp.json"]
     adapters.insert(cc);
     adapters.insert(mcp);
 
-    let reg = RegistryLayout::from_root(Path::new("/aenv"));
+    let reg = RegistryLayout::new(PathBuf::from("/aenv"));
 
     create_namespace_from_project(
         &fs, &reg, &adapters, "new-env", Path::new("/p"),
@@ -4124,7 +4308,7 @@ files = [".mcp.json"]
 
     // Manifest is created with the right adapters + files.
     let manifest_bytes = fs.read(Path::new("/aenv/envs/new-env/aenv.toml")).unwrap();
-    let m: aenv_core::manifest::AenvManifest = toml::from_slice(&manifest_bytes).unwrap();
+    let m: aenv_core::manifest::AenvManifest = toml::from_str(std::str::from_utf8(&manifest_bytes).unwrap()).unwrap();
     assert_eq!(m.name, "new-env");
     assert!(m.adapters.contains_key("claude-code"));
     assert!(m.adapters.contains_key("mcp"));
@@ -4148,8 +4332,8 @@ Append to `crates/aenv-core/src/namespace.rs`:
 /// Files that the adapter declares but the project lacks are silently
 /// skipped — this lets a user fork from a partial project without first
 /// creating placeholder files.
-pub fn create_namespace_from_project(
-    fs: &dyn crate::fs::Filesystem,
+pub fn create_namespace_from_project<F: crate::fs::Filesystem>(
+    fs: &F,
     registry: &crate::home::RegistryLayout,
     adapters: &crate::adapter::AdapterRegistry,
     new_name: &str,
@@ -4157,12 +4341,13 @@ pub fn create_namespace_from_project(
 ) -> Result<(), crate::AenvError> {
     let dest = registry.namespace_dir(new_name);
     if fs.exists(&dest)? {
-        return Err(crate::AenvError::ActivationConflict(
+        return Err(crate::AenvError::ManifestInvalid(
             format!("namespace {new_name} already exists at {}", dest.display()),
         ));
     }
     let mut manifest_adapters = std::collections::BTreeMap::new();
-    for adapter in adapters.iter() {
+    // AdapterRegistry::iter yields (&String, &Adapter) tuples.
+    for (_, adapter) in adapters.iter() {
         let mut files: Vec<String> = Vec::new();
         for rel in &adapter.files {
             // Skip glob entries in Phase 2 — Phase 4's full glob lands later.
@@ -4204,7 +4389,7 @@ pub fn run_name(
     project_root: PathBuf,
     new_name: String,
 ) -> aenv_core::Result<()> {
-    let registry = aenv_core::home::RegistryLayout::from_root(&aenv_home);
+    let registry = aenv_core::home::RegistryLayout::new(aenv_home.to_path_buf());
     let adapters = aenv_cli::paths::load_adapter_registry(&registry)?;
     aenv_core::namespace::create_namespace_from_project(
         &aenv_core::fs::RealFilesystem,
@@ -4403,6 +4588,7 @@ fn describe(mf: &ManagedFile) -> String {
             };
             format!("merged (deep-merge {fmt_name}) from {}", parts.join(" + "))
         }
+        MaterializeStrategy::Merged => format!("merged (Phase 1 legacy) {}", mf.qualified_name),
     }
 }
 
@@ -4416,7 +4602,7 @@ pub fn run(project_root: std::path::PathBuf, aenv_home: std::path::PathBuf)
     }
     let state: ActivationState = serde_json::from_slice(&std::fs::read(&state_path)?)
         .map_err(|e| aenv_core::AenvError::ActivationConflict(e.to_string()))?;
-    let registry = aenv_core::home::RegistryLayout::from_root(&aenv_home);
+    let registry = aenv_core::home::RegistryLayout::new(aenv_home.to_path_buf());
     let adapters = crate::paths::load_adapter_registry(&registry)?;
     let resolution = aenv_core::resolve::resolve_namespace(
         &aenv_core::fs::RealFilesystem,
@@ -4676,54 +4862,30 @@ fn no_materialized_path_contains_double_colon() {
 }
 
 fn walk_for_double_colon(root: &std::path::Path) {
-    for entry in walkdir(root) {
-        let path = entry.unwrap();
-        let s = path.to_string_lossy();
+    for entry in walkdir::WalkDir::new(root) {
+        let entry = entry.unwrap();
+        let s = entry.path().to_string_lossy();
         assert!(
             !s.contains("::"),
             "materialized path {s} contains '::' which violates identity-erasure"
         );
     }
 }
-
-fn walkdir(root: &std::path::Path) -> impl Iterator<Item = std::io::Result<PathBuf>> {
-    // Minimal recursive walker — avoid pulling the `walkdir` crate for one test.
-    use std::collections::VecDeque;
-    let mut q = VecDeque::new();
-    q.push_back(root.to_path_buf());
-    std::iter::from_fn(move || {
-        while let Some(dir) = q.pop_front() {
-            match std::fs::read_dir(&dir) {
-                Ok(entries) => {
-                    for e in entries.flatten() {
-                        let p = e.path();
-                        if e.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-                            q.push_back(p.clone());
-                        }
-                        return Some(Ok(p));
-                    }
-                }
-                Err(e) => return Some(Err(e)),
-            }
-        }
-        None
-    })
-}
 ```
 
-- [ ] **Step 2: Run the e2e tests**
+Add `walkdir` as a dev-dep. The hand-rolled iterator that was tempting here has subtle correctness pitfalls (queue draining vs. depth-first generator) — `walkdir` is a single-purpose crate written for exactly this; don't reinvent.
 
-Run: `cargo test -p aenv-cli --test composition_e2e`
-Expected: 5 PASS. Each test takes a few seconds (builds the binary, runs it as a subprocess).
-
-The walkdir iterator above has a bug — it returns at most one path per directory before draining the queue. Rewrite it as a proper depth-first generator (use a `Vec<PathBuf>` and pop entries as you go), or pull in the `walkdir` crate as a dev-dep:
+In `crates/aenv-cli/Cargo.toml`:
 
 ```toml
 [dev-dependencies]
 walkdir = "2"
 ```
 
-…and use `walkdir::WalkDir::new(root)` directly. Recommend the latter to avoid bug surface.
+- [ ] **Step 2: Run the e2e tests**
+
+Run: `cargo test -p aenv-cli --test composition_e2e`
+Expected: 5 PASS. Each test takes a few seconds (builds the binary, runs it as a subprocess).
 
 - [ ] **Step 3: Run the whole workspace test**
 
@@ -4838,20 +5000,40 @@ Expected: the message rendered.
   - R-13 — missing adapter aborts. ✓ Task 3.
   - R-30 — all seven adapters ship. ✓ Task 12.
   - R-47 — deep-merge produces a regular file with recorded contributors. ✓ Tasks 6–8 + 11.
-  - R-50 — `aenv status` prints chain + qualified provenance. ✓ Task 16.
+  - R-50 — `aenv status` prints chain + qualified provenance. ✓ Task 16. (Parameters deferred to Phase 3.)
   - R-52 — `aenv which <path>` reports qualified id + shadows. ✓ Task 13.
-  - R-53 — `aenv fork` detaches a file. ✓ Task 14.
-  - R-54 — `aenv fork <name>` creates namespace from project. ✓ Task 15.
+  - R-53 — `aenv fork [<file>]` detaches a file. ✓ Task 14. Note: the bare-`aenv fork` whole-project-detach variant is deferred (not in Phase 2 scope).
+  - R-54 — `aenv fork <name>` creates namespace from project. ✓ Task 15. Note: glob-declared files are not copied; full directory walking is deferred to Phase 4 alongside the skill lifecycle.
 
 - **Placeholder scan:**
   - No "TBD" / "implement later" / "similar to Task N" abbreviations.
-  - One spot to verify: the regex glob approach in Task 3 Step 4 is rejected inline and replaced with the hand-rolled matcher. Implementer should use the hand-rolled version.
+  - Task 3's glob helper uses the hand-rolled `glob_match` (no `regex` dependency). The previously-shown rejected alternative was removed from the plan during adversarial review.
+  - Task 11's `phase1::materialize_symlink` body is a `todo!()` — Step 3b explicitly calls out the extraction as a substantive lift-and-shift from Phase 1's `perform_activation`. The four `ProjectPathState` arms (Absent / AlreadyOurSymlink / ByteIdenticalRegular / Displaced) get adapted to push through `&mut Vec<UndoStep>` + `&mut Vec<ManagedFile>` + `&mut Vec<BackedUpFile>`.
 
 - **Type consistency:**
-  - `NamespaceId::new`, `ShortName::new`, `QualifiedName::new` — used consistently.
-  - `decide_strategy(candidates: &[Candidate], adapters: &AdapterRegistry) -> Result<MaterializeStrategy, AenvError>` — matches every call site (strategy.rs, activate.rs, shadow.rs).
-  - `compute_shadows(&[Candidate], MaterializeStrategy, &AdapterRegistry) -> Vec<QualifiedName>` — adapters arg unused in Phase 2 but kept for Phase 4 (skill short-name resolution); ok to keep underscore-prefixed.
-  - `MaterializeStrategy` enum variants in `resolve.rs` are the canonical set; `state.rs` re-exports.
+  - `NamespaceId::new`, `ShortName::new`, `QualifiedName::new` — used consistently. `NamespaceId::new(s: impl Into<String>)` accepts `&str` and `String`; never `&String`.
+  - `decide_strategy(candidates: &[Candidate], adapters: &AdapterRegistry) -> Result<MaterializeStrategy, AenvError>` — matches every call site in strategy.rs and activate.rs.
+  - `compute_shadows(&[Candidate], MaterializeStrategy, &AdapterRegistry) -> Result<Vec<QualifiedName>>` — returns `Result` (not bare `Vec`) so manifest-invalid candidate paths surface cleanly. `adapters` arg unused in Phase 2 but kept for Phase 4 (skill short-name resolution).
+  - `qualified_from_candidate(&Candidate) -> Result<QualifiedName>` — same Result discipline.
+  - `MaterializeStrategy` enum variants live in `resolve.rs`. Phase 1's `state.rs` definition is deleted in Task 10; `state.rs` re-exports the resolve version. Carries `#[serde(rename_all = "kebab-case")]` plus an explicit `#[serde(rename = "merged")]` on the legacy variant for schema-1 compat.
+  - `BackedUpFile` fields are `original_path` and `backup_path` (matches Phase 1's `state.rs`).
+  - `UndoStep` (Phase 1's name) gains a `RemoveRegularFile { path }` variant. The function `undo<F: Filesystem>(fs: &F, log: Vec<UndoStep>)` keeps its name.
+  - `activate_namespace<F: Filesystem>(fs: &F, layout: &RegistryLayout, adapters: &AdapterRegistry, project_root: &Path, leaf: &NamespaceId) -> Result<ActivationState>` — generic shape preserved from Phase 1; only the final parameter changed from `&str` to `&NamespaceId`.
+
+- **Crate-API consistency:**
+  - `toml = "0.8"` workspace dep: `toml::from_slice` was removed; all parsing uses `toml::from_str(std::str::from_utf8(bytes)?)`.
+  - `pulldown-cmark = "0.10"` API: `Tag::Heading { level, .. }` struct variant and `Event::End(TagEnd::Heading(_))`. `Options::empty()` to avoid pulling table/footnote/strikethrough events.
+  - `RegistryLayout::new(root: PathBuf)` (not `from_root`); test helpers wrap `PathBuf::from(REG)`.
+  - `crate::atomicity::probe_rename_atomicity` (not `probe_rename`).
+  - `Filesystem::Metadata` is a struct with fields `{ kind: FileKind, len: u64 }` — no methods. Symlink/dir checks via `matches!(meta.kind, FileKind::Symlink | FileKind::Directory)` or the trait's `fs.is_symlink(path)`.
+  - `AdapterRegistry::iter()` yields `(&String, &Adapter)` tuples; destructure as `for (_, adapter) in adapters.iter()`.
+  - `MergeError` carries an `impl From<MergeError> for AenvError` so `?` propagation works in `materialize_one`.
+
+- **Open items punted to the implementer or to a later phase:**
+  - `(merged)` synthetic namespace: documented as a Phase 2 convention. Future reservation (rejecting it from `NamespaceId::new` for user input) is deferred — there's no `aenv create` validation in Phase 2 either, so the guard would have one bypass.
+  - Section-merge doubling of identical content: per-spec; flag for `aenv doctor` in Phase 4.
+  - `<!-- aenv:replace -->` on the first namespace in the chain: silent no-op; one-line code comment in `merge_section.rs`.
+  - Windows symlink semantics (Task 14's `fork_file`): Phase 7 territory.
 
 ---
 
