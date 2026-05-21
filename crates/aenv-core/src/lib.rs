@@ -20,6 +20,7 @@ pub mod identity;
 pub mod manifest;
 pub mod namespace;
 pub mod project;
+pub mod resolve;
 pub mod restore;
 pub mod state;
 
