@@ -7,6 +7,7 @@
 //! All merge functions take `Vec<bytes>` in chain order (root first) and
 //! return the merged byte output. Errors are reported as `MergeError`.
 
+pub mod deep_json;
 pub mod section;
 
 /// Errors produced by the merge algorithms.
