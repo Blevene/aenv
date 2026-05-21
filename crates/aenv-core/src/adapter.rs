@@ -18,9 +18,16 @@ pub struct Adapter {
     /// Project-relative paths or directory prefixes the adapter manages.
     #[serde(default)]
     pub files: Vec<String>,
-    /// Merge strategies keyed by relative path. Unused in Phase 1.
+    /// Phase 1 holdover — explicit per-file merge declaration on the adapter
+    /// (rarely used; manifests override). Kept for back-compat.
     #[serde(default)]
     pub merge_strategies: BTreeMap<String, String>,
+    /// Per-path role declaration. Phase 2 understands `"instructions"`.
+    #[serde(default)]
+    pub roles: BTreeMap<String, String>,
+    /// Per-path default merge strategy (consulted before role fallback).
+    #[serde(default)]
+    pub default_merge: BTreeMap<String, String>,
 }
 
 impl Adapter {

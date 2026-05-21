@@ -18,6 +18,8 @@ fn registry_with_claude() -> AdapterRegistry {
         name: "claude-code".to_string(),
         files: vec!["CLAUDE.md".to_string()],
         merge_strategies: Default::default(),
+        roles: Default::default(),
+        default_merge: Default::default(),
     });
     r
 }

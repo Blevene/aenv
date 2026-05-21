@@ -48,6 +48,8 @@ fn registry_insert_then_lookup() {
         name: "claude-code".to_string(),
         files: vec!["CLAUDE.md".to_string()],
         merge_strategies: Default::default(),
+        roles: Default::default(),
+        default_merge: Default::default(),
     };
     reg.insert(a.clone());
     assert_eq!(reg.get("claude-code"), Some(&a));
@@ -133,4 +135,28 @@ fn load_adapters_dir_skips_non_toml_files() {
 
     let reg = AdapterRegistry::load_from_dir(&fs, &dir).unwrap();
     assert_eq!(reg.len(), 1);
+}
+
+#[test]
+fn adapter_parses_roles_and_default_merge() {
+    let toml = r#"
+name = "mcp"
+files = [".mcp.json"]
+[default_merge]
+".mcp.json" = "deep"
+"#;
+    let a: aenv_core::adapter::Adapter = toml::from_str(toml).unwrap();
+    assert_eq!(a.default_merge.get(".mcp.json").unwrap(), "deep");
+}
+
+#[test]
+fn adapter_parses_role_declaration() {
+    let toml = r#"
+name = "claude-code"
+files = ["CLAUDE.md"]
+[roles]
+"CLAUDE.md" = "instructions"
+"#;
+    let a: aenv_core::adapter::Adapter = toml::from_str(toml).unwrap();
+    assert_eq!(a.roles.get("CLAUDE.md").unwrap(), "instructions");
 }

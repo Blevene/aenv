@@ -23,5 +23,6 @@ pub mod project;
 pub mod resolve;
 pub mod restore;
 pub mod state;
+pub mod strategy;
 
 pub use error::{AenvError, Result};
