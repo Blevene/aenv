@@ -1,22 +1,85 @@
 //! `aenv status [--project <path>]`.
 
 use aenv_core::fs::Filesystem;
-use aenv_core::state::{ActivationState, MaterializeStrategy};
+use aenv_core::identity::NamespaceId;
+use aenv_core::resolve::{DeepMergeFormat, MaterializeStrategy};
+use aenv_core::state::{ActivationState, ManagedFile};
 use aenv_core::Result;
 use std::path::Path;
 
-fn strategy_label(s: MaterializeStrategy) -> &'static str {
-    match s {
-        MaterializeStrategy::Symlink => "symlink",
-        MaterializeStrategy::Copy => "copy",
-        MaterializeStrategy::Identical => "identical",
-        MaterializeStrategy::Merged => "merged",
-        MaterializeStrategy::SectionMerge => "section-merge",
-        MaterializeStrategy::DeepMerge(_) => "deep-merge",
+/// Format activation state with resolution chain into human-readable output.
+///
+/// Shows the active namespace, resolution chain (root → leaf), and per-file
+/// provenance (qualified name, merge strategy, contributors, shadows).
+pub fn format_status(state: &ActivationState, chain: &[NamespaceId]) -> String {
+    let mut out = String::new();
+    out.push_str(&format!("Active namespace: {}\n", state.active_namespace));
+    out.push_str("Resolution:       ");
+    let rendered: Vec<&str> = chain.iter().map(|n| n.as_str()).collect();
+    out.push_str(&rendered.join(" → "));
+    out.push('\n');
+    out.push('\n');
+
+    if state.managed_files.is_empty() {
+        out.push_str("No managed files.\n");
+    } else {
+        out.push_str("Managed files:\n");
+        for mf in &state.managed_files {
+            out.push_str(&format!("  ./{}\n", mf.path.display()));
+            out.push_str(&format!("      {}\n", describe(mf)));
+            for s in &mf.shadows {
+                out.push_str(&format!("      (shadows {s})\n"));
+            }
+        }
+    }
+
+    if !state.backed_up.is_empty() {
+        out.push('\n');
+        out.push_str("Backed-up originals:\n");
+        for b in &state.backed_up {
+            out.push_str(&format!("  {} -> {}\n", b.original_path.display(), b.backup_path.display()));
+        }
+    }
+    out
+}
+
+fn describe(mf: &ManagedFile) -> String {
+    match mf.strategy {
+        MaterializeStrategy::Symlink => format!("from {}", mf.qualified_name),
+        MaterializeStrategy::Identical => {
+            format!("identical to {} (no symlink)", mf.qualified_name)
+        }
+        MaterializeStrategy::Copy => format!("copy of {}", mf.qualified_name),
+        MaterializeStrategy::SectionMerge => {
+            let parts: Vec<String> = mf
+                .contributors
+                .iter()
+                .map(|c| c.namespace().as_str().to_string())
+                .collect();
+            format!("merged from {}", parts.join(" + "))
+        }
+        MaterializeStrategy::DeepMerge(fmt) => {
+            let parts: Vec<String> = mf
+                .contributors
+                .iter()
+                .map(|c| c.namespace().as_str().to_string())
+                .collect();
+            let fmt_name = match fmt {
+                DeepMergeFormat::Json => "json",
+                DeepMergeFormat::Yaml => "yaml",
+                DeepMergeFormat::Toml => "toml",
+            };
+            format!("merged (deep-merge {}) from {}", fmt_name, parts.join(" + "))
+        }
+        MaterializeStrategy::Merged => format!("merged (Phase 1 legacy) {}", mf.qualified_name),
     }
 }
 
-pub fn run<F: Filesystem>(fs: &F, project_root: &Path) -> Result<()> {
+pub fn run<F: Filesystem>(
+    fs: &F,
+    project_root: &Path,
+    aenv_home: &Path,
+) -> Result<()> {
     let state_path = project_root.join(".aenv-state/state.json");
     if !fs.exists(&state_path)? {
         println!("No active namespace in {}", project_root.display());
@@ -26,25 +89,16 @@ pub fn run<F: Filesystem>(fs: &F, project_root: &Path) -> Result<()> {
     let text = String::from_utf8(bytes)
         .map_err(|e| aenv_core::AenvError::ManifestInvalid(format!("state.json: {e}")))?;
     let state = ActivationState::from_json(&text)?;
-    println!("Active namespace: {}", state.active_namespace);
-    println!("Project root: {}", state.project_root.display());
-    println!("Managed files ({}):", state.managed_files.len());
-    for file in &state.managed_files {
-        println!(
-            "  {} ({})",
-            file.path.display(),
-            strategy_label(file.strategy)
-        );
-    }
-    if !state.backed_up.is_empty() {
-        println!("Backed up ({}):", state.backed_up.len());
-        for backup in &state.backed_up {
-            println!(
-                "  {} -> {}",
-                backup.original_path.display(),
-                backup.backup_path.display()
-            );
-        }
-    }
+
+    // Re-resolve the chain
+    let registry = aenv_core::home::RegistryLayout::new(aenv_home.to_path_buf());
+    let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
+        fs,
+        &registry.adapters_dir(),
+    )?;
+    let leaf = NamespaceId::new(state.active_namespace.as_str())?;
+    let resolution = aenv_core::resolve::resolve_namespace(fs, &registry, &adapters, &leaf)?;
+
+    print!("{}", format_status(&state, &resolution.chain));
     Ok(())
 }

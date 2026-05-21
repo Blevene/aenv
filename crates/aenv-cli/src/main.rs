@@ -127,7 +127,8 @@ fn main() -> ExitCode {
             }
             Command::Status { project } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;
-                cmd::status::run(&fs, &project_root)
+                let aenv_home = paths::resolve_aenv_home()?;
+                cmd::status::run(&fs, &project_root, &aenv_home)
             }
             Command::Adapter { action } => match action {
                 AdapterAction::Add { path } => cmd::adapter::run_add(&fs, &layout, &path),
