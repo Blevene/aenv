@@ -35,6 +35,9 @@ pub(super) fn materialize_symlink<F: Filesystem>(
     let action = super::classify_project_path(fs, project_path, source)?;
     match action {
         super::ProjectPathState::Absent => {
+            if let Some(parent) = project_path.parent() {
+                fs.create_dir_all(parent)?;
+            }
             fs.symlink(source, project_path)?;
             undo_log.push(UndoStep::RemoveSymlink {
                 link: project_path.to_path_buf(),

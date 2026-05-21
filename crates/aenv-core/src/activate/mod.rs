@@ -299,6 +299,9 @@ fn write_merged_regular<F: Filesystem>(
             backup_path,
         });
     }
+    if let Some(parent) = project_path.parent() {
+        fs.create_dir_all(parent)?;
+    }
     fs.write(project_path, contents)?;
     undo_log.push(UndoStep::RemoveRegularFile {
         path: project_path.to_path_buf(),
