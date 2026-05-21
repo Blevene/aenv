@@ -125,3 +125,45 @@ fn yaml_invalid_input_returns_parse_error() {
         aenv_core::merge::MergeError::Parse { kind: "yaml", .. }
     ));
 }
+
+use aenv_core::merge::deep_toml::merge_toml;
+
+#[test]
+fn toml_merges_tables_union_of_keys() {
+    let a = b"a = 1\nb = 2\n";
+    let b = b"b = 20\nc = 3\n";
+    let out = merge_toml(&[a.to_vec(), b.to_vec()]).unwrap();
+    let v: toml::Value = toml::from_str(std::str::from_utf8(&out).unwrap()).unwrap();
+    assert_eq!(v["a"].as_integer().unwrap(), 1);
+    assert_eq!(v["b"].as_integer().unwrap(), 20);
+    assert_eq!(v["c"].as_integer().unwrap(), 3);
+}
+
+#[test]
+fn toml_arrays_concatenate() {
+    let a = b"list = [1, 2]\n";
+    let b = b"list = [3]\n";
+    let out = merge_toml(&[a.to_vec(), b.to_vec()]).unwrap();
+    let v: toml::Value = toml::from_str(std::str::from_utf8(&out).unwrap()).unwrap();
+    assert_eq!(v["list"].as_array().unwrap().len(), 3);
+}
+
+#[test]
+fn toml_nested_tables_merge_recursively() {
+    let a = b"[adapters.cc]\nfiles = [\"a\"]\n";
+    let b = b"[adapters.cursor]\nfiles = [\"b\"]\n";
+    let out = merge_toml(&[a.to_vec(), b.to_vec()]).unwrap();
+    let v: toml::Value = toml::from_str(std::str::from_utf8(&out).unwrap()).unwrap();
+    assert!(v["adapters"]["cc"]["files"].is_array());
+    assert!(v["adapters"]["cursor"]["files"].is_array());
+}
+
+#[test]
+fn toml_invalid_input_returns_parse_error() {
+    let a = b"= invalid\n";
+    let err = merge_toml(&[a.to_vec()]).unwrap_err();
+    assert!(matches!(
+        err,
+        aenv_core::merge::MergeError::Parse { kind: "toml", .. }
+    ));
+}
