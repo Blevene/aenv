@@ -109,17 +109,12 @@ impl PolicyOutcome {
     }
 }
 
-/// The interface implemented by every built-in evaluator.
-///
-/// `evaluate` returns the outcomes for *this* policy against the namespace
-/// in context. Returning an empty Vec is legal (e.g. a policy with no
-/// applicable artifacts).
-pub trait PolicyEvaluator<F: Filesystem> {
-    /// Evaluate the policy and produce a flat list of outcomes.
-    fn evaluate(&self, policy: &ResolvedPolicy, ctx: &PolicyContext<F>) -> Vec<PolicyOutcome>;
-}
-
 /// Route a resolved policy to its evaluator.
+///
+/// Each known policy key maps to a free function in its own submodule. Unknown
+/// keys produce a single `WarnSkip` so `aenv doctor` can surface them without
+/// failing — this keeps the manifest format forward-compatible with policy
+/// keys a future binary version might add.
 pub fn dispatch<F: Filesystem>(
     key: &str,
     policy: &ResolvedPolicy,

@@ -1,8 +1,5 @@
 use aenv_core::identity::{NamespaceId, QualifiedName, ShortName};
-#[allow(unused_imports)]
-use aenv_core::policies::builtin::{
-    dispatch, OutcomeStatus, PolicyContext, PolicyEvaluator, PolicyOutcome,
-};
+use aenv_core::policies::builtin::{dispatch, OutcomeStatus, PolicyContext, PolicyOutcome};
 use aenv_core::policies::{PolicyValue, ResolvedPolicy};
 
 #[test]
