@@ -49,10 +49,7 @@ pub fn format_status(state: &ActivationState, chain: &[NamespaceId]) -> String {
         out.push('\n');
         out.push_str("Parameters:\n");
         for (k, rp) in &state.parameters {
-            out.push_str(&format!(
-                "  {k:30} = {} (from {})\n",
-                rp.value, rp.source
-            ));
+            out.push_str(&format!("  {k:30} = {} (from {})\n", rp.value, rp.source));
         }
     }
 

@@ -37,8 +37,9 @@ pub fn evaluate<F: Filesystem>(
         }
         let target = QualifiedName::new(
             c.namespace.clone(),
-            ShortName::new(rel.clone())
-                .unwrap_or_else(|_| ShortName::new("?".to_string()).expect("trivial short name is valid")),
+            ShortName::new(rel.clone()).unwrap_or_else(|_| {
+                ShortName::new("?".to_string()).expect("trivial short name is valid")
+            }),
         );
         let msg = format!(
             "{} matches forbid_paths pattern; namespace must not declare this path.",

@@ -191,11 +191,7 @@ fn get_undefined_parameter_exits_16() {
     )
     .unwrap();
 
-    let out = h
-        .cmd()
-        .args(["get", "base.nonexistent"])
-        .output()
-        .unwrap();
+    let out = h.cmd().args(["get", "base.nonexistent"]).output().unwrap();
 
     assert!(!out.status.success(), "should have failed");
     assert_eq!(

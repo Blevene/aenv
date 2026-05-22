@@ -194,8 +194,12 @@ pub fn resolve_namespace<F: Filesystem>(
     walk(fs, registry, leaf, &mut chain, &mut visiting, &mut visited)?;
 
     let mut candidates: Vec<Candidate> = Vec::new();
-    let mut params_per_ns: BTreeMap<NamespaceId, BTreeMap<String, crate::parameters::ParameterValue>> = BTreeMap::new();
-    let mut policies_per_ns: BTreeMap<NamespaceId, BTreeMap<String, crate::policies::PolicyDecl>> = BTreeMap::new();
+    let mut params_per_ns: BTreeMap<
+        NamespaceId,
+        BTreeMap<String, crate::parameters::ParameterValue>,
+    > = BTreeMap::new();
+    let mut policies_per_ns: BTreeMap<NamespaceId, BTreeMap<String, crate::policies::PolicyDecl>> =
+        BTreeMap::new();
     for ns in &chain {
         let manifest = load_manifest(fs, registry, ns)?;
         for adapter_name in manifest.adapters.keys() {
@@ -207,21 +211,24 @@ pub fn resolve_namespace<F: Filesystem>(
         params_per_ns.insert(ns.clone(), manifest.parameters.clone());
         policies_per_ns.insert(ns.clone(), manifest.policies.clone());
     }
-    let parameters = resolve_parameters(&chain, &params_per_ns)
-        .map_err(|e| ResolutionError::ManifestInvalid {
+    let parameters = resolve_parameters(&chain, &params_per_ns).map_err(|e| {
+        ResolutionError::ManifestInvalid {
             namespace: leaf.clone(),
             reason: e.to_string(),
-        })?;
-    let policies = resolve_policies(&chain, &policies_per_ns)
-        .map_err(|e| ResolutionError::ManifestInvalid {
+        }
+    })?;
+    let policies = resolve_policies(&chain, &policies_per_ns).map_err(|e| {
+        ResolutionError::ManifestInvalid {
             namespace: leaf.clone(),
             reason: e.to_string(),
-        })?;
-    crate::parameters::check_against_adapters(&parameters, adapters)
-        .map_err(|e| ResolutionError::ManifestInvalid {
+        }
+    })?;
+    crate::parameters::check_against_adapters(&parameters, adapters).map_err(|e| {
+        ResolutionError::ManifestInvalid {
             namespace: leaf.clone(),
             reason: e.to_string(),
-        })?;
+        }
+    })?;
     Ok(ResolutionResult {
         chain,
         candidates,

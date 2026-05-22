@@ -8,7 +8,8 @@ use aenv_core::resolve::resolve_namespace;
 use std::path::PathBuf;
 
 fn write_manifest(fs: &MockFilesystem, layout: &RegistryLayout, name: &str, body: &str) {
-    fs.write(&layout.manifest_path(name), body.as_bytes()).unwrap();
+    fs.write(&layout.manifest_path(name), body.as_bytes())
+        .unwrap();
     fs.write(
         &layout.namespace_dir(name).join("CLAUDE.md"),
         b"placeholder",
@@ -21,8 +22,8 @@ fn resolves_parameters_and_policies_from_chain() {
     let fs = MockFilesystem::new();
     let layout = RegistryLayout::new(PathBuf::from("/h"));
     let adapters = AdapterRegistry::new(); // empty adapters → ignore the [adapters.x] field; but resolver still walks
-    // Even with empty adapter registry, the manifests below declare no adapters,
-    // so resolution should succeed.
+                                           // Even with empty adapter registry, the manifests below declare no adapters,
+                                           // so resolution should succeed.
 
     write_manifest(
         &fs,

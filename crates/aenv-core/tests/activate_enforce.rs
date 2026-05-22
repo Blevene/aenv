@@ -27,7 +27,8 @@ files = ["CLAUDE.md"]
 }
 
 fn write_manifest(fs: &MockFilesystem, layout: &RegistryLayout, name: &str, body: &str) {
-    fs.write(&layout.manifest_path(name), body.as_bytes()).unwrap();
+    fs.write(&layout.manifest_path(name), body.as_bytes())
+        .unwrap();
 }
 
 #[test]

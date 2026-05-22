@@ -46,9 +46,7 @@ fn parse_spec(spec: &str) -> Result<(&str, &str)> {
         ));
     }
     let (ns, param) = spec.split_once('.').ok_or_else(|| {
-        AenvError::ManifestInvalid(format!(
-            "expected '<namespace>.<parameter>', got '{spec}'"
-        ))
+        AenvError::ManifestInvalid(format!("expected '<namespace>.<parameter>', got '{spec}'"))
     })?;
     if ns.is_empty() || param.is_empty() {
         return Err(AenvError::ManifestInvalid(format!(

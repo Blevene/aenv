@@ -61,8 +61,7 @@ fn set_inserts_new_parameter() {
         .unwrap();
     assert_success(&out, "set base.default_model");
 
-    let manifest =
-        std::fs::read_to_string(h.aenv_home().join("envs/base/aenv.toml")).unwrap();
+    let manifest = std::fs::read_to_string(h.aenv_home().join("envs/base/aenv.toml")).unwrap();
     assert!(
         manifest.contains("default_model"),
         "manifest missing 'default_model': {manifest}"
@@ -98,8 +97,7 @@ fn set_overwrites_existing() {
         .unwrap();
     assert_success(&out, "set base.budget");
 
-    let manifest =
-        std::fs::read_to_string(h.aenv_home().join("envs/base/aenv.toml")).unwrap();
+    let manifest = std::fs::read_to_string(h.aenv_home().join("envs/base/aenv.toml")).unwrap();
     assert!(
         manifest.contains("3000"),
         "manifest should contain 3000: {manifest}"
@@ -128,8 +126,7 @@ fn set_infers_boolean() {
         .unwrap();
     assert_success(&out, "set base.verbose");
 
-    let manifest =
-        std::fs::read_to_string(h.aenv_home().join("envs/base/aenv.toml")).unwrap();
+    let manifest = std::fs::read_to_string(h.aenv_home().join("envs/base/aenv.toml")).unwrap();
     assert!(
         manifest.contains("verbose = true"),
         "manifest should contain 'verbose = true': {manifest}"
@@ -154,11 +151,13 @@ fn set_infers_list_of_strings() {
         .unwrap();
     assert_success(&out, "set base.forbid_tools");
 
-    let manifest =
-        std::fs::read_to_string(h.aenv_home().join("envs/base/aenv.toml")).unwrap();
+    let manifest = std::fs::read_to_string(h.aenv_home().join("envs/base/aenv.toml")).unwrap();
     assert!(manifest.contains("edit"), "missing 'edit': {manifest}");
     assert!(manifest.contains("write"), "missing 'write': {manifest}");
-    assert!(manifest.contains("bash:rm"), "missing 'bash:rm': {manifest}");
+    assert!(
+        manifest.contains("bash:rm"),
+        "missing 'bash:rm': {manifest}"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -169,11 +168,7 @@ fn set_infers_list_of_strings() {
 fn set_unknown_namespace_exits_10() {
     let h = Harness::new();
 
-    let out = h
-        .cmd()
-        .args(["set", "ghost.x", "1"])
-        .output()
-        .unwrap();
+    let out = h.cmd().args(["set", "ghost.x", "1"]).output().unwrap();
     assert!(
         !out.status.success(),
         "expected failure for unknown namespace"
@@ -194,11 +189,7 @@ fn set_unknown_namespace_exits_10() {
 fn set_requires_explicit_namespace() {
     let h = Harness::new();
 
-    let out = h
-        .cmd()
-        .args(["set", ".x", "1"])
-        .output()
-        .unwrap();
+    let out = h.cmd().args(["set", ".x", "1"]).output().unwrap();
     assert!(
         !out.status.success(),
         "expected failure when no explicit namespace given"

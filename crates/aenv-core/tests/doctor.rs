@@ -61,7 +61,10 @@ fn clean_report_when_all_pass() {
     let report = evaluate(&fs, &layout, &adapters, &resolved);
     assert!(!report.has_enforce_violations());
     assert_eq!(report.fail_count(), 0);
-    assert!(report.outcomes.iter().any(|o| matches!(o.status, OutcomeStatus::Pass)));
+    assert!(report
+        .outcomes
+        .iter()
+        .any(|o| matches!(o.status, OutcomeStatus::Pass)));
 }
 
 #[test]

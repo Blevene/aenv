@@ -2,10 +2,9 @@ use aenv_core::parameters::ParameterValue;
 
 #[test]
 fn parses_string() {
-    let pv: ParameterValue = ParameterValue::from_toml_value(&toml::Value::String(
-        "claude-opus-4.7".to_owned(),
-    ))
-    .unwrap();
+    let pv: ParameterValue =
+        ParameterValue::from_toml_value(&toml::Value::String("claude-opus-4.7".to_owned()))
+            .unwrap();
     assert_eq!(pv, ParameterValue::String("claude-opus-4.7".into()));
 }
 

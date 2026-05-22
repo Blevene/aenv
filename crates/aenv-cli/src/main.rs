@@ -160,8 +160,10 @@ fn main() -> ExitCode {
                 AdapterAction::List => cmd::adapter::run_list(&fs, &layout),
             },
             Command::Get { spec } => {
-                let adapters =
-                    aenv_core::adapter::AdapterRegistry::load_from_dir(&fs, &layout.adapters_dir())?;
+                let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
+                    &fs,
+                    &layout.adapters_dir(),
+                )?;
                 // Defer project-root resolution so `aenv get ns.param` works
                 // outside a project directory (no .aenv pin needed).
                 cmd::get::run(&fs, &layout, &adapters, None, &spec)

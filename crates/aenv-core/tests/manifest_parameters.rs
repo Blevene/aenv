@@ -27,7 +27,10 @@ forbid_tools = ["edit", "write"]
     );
     assert_eq!(
         m.parameters.get("forbid_tools"),
-        Some(&ParameterValue::ListString(vec!["edit".into(), "write".into()]))
+        Some(&ParameterValue::ListString(vec![
+            "edit".into(),
+            "write".into()
+        ]))
     );
 }
 

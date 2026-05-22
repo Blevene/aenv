@@ -87,9 +87,10 @@ pub fn run<F: Filesystem>(
     let rr = resolve_namespace(fs, layout, adapters, &leaf)?;
 
     // Look up the parameter in the resolution result.
-    let rp = rr.parameters.get(param).ok_or_else(|| {
-        AenvError::ParameterUndefined(format!("{leaf_name}.{param}"))
-    })?;
+    let rp = rr
+        .parameters
+        .get(param)
+        .ok_or_else(|| AenvError::ParameterUndefined(format!("{leaf_name}.{param}")))?;
 
     // Line 1: value.
     println!("{}", rp.value);
@@ -126,9 +127,9 @@ pub fn run<F: Filesystem>(
     let provenance = if source_str == leaf_name {
         // The leaf namespace supplied this value.
         match prior_info {
-            Some((prior_ns, prior_val)) => format!(
-                "  source: {source_str} (overrides {prior_ns} which declared {prior_val})"
-            ),
+            Some((prior_ns, prior_val)) => {
+                format!("  source: {source_str} (overrides {prior_ns} which declared {prior_val})")
+            }
             None => format!("  source: {source_str} (declared, not inherited)"),
         }
     } else {

@@ -68,7 +68,10 @@ fn pass_when_under_limit() {
     };
     let out = dispatch("instructions_max_chars", &rp, &ctx);
     assert_eq!(out.len(), 1);
-    assert!(matches!(out[0].status, OutcomeStatus::Pass), "out = {out:?}");
+    assert!(
+        matches!(out[0].status, OutcomeStatus::Pass),
+        "out = {out:?}"
+    );
 }
 
 #[test]

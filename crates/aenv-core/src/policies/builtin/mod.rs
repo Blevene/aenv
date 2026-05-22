@@ -149,10 +149,9 @@ impl<'a> PolicyContext<'a, crate::fs::MockFilesystem> {
         // one AdapterRegistry, one ResolutionResult per call).
         let fs: &'static crate::fs::MockFilesystem =
             Box::leak(Box::new(crate::fs::MockFilesystem::new()));
-        let layout: &'static crate::home::RegistryLayout =
-            Box::leak(Box::new(crate::home::RegistryLayout::new(
-                std::path::PathBuf::from("/dummy"),
-            )));
+        let layout: &'static crate::home::RegistryLayout = Box::leak(Box::new(
+            crate::home::RegistryLayout::new(std::path::PathBuf::from("/dummy")),
+        ));
         let adapters: &'static crate::adapter::AdapterRegistry =
             Box::leak(Box::new(crate::adapter::AdapterRegistry::new()));
         let resolved: &'static ResolutionResult = Box::leak(Box::new(ResolutionResult {

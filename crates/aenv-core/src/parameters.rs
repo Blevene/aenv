@@ -188,7 +188,10 @@ pub fn check_against_adapters(
                     )));
                 }
             } else {
-                decls.insert(p.name.as_str(), (adapter_name.as_str(), p.r#type.type_tag()));
+                decls.insert(
+                    p.name.as_str(),
+                    (adapter_name.as_str(), p.r#type.type_tag()),
+                );
             }
         }
     }

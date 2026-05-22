@@ -68,7 +68,11 @@ fn exact_match_advisory_warns() {
         policies: BTreeMap::new(),
     };
     let policy = forbid(vec![".env"], false);
-    let out = dispatch("forbid_paths", &policy, &ctx(&fs, &layout, &adapters, &resolved));
+    let out = dispatch(
+        "forbid_paths",
+        &policy,
+        &ctx(&fs, &layout, &adapters, &resolved),
+    );
     assert_eq!(out.len(), 1);
     if let OutcomeStatus::Warn { msg } = &out[0].status {
         assert!(msg.contains(".env"));
@@ -90,7 +94,11 @@ fn exact_match_enforced_fails() {
         policies: BTreeMap::new(),
     };
     let policy = forbid(vec![".env"], true);
-    let out = dispatch("forbid_paths", &policy, &ctx(&fs, &layout, &adapters, &resolved));
+    let out = dispatch(
+        "forbid_paths",
+        &policy,
+        &ctx(&fs, &layout, &adapters, &resolved),
+    );
     assert!(matches!(out[0].status, OutcomeStatus::Fail { .. }));
 }
 
@@ -107,7 +115,11 @@ fn star_suffix_matches() {
         policies: BTreeMap::new(),
     };
     let policy = forbid(vec![".env*"], false);
-    let out = dispatch("forbid_paths", &policy, &ctx(&fs, &layout, &adapters, &resolved));
+    let out = dispatch(
+        "forbid_paths",
+        &policy,
+        &ctx(&fs, &layout, &adapters, &resolved),
+    );
     assert!(matches!(out[0].status, OutcomeStatus::Warn { .. }));
 }
 
@@ -124,7 +136,11 @@ fn glob_double_star_matches_subtree() {
         policies: BTreeMap::new(),
     };
     let policy = forbid(vec!["secrets/**"], false);
-    let out = dispatch("forbid_paths", &policy, &ctx(&fs, &layout, &adapters, &resolved));
+    let out = dispatch(
+        "forbid_paths",
+        &policy,
+        &ctx(&fs, &layout, &adapters, &resolved),
+    );
     assert!(matches!(out[0].status, OutcomeStatus::Warn { .. }));
 }
 
@@ -141,7 +157,11 @@ fn pass_outcome_when_no_match() {
         policies: BTreeMap::new(),
     };
     let policy = forbid(vec![".env*", "secrets/**"], false);
-    let out = dispatch("forbid_paths", &policy, &ctx(&fs, &layout, &adapters, &resolved));
+    let out = dispatch(
+        "forbid_paths",
+        &policy,
+        &ctx(&fs, &layout, &adapters, &resolved),
+    );
     assert_eq!(out.len(), 1);
     assert!(matches!(out[0].status, OutcomeStatus::Pass));
 }
@@ -159,7 +179,11 @@ fn empty_list_passes() {
         policies: BTreeMap::new(),
     };
     let policy = forbid(vec![], false);
-    let out = dispatch("forbid_paths", &policy, &ctx(&fs, &layout, &adapters, &resolved));
+    let out = dispatch(
+        "forbid_paths",
+        &policy,
+        &ctx(&fs, &layout, &adapters, &resolved),
+    );
     assert!(matches!(out[0].status, OutcomeStatus::Pass));
 }
 
@@ -179,6 +203,10 @@ fn wrong_value_type_warn_skips() {
         enforce: false,
         source: ns("base"),
     };
-    let out = dispatch("forbid_paths", &policy, &ctx(&fs, &layout, &adapters, &resolved));
+    let out = dispatch(
+        "forbid_paths",
+        &policy,
+        &ctx(&fs, &layout, &adapters, &resolved),
+    );
     assert!(matches!(out[0].status, OutcomeStatus::WarnSkip { .. }));
 }
