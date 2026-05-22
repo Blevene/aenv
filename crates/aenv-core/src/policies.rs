@@ -14,6 +14,7 @@
 //! a warning).
 
 use crate::error::{AenvError, Result};
+use crate::identity::NamespaceId;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -141,4 +142,117 @@ pub fn parse_policy_table(
         out.insert(k.clone(), PolicyDecl::from_toml_value(k, v)?);
     }
     Ok(out)
+}
+
+/// One resolved policy after `extends`-chain resolution.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ResolvedPolicy {
+    /// Effective value after `extends`-chain resolution.
+    pub value: PolicyValue,
+    /// Final `enforce` flag (`true` if any namespace in the chain set it).
+    pub enforce: bool,
+    /// Latest namespace in the chain that declared this key.
+    pub source: NamespaceId,
+}
+
+/// Resolve `[policies]` tables across the `extends` chain. Returns
+/// `ManifestInvalid` if any child weakens a parent's `enforce = true`
+/// declaration (R-75) or if the same key has incompatible types across the chain.
+///
+/// "Weaken" is defined per type:
+/// * Integer: raising the limit (`child > parent`) weakens.
+/// * Boolean: flipping `true` -> `false` weakens.
+/// * ListString: removing entries weakens (the child must be a superset).
+/// * Enforce flag: changing `true` -> `false` weakens, even with the same value.
+pub fn resolve_policies(
+    chain: &[NamespaceId],
+    per_ns: &BTreeMap<NamespaceId, BTreeMap<String, PolicyDecl>>,
+) -> Result<BTreeMap<String, ResolvedPolicy>> {
+    let mut out: BTreeMap<String, ResolvedPolicy> = BTreeMap::new();
+    for ns in chain {
+        let table = match per_ns.get(ns) {
+            Some(t) => t,
+            None => continue,
+        };
+        for (k, decl) in table {
+            if let Some(prev) = out.get(k) {
+                if prev.value.type_tag() != decl.value.type_tag() {
+                    return Err(AenvError::ManifestInvalid(format!(
+                        "policy '{}' has incompatible types across chain: \
+                         {} declared {} but {} declared {}",
+                        k,
+                        prev.source,
+                        prev.value.type_tag(),
+                        ns,
+                        decl.value.type_tag()
+                    )));
+                }
+                if prev.enforce {
+                    enforce_protection(k, ns, prev, decl)?;
+                }
+            }
+            out.insert(
+                k.clone(),
+                ResolvedPolicy {
+                    value: decl.value.clone(),
+                    enforce: decl.enforce,
+                    source: ns.clone(),
+                },
+            );
+        }
+    }
+    Ok(out)
+}
+
+fn enforce_protection(
+    key: &str,
+    child_ns: &NamespaceId,
+    parent: &ResolvedPolicy,
+    child: &PolicyDecl,
+) -> Result<()> {
+    // The parent is enforced. The child may keep enforce on or raise it; it
+    // may not downgrade to advisory.
+    if !child.enforce {
+        return Err(AenvError::ManifestInvalid(format!(
+            "policy '{}' is enforced by {} but {} sets enforce = false (R-75: \
+             a child may not downgrade an inherited enforced policy)",
+            key, parent.source, child_ns
+        )));
+    }
+
+    // Same-or-stricter check by type.
+    match (&parent.value, &child.value) {
+        (PolicyValue::Integer(p), PolicyValue::Integer(c)) => {
+            if c > p {
+                return Err(AenvError::ManifestInvalid(format!(
+                    "policy '{key}' is enforced by {} at {p}; {} attempts to weaken \
+                     by raising the limit to {c} (R-75)",
+                    parent.source, child_ns
+                )));
+            }
+        }
+        (PolicyValue::Boolean(p), PolicyValue::Boolean(c)) => {
+            if *p && !*c {
+                return Err(AenvError::ManifestInvalid(format!(
+                    "policy '{key}' is enforced by {} at true; {} attempts to weaken \
+                     to false (R-75)",
+                    parent.source, child_ns
+                )));
+            }
+        }
+        (PolicyValue::ListString(p_list), PolicyValue::ListString(c_list)) => {
+            for parent_entry in p_list {
+                if !c_list.contains(parent_entry) {
+                    return Err(AenvError::ManifestInvalid(format!(
+                        "policy '{key}' is enforced by {} and includes '{parent_entry}'; \
+                         {} attempts to weaken by removing it (R-75)",
+                        parent.source, child_ns
+                    )));
+                }
+            }
+        }
+        // Type-mismatch already caught by the caller.
+        _ => unreachable!("type-mismatch should have been caught earlier"),
+    }
+    Ok(())
 }
