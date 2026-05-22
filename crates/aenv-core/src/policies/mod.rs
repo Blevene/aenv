@@ -204,6 +204,8 @@ pub fn resolve_policies(
     Ok(out)
 }
 
+pub mod builtin;
+
 fn enforce_protection(
     key: &str,
     child_ns: &NamespaceId,
