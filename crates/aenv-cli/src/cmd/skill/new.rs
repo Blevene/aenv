@@ -75,6 +75,8 @@ pub fn run<F: Filesystem>(
         required: false,
     });
     fs.write(&manifest_path, manifest.to_toml().as_bytes())?;
-    println!("Created authored skill '{skill_name}' in namespace '{namespace}'");
+    println!("Created authored skill '{skill_name}' in namespace '{namespace}':");
+    println!("  - {}", skill_md_path.display());
+    println!("  - registered in {}", manifest_path.display());
     Ok(())
 }

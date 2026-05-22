@@ -66,7 +66,8 @@ pub fn run<F: Filesystem>(
     // resolved ref. If the user said `--pin master`, we want the actual SHA,
     // not the branch name. Use `apply_required_rule` with required=true so
     // resolution failure surfaces as an error.
-    if pin.is_some() {
+    if let Some(pin_ref) = pin {
+        eprintln!("Resolving {source} @ {pin_ref}...");
         decl.required = true;
         let resolution =
             apply_required_rule(fs, layout, &decl)?.expect("required=true should propagate errors");
@@ -77,9 +78,17 @@ pub fn run<F: Filesystem>(
     }
 
     let _ = adapters; // declarations don't need adapter lookup yet
+    let pinned_ref = decl.ref_.clone();
     manifest.skills.push(decl);
     fs.write(&manifest_path, manifest.to_toml().as_bytes())?;
-    println!("Imported skill '{skill_name}' into namespace '{namespace}'");
+    println!("Imported skill '{skill_name}' into namespace '{namespace}':");
+    println!("  - source: {source}");
+    if let Some(r) = pinned_ref {
+        println!("  - pinned ref: {r}");
+    } else {
+        println!("  - no pin (resolves on each activation)");
+    }
+    println!("  - registered in {}", manifest_path.display());
     Ok(())
 }
 

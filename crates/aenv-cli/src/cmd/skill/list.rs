@@ -42,7 +42,14 @@ pub fn run<F: Filesystem>(fs: &F, layout: &RegistryLayout, ns_filter: Option<&st
                 SkillMode::Imported => "imported",
             };
             let source = s.source.as_deref().unwrap_or("-");
-            let pin = s.ref_.as_deref().unwrap_or("-");
+            // Per functional spec §5.11, unpinned imported skills render
+            // as "(head)" — they resolve to head on each activation.
+            // Authored skills render as "-" since pinning doesn't apply.
+            let pin = match (s.mode, s.ref_.as_deref()) {
+                (_, Some(r)) => r.to_string(),
+                (SkillMode::Imported, None) => "(head)".to_string(),
+                (SkillMode::Authored, None) => "-".to_string(),
+            };
             println!(
                 "{:<20}  {:<30}  {:<10}  {:<60}  {}",
                 ns, s.name, mode, source, pin
