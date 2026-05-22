@@ -62,10 +62,7 @@ name = "x"
 forbid_paths = { value = ["a"], enforce = false }
 "#;
     let m = AenvManifest::from_toml(toml).unwrap();
-    assert_eq!(
-        m.policies.get("forbid_paths").unwrap().enforce,
-        false
-    );
+    assert!(!m.policies.get("forbid_paths").unwrap().enforce);
 }
 
 #[test]
