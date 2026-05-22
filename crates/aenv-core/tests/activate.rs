@@ -23,6 +23,7 @@ fn claude_adapter() -> Adapter {
         merge_strategies: Default::default(),
         roles: Default::default(),
         default_merge: Default::default(),
+        parameters: vec![],
     }
 }
 

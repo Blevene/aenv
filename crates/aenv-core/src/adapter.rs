@@ -1,14 +1,52 @@
 //! Adapter TOML parsing and registry.
-//!
-//! An adapter declares a tool's project-relative paths and (in Phase 2)
-//! merge strategies. Phase 1 supports parsing the minimal `name` + `files`
-//! fields; merge strategies are accepted via serde's default but unused.
 
 use crate::error::{AenvError, Result};
 use crate::fs::Filesystem;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::Path;
+
+/// Allowed parameter type for an adapter declaration.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+pub enum AdapterParameterType {
+    /// `parameter = "..."`
+    #[serde(rename = "string")]
+    String,
+    /// `parameter = 1234`
+    #[serde(rename = "integer")]
+    Integer,
+    /// `parameter = true`
+    #[serde(rename = "boolean")]
+    Boolean,
+    /// `parameter = ["a", "b"]`
+    #[serde(rename = "list-of-string")]
+    ListString,
+}
+
+impl AdapterParameterType {
+    /// String matching `ParameterValue::type_tag()`.
+    pub fn type_tag(&self) -> &'static str {
+        match self {
+            AdapterParameterType::String => "string",
+            AdapterParameterType::Integer => "integer",
+            AdapterParameterType::Boolean => "boolean",
+            AdapterParameterType::ListString => "list-of-string",
+        }
+    }
+}
+
+/// One parameter an adapter consumes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdapterParameterDecl {
+    /// Parameter key (e.g. `"default_model"`).
+    pub name: String,
+    /// Expected TOML type.
+    #[serde(rename = "type")]
+    pub r#type: AdapterParameterType,
+    /// Optional projection target. Phase 3 records this; Phase 4+ uses it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub projects_to: Option<String>,
+}
 
 /// A parsed adapter definition.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -18,8 +56,7 @@ pub struct Adapter {
     /// Project-relative paths or directory prefixes the adapter manages.
     #[serde(default)]
     pub files: Vec<String>,
-    /// Phase 1 holdover — explicit per-file merge declaration on the adapter
-    /// (rarely used; manifests override). Kept for back-compat.
+    /// Phase 1 holdover — explicit per-file merge declaration on the adapter.
     #[serde(default)]
     pub merge_strategies: BTreeMap<String, String>,
     /// Per-path role declaration. Phase 2 understands `"instructions"`.
@@ -28,12 +65,27 @@ pub struct Adapter {
     /// Per-path default merge strategy (consulted before role fallback).
     #[serde(default)]
     pub default_merge: BTreeMap<String, String>,
+    /// Parameters this adapter consumes. Empty for adapters that take none.
+    #[serde(default, rename = "parameters", skip_serializing_if = "Vec::is_empty")]
+    pub parameters: Vec<AdapterParameterDecl>,
 }
 
 impl Adapter {
-    /// Parse an adapter from a TOML string.
+    /// Parse an adapter from a TOML string. Enforces no-duplicate parameter
+    /// names within a single adapter.
     pub fn from_toml(input: &str) -> Result<Self> {
-        toml::from_str(input).map_err(|e| AenvError::ManifestInvalid(format!("{e}")))
+        let a: Adapter =
+            toml::from_str(input).map_err(|e| AenvError::ManifestInvalid(format!("{e}")))?;
+        let mut seen: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
+        for p in &a.parameters {
+            if !seen.insert(p.name.as_str()) {
+                return Err(AenvError::ManifestInvalid(format!(
+                    "adapter '{}' declares parameter '{}' more than once",
+                    a.name, p.name
+                )));
+            }
+        }
+        Ok(a)
     }
 }
 

@@ -21,6 +21,7 @@ fn registry_with_claude() -> AdapterRegistry {
         merge_strategies: Default::default(),
         roles: Default::default(),
         default_merge: Default::default(),
+        parameters: vec![],
     });
     r
 }
