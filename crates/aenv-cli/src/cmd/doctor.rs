@@ -52,23 +52,38 @@ pub fn run<F: Filesystem>(
 }
 
 /// Print the doctor report to stdout.
+///
+/// Format follows functional spec §5.12:
+/// - Header: `Namespace 'X' (resolution: a → b)`
+/// - Active policies block with `(from <ns>[, inherited])` suffix
+/// - `Issues:` section listing every Fail/Warn as `✗ POLICY violation: <key>`
+///   with `skill:` / `file:` / `hint:` sub-labels
+/// - `Skipped:` section for unknown keys
+/// - Footer summary line
 fn print_report(leaf: &str, report: &aenv_core::doctor::DoctorReport) {
     // Header line.
     let chain_str: Vec<&str> = report.chain.iter().map(|n| n.as_str()).collect();
     println!("Namespace '{leaf}' (resolution: {})", chain_str.join(" → "));
     println!();
 
-    // Active policies section.
+    // Active policies section. The `(from <ns>, inherited)` suffix matches
+    // spec §5.12: a policy whose source is an ancestor of the leaf is shown
+    // as inherited; one declared by the leaf itself omits the suffix.
     if report.policies.is_empty() {
         println!("Active policies: (none)");
     } else {
         println!("Active policies (after inheritance):");
         for (key, rp) in &report.policies {
             let enforce_str = if rp.enforce { " enforce=true" } else { "" };
+            let inherited = rp.source.as_str() != leaf;
+            let source_suffix = if inherited {
+                format!("(from {}, inherited)", rp.source)
+            } else {
+                format!("(from {})", rp.source)
+            };
             println!(
-                "  {key:30} = {} (from {}){enforce_str}",
+                "  {key:30} = {} {source_suffix}{enforce_str}",
                 rp.value_display(),
-                rp.source
             );
         }
     }
@@ -96,36 +111,21 @@ fn print_report(leaf: &str, report: &aenv_core::doctor::DoctorReport) {
         .filter(|o| matches!(o.status, OutcomeStatus::Pass))
         .count();
 
-    if !fails.is_empty() {
+    // Per spec §5.12, both enforced and advisory violations render under a
+    // single `Issues:` header with the same `✗` marker. The summary line at
+    // the bottom is what distinguishes the two flavors.
+    if !fails.is_empty() || !warns.is_empty() {
         println!("Issues:");
-        for o in &fails {
-            println!("  X POLICY violation: {}", o.key);
-            if let Some(target) = &o.target {
-                println!("    target: {target}");
-            }
-            if let OutcomeStatus::Fail { msg } = &o.status {
-                for line in msg.lines() {
-                    println!("    {line}");
-                }
-            }
+        for o in fails.iter().chain(warns.iter()) {
+            let msg = match &o.status {
+                OutcomeStatus::Fail { msg } | OutcomeStatus::Warn { msg } => msg.as_str(),
+                _ => continue,
+            };
+            println!("  ✗ POLICY violation: {}", o.key);
+            print_issue_target(&o.target);
+            print_hint(msg);
+            println!();
         }
-        println!();
-    }
-
-    if !warns.is_empty() {
-        println!("Advisory:");
-        for o in &warns {
-            println!("  ! POLICY {}", o.key);
-            if let Some(target) = &o.target {
-                println!("    target: {target}");
-            }
-            if let OutcomeStatus::Warn { msg } = &o.status {
-                for line in msg.lines() {
-                    println!("    {line}");
-                }
-            }
-        }
-        println!();
     }
 
     if !warn_skips.is_empty() {
@@ -146,4 +146,38 @@ fn print_report(leaf: &str, report: &aenv_core::doctor::DoctorReport) {
         warn_skips.len()
     );
     println!("{}", report.summary_line());
+}
+
+/// Print `skill:` and/or `file:` sub-labels for an issue's target.
+///
+/// A target whose short name matches `.claude/skills/<dir>/SKILL.md` is shown
+/// as a `skill:` qualified by the namespace and the skill directory name,
+/// plus a separate `file:` line for the on-disk path. Anything else gets a
+/// bare `file:` line.
+fn print_issue_target(target: &Option<aenv_core::identity::QualifiedName>) {
+    let Some(qn) = target else {
+        return;
+    };
+    let short = qn.short().as_str();
+    let parts: Vec<&str> = short.split('/').collect();
+    if parts.len() == 4 && parts[0] == ".claude" && parts[1] == "skills" && parts[3] == "SKILL.md" {
+        println!("    skill:   {}::{}", qn.namespace(), parts[2]);
+        println!("    file:    {}", short);
+    } else {
+        println!("    file:    {}", short);
+    }
+}
+
+/// Print `hint:` on the first line of `msg` and continuation indentation
+/// on subsequent lines. Spec §5.12 shows hints wrapped at ~70 cols; we keep
+/// the wrapping the message-author chose (single-line for our four built-ins)
+/// rather than re-wrapping here.
+fn print_hint(msg: &str) {
+    for (i, line) in msg.lines().enumerate() {
+        if i == 0 {
+            println!("    hint:    {line}");
+        } else {
+            println!("             {line}");
+        }
+    }
 }

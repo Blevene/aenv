@@ -52,6 +52,11 @@ impl DoctorReport {
     }
 
     /// One-line summary for human-friendly text output.
+    ///
+    /// Wording matches functional spec §5.12:
+    /// - clean: "No issues found."
+    /// - advisory only: "N policy violations. Activation is unaffected; doctor is advisory."
+    /// - enforced: "N enforce-policy violations, M advisory issues. Activation refused."
     pub fn summary_line(&self) -> String {
         let f = self.fail_count();
         let w = self.warn_count();
@@ -59,12 +64,12 @@ impl DoctorReport {
             "No issues found.".into()
         } else if f == 0 {
             format!(
-                "{w} advisory issue{}; activation unaffected (doctor is advisory).",
+                "{w} policy violation{}. Activation is unaffected; doctor is advisory.",
                 if w == 1 { "" } else { "s" }
             )
         } else {
             format!(
-                "{f} enforce-policy violation{}, {w} advisory issue{}.",
+                "{f} enforce-policy violation{}, {w} advisory issue{}. Activation refused.",
                 if f == 1 { "" } else { "s" },
                 if w == 1 { "" } else { "s" }
             )
