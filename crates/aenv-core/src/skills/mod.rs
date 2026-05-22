@@ -10,7 +10,9 @@
 
 pub mod cache;
 pub mod git;
+pub mod git_source;
 pub mod local;
+pub mod registry;
 pub mod source;
 
 use serde::{Deserialize, Serialize};
