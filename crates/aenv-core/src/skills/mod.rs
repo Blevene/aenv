@@ -9,6 +9,7 @@
 //! table.
 
 pub mod cache;
+pub mod git;
 pub mod local;
 pub mod source;
 
