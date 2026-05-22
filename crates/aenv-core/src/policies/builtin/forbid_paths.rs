@@ -57,10 +57,14 @@ pub fn evaluate<F: Filesystem>(
     outcomes
 }
 
+/// Match `candidate` against a single `forbid_paths` pattern.
+///
+/// Supported forms (no nesting, no `?` or character classes):
+///   * `secrets/**` — matches any path under `secrets/` (one or more components).
+///   * `.env*` — matches any path whose first component begins with `.env`.
+///   * literal — exact string match.
 fn forbid_match(pattern: &str, candidate: &str) -> bool {
     if let Some(prefix) = pattern.strip_suffix("/**") {
-        candidate.starts_with(prefix) && candidate[prefix.len()..].starts_with('/')
-    } else if let Some(prefix) = pattern.strip_suffix("/**/*") {
         candidate.starts_with(prefix) && candidate[prefix.len()..].starts_with('/')
     } else if let Some(prefix) = pattern.strip_suffix('*') {
         candidate.starts_with(prefix)
