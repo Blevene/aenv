@@ -84,6 +84,46 @@ pub fn evaluate<F: Filesystem>(
     adapters: &AdapterRegistry,
     resolved: &ResolutionResult,
 ) -> DoctorReport {
+    // Build a mutable copy of policies so we can inject the R-24 auto-fire.
+    let mut effective_policies = resolved.policies.clone();
+    if !effective_policies.contains_key("instructions_max_chars") {
+        // Find the strictest soft_limits.instructions across all adapters that
+        // own at least one instructions-role candidate.
+        let mut min_limit: Option<usize> = None;
+        for c in &resolved.candidates {
+            let adapter = match adapters.get(&c.adapter) {
+                Some(a) => a,
+                None => continue,
+            };
+            let role = adapter
+                .roles
+                .get(c.path.to_string_lossy().as_ref())
+                .map(String::as_str)
+                .unwrap_or("");
+            if role != "instructions" {
+                continue;
+            }
+            if let Some(&limit) = adapter.soft_limits.get("instructions") {
+                min_limit = Some(min_limit.map_or(limit, |m| m.min(limit)));
+            }
+        }
+        if let Some(limit) = min_limit {
+            let leaf = resolved
+                .chain
+                .last()
+                .cloned()
+                .unwrap_or_else(|| crate::identity::NamespaceId::new("(synthesized)").unwrap());
+            effective_policies.insert(
+                "instructions_max_chars".to_string(),
+                crate::policies::ResolvedPolicy {
+                    value: crate::policies::PolicyValue::Integer(limit as i64),
+                    enforce: false,
+                    source: leaf,
+                },
+            );
+        }
+    }
+
     let ctx = PolicyContext {
         fs,
         layout,
@@ -91,12 +131,12 @@ pub fn evaluate<F: Filesystem>(
         resolved,
     };
     let mut outcomes: Vec<PolicyOutcome> = Vec::new();
-    for (key, policy) in &resolved.policies {
+    for (key, policy) in &effective_policies {
         outcomes.extend(dispatch(key, policy, &ctx));
     }
     DoctorReport {
         chain: resolved.chain.clone(),
-        policies: resolved.policies.clone(),
+        policies: effective_policies,
         outcomes,
     }
 }
