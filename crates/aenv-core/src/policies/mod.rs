@@ -134,7 +134,7 @@ fn toml_type_name(v: &toml::Value) -> &'static str {
 
 /// Convenience: parse every entry in a `BTreeMap<String, toml::Value>`
 /// (typically from a manifest's `[policies]` table) into typed `PolicyDecl`s.
-pub fn parse_policy_table(
+pub fn policy_table_from_toml(
     raw: &BTreeMap<String, toml::Value>,
 ) -> Result<BTreeMap<String, PolicyDecl>> {
     let mut out = BTreeMap::new();

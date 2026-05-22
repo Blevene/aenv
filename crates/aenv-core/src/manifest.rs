@@ -7,7 +7,7 @@
 
 use crate::error::{AenvError, Result};
 use crate::parameters::ParameterValue;
-use crate::policies::{parse_policy_table, PolicyDecl};
+use crate::policies::{policy_table_from_toml, PolicyDecl};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -83,7 +83,7 @@ impl AenvManifest {
         }
 
         // Stage 3: validate each policy entry.
-        let policies = parse_policy_table(&raw.policies)?;
+        let policies = policy_table_from_toml(&raw.policies)?;
 
         Ok(AenvManifest {
             name: raw.name,
