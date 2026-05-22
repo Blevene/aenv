@@ -1,5 +1,14 @@
 //! `instructions_max_chars`: cap on the UTF-8 character count of any
 //! adapter-managed file with `role = "instructions"`.
+//!
+//! Effective limit: `min(policy_limit, instructions_budget_parameter)`.
+//! If `instructions_budget` is declared in a manifest but no
+//! `instructions_max_chars` policy is declared AND no adapter has a
+//! `soft_limits.instructions` entry, the budget parameter has no effect —
+//! the policy never fires. This is intentional: the parameter narrows
+//! limits, it does not create them. Users who want a limit from the budget
+//! alone should also declare the policy (or rely on a built-in adapter's
+//! `soft_limits.instructions` triggering R-24 auto-fire in `doctor.rs`).
 
 use crate::fs::Filesystem;
 use crate::identity::{QualifiedName, ShortName};

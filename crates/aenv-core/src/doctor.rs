@@ -84,43 +84,10 @@ pub fn evaluate<F: Filesystem>(
     adapters: &AdapterRegistry,
     resolved: &ResolutionResult,
 ) -> DoctorReport {
-    // Build a mutable copy of policies so we can inject the R-24 auto-fire.
     let mut effective_policies = resolved.policies.clone();
     if !effective_policies.contains_key("instructions_max_chars") {
-        // Find the strictest soft_limits.instructions across all adapters that
-        // own at least one instructions-role candidate.
-        let mut min_limit: Option<usize> = None;
-        for c in &resolved.candidates {
-            let adapter = match adapters.get(&c.adapter) {
-                Some(a) => a,
-                None => continue,
-            };
-            let role = adapter
-                .roles
-                .get(c.path.to_string_lossy().as_ref())
-                .map(String::as_str)
-                .unwrap_or("");
-            if role != "instructions" {
-                continue;
-            }
-            if let Some(&limit) = adapter.soft_limits.get("instructions") {
-                min_limit = Some(min_limit.map_or(limit, |m| m.min(limit)));
-            }
-        }
-        if let Some(limit) = min_limit {
-            let leaf = resolved
-                .chain
-                .last()
-                .cloned()
-                .unwrap_or_else(|| crate::identity::NamespaceId::new("(synthesized)").unwrap());
-            effective_policies.insert(
-                "instructions_max_chars".to_string(),
-                crate::policies::ResolvedPolicy {
-                    value: crate::policies::PolicyValue::Integer(limit as i64),
-                    enforce: false,
-                    source: leaf,
-                },
-            );
+        if let Some(synth) = synthesize_instructions_limit(adapters, resolved) {
+            effective_policies.insert("instructions_max_chars".to_string(), synth);
         }
     }
 
@@ -139,4 +106,51 @@ pub fn evaluate<F: Filesystem>(
         policies: effective_policies,
         outcomes,
     }
+}
+
+/// R-24 auto-fire helper: produce an `instructions_max_chars` policy from
+/// the strictest adapter `soft_limits.instructions` across the resolved
+/// candidates, when no manifest declared one. Returns `None` if no
+/// instructions-role candidate has an adapter with a declared soft limit.
+///
+/// The synthesized policy is always advisory (`enforce = false`) — adapter
+/// defaults shouldn't block activation. Attribute the source to the leaf
+/// namespace; if the chain is empty (synthetic test contexts) we fall back
+/// to a `"(synthesized)"` sentinel.
+///
+/// **Interaction with R-26 `instructions_budget`:** the per-evaluator
+/// narrowing in `instructions_max_chars::evaluate` still applies, so the
+/// effective limit is `min(adapter_soft_limit, instructions_budget)`.
+fn synthesize_instructions_limit(
+    adapters: &AdapterRegistry,
+    resolved: &ResolutionResult,
+) -> Option<crate::policies::ResolvedPolicy> {
+    let mut min_limit: Option<usize> = None;
+    for c in &resolved.candidates {
+        let Some(adapter) = adapters.get(&c.adapter) else {
+            continue;
+        };
+        let role = adapter
+            .roles
+            .get(c.path.to_string_lossy().as_ref())
+            .map(String::as_str)
+            .unwrap_or("");
+        if role != "instructions" {
+            continue;
+        }
+        if let Some(&limit) = adapter.soft_limits.get("instructions") {
+            min_limit = Some(min_limit.map_or(limit, |m| m.min(limit)));
+        }
+    }
+    let limit = min_limit?;
+    let leaf = resolved
+        .chain
+        .last()
+        .cloned()
+        .unwrap_or_else(|| crate::identity::NamespaceId::new("(synthesized)").unwrap());
+    Some(crate::policies::ResolvedPolicy {
+        value: crate::policies::PolicyValue::Integer(limit as i64),
+        enforce: false,
+        source: leaf,
+    })
 }

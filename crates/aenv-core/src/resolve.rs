@@ -377,6 +377,20 @@ fn gather_candidates<F: Filesystem>(
     Ok(())
 }
 
+/// Emit `Candidate`s for every skill file declared by this namespace.
+///
+/// Authored skills walk the namespace directory under
+/// `<adapter.skills_dir>/<skill.name>/`. Imported skills resolve via
+/// `apply_required_rule` and walk the resolved cache directory.
+///
+/// **Skill-name shadowing across the chain:** the caller invokes this
+/// once per namespace in `extends` order (root → leaf). Two namespaces
+/// declaring the same skill name produce two `Candidate`s with the same
+/// `path` (e.g. both `.claude/skills/foo/SKILL.md`). The Phase 2
+/// shadow/merge machinery in `activate::materialize_one` then groups
+/// candidates by `path` and applies last-writer-wins (Symlink strategy),
+/// so the leaf namespace's skill wins and the parent's is shadowed —
+/// matching the behavior for regular adapter files.
 fn gather_skill_candidates<F: Filesystem>(
     fs: &F,
     registry: &RegistryLayout,
