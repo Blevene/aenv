@@ -3,6 +3,7 @@
 pub mod activate;
 pub mod adapter;
 pub mod create;
+pub mod doctor;
 pub mod deactivate;
 pub mod delete;
 pub mod fork;

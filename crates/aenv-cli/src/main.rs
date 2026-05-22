@@ -90,6 +90,15 @@ enum Command {
         /// "[a, b]" → list-of-string, else string).
         value: String,
     },
+    /// Evaluate policies for a namespace and report.
+    ///
+    /// Without an argument, uses the active project's pinned namespace (exit 20
+    /// if not pinned). With a namespace name, evaluates that namespace directly.
+    /// Exits 17 if any `enforce = true` policy is violated.
+    Doctor {
+        /// Namespace to evaluate (defaults to the active project's pinned namespace).
+        namespace: Option<String>,
+    },
     /// Detach a file (or whole project) from namespace management.
     ///
     /// With no argument: detach all managed files and remove .aenv-state/.
@@ -158,6 +167,17 @@ fn main() -> ExitCode {
                 cmd::get::run(&fs, &layout, &adapters, None, &spec)
             }
             Command::Set { spec, value } => cmd::set::run(&fs, &layout, &spec, &value),
+            Command::Doctor { namespace } => {
+                let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
+                    &fs,
+                    &layout.adapters_dir(),
+                )?;
+                // Resolve project root best-effort; used only when ns_arg is None.
+                let project_root = paths::resolve_project_root(&fs, None)
+                    .ok()
+                    .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+                cmd::doctor::run(&fs, &layout, &adapters, &project_root, namespace.as_deref())
+            }
             Command::Which { path, project } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;
                 cmd::which::run(project_root, path)

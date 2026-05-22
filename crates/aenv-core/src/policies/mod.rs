@@ -155,6 +155,23 @@ pub struct ResolvedPolicy {
     pub source: NamespaceId,
 }
 
+impl ResolvedPolicy {
+    /// Human-readable rendering of the effective policy value.
+    pub fn value_display(&self) -> String {
+        match &self.value {
+            PolicyValue::Integer(i) => i.to_string(),
+            PolicyValue::Boolean(b) => b.to_string(),
+            PolicyValue::ListString(xs) => format!(
+                "[{}]",
+                xs.iter()
+                    .map(|s| format!("\"{s}\""))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        }
+    }
+}
+
 /// Resolve `[policies]` tables across the `extends` chain. Returns
 /// `ManifestInvalid` if any child weakens a parent's `enforce = true`
 /// declaration (R-75) or if the same key has incompatible types across the chain.

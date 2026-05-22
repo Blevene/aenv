@@ -44,6 +44,32 @@ pub fn format_status(state: &ActivationState, chain: &[NamespaceId]) -> String {
             ));
         }
     }
+
+    if !state.parameters.is_empty() {
+        out.push('\n');
+        out.push_str("Parameters:\n");
+        for (k, rp) in &state.parameters {
+            out.push_str(&format!(
+                "  {k:30} = {} (from {})\n",
+                rp.value, rp.source
+            ));
+        }
+    }
+
+    if !state.policies.is_empty() {
+        out.push('\n');
+        out.push_str("Active policies:\n");
+        for (k, rp) in &state.policies {
+            let enforce = if rp.enforce { " enforce=true" } else { "" };
+            out.push_str(&format!(
+                "  {k:30} = {} (from {}){}\n",
+                rp.value_display(),
+                rp.source,
+                enforce
+            ));
+        }
+    }
+
     out
 }
 
