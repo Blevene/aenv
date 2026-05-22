@@ -8,6 +8,7 @@
 //! struct here is the wire shape that lands in `aenv.toml`'s `[[skills]]`
 //! table.
 
+pub mod cache;
 pub mod source;
 
 use serde::{Deserialize, Serialize};

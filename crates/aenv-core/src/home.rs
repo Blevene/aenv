@@ -49,4 +49,15 @@ impl RegistryLayout {
     pub fn config_path(&self) -> PathBuf {
         self.root.join("config.toml")
     }
+
+    /// The `cache/` subdirectory holding fetched skill content and other
+    /// transient caches that aenv manages.
+    pub fn cache_dir(&self) -> PathBuf {
+        self.root.join("cache")
+    }
+
+    /// The `cache/skills/` subdirectory.
+    pub fn skills_cache_dir(&self) -> PathBuf {
+        self.cache_dir().join("skills")
+    }
 }
