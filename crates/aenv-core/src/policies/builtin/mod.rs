@@ -9,6 +9,7 @@
 //! `PolicyContext` carries the references an evaluator needs without forcing
 //! every evaluator to take a long argument list.
 
+pub mod forbid_paths;
 pub mod instructions_max_chars;
 pub mod mcp_requires_command_or_url;
 pub mod skill_requires_description;
@@ -125,6 +126,7 @@ pub fn dispatch<F: Filesystem>(
     ctx: &PolicyContext<F>,
 ) -> Vec<PolicyOutcome> {
     match key {
+        "forbid_paths" => forbid_paths::evaluate(policy, ctx),
         "instructions_max_chars" => instructions_max_chars::evaluate(policy, ctx),
         "mcp_requires_command_or_url" => mcp_requires_command_or_url::evaluate(policy, ctx),
         "skill_requires_description" => skill_requires_description::evaluate(policy, ctx),
