@@ -7,6 +7,7 @@
 
 use crate::error::{AenvError, Result};
 use crate::parameters::ParameterValue;
+use crate::policies::{parse_policy_table, PolicyDecl};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -28,6 +29,11 @@ pub struct AenvManifest {
     /// Typed parameters. Always non-`None` after a successful `from_toml`.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub parameters: BTreeMap<String, ParameterValue>,
+
+    /// Policy declarations. Keys are policy names; values hold the typed value
+    /// and whether the policy is enforced.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub policies: BTreeMap<String, PolicyDecl>,
 }
 
 /// Per-adapter manifest entry.
@@ -58,6 +64,8 @@ impl AenvManifest {
             adapters: BTreeMap<String, AdapterEntry>,
             #[serde(default)]
             parameters: BTreeMap<String, toml::Value>,
+            #[serde(default)]
+            policies: BTreeMap<String, toml::Value>,
         }
         let raw: Raw =
             toml::from_str(input).map_err(|e| AenvError::ManifestInvalid(format!("{e}")))?;
@@ -74,11 +82,15 @@ impl AenvManifest {
             parameters.insert(k.clone(), pv);
         }
 
+        // Stage 3: validate each policy entry.
+        let policies = parse_policy_table(&raw.policies)?;
+
         Ok(AenvManifest {
             name: raw.name,
             extends: raw.extends,
             adapters: raw.adapters,
             parameters,
+            policies,
         })
     }
 
@@ -94,6 +106,7 @@ impl AenvManifest {
             extends: Vec::new(),
             adapters: BTreeMap::new(),
             parameters: BTreeMap::new(),
+            policies: BTreeMap::new(),
         }
     }
 }

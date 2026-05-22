@@ -21,6 +21,7 @@ pub mod manifest;
 pub mod merge;
 pub mod namespace;
 pub mod parameters;
+pub mod policies;
 pub mod project;
 pub mod resolve;
 pub mod restore;
