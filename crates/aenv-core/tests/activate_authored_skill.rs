@@ -48,5 +48,7 @@ fn authored_skill_materializes_at_project_path() {
     .unwrap();
     let paths: Vec<_> = state.managed_files.iter().map(|m| m.path.clone()).collect();
     assert!(paths.contains(&PathBuf::from(".claude/skills/my-skill/SKILL.md")));
-    assert!(fs.exists(&project.join(".claude/skills/my-skill/SKILL.md")).unwrap());
+    assert!(fs
+        .exists(&project.join(".claude/skills/my-skill/SKILL.md"))
+        .unwrap());
 }

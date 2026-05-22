@@ -12,23 +12,48 @@ fn skip_unless_git() -> bool {
 fn make_bare_repo_with_skill() -> tempfile::TempDir {
     let bare = tempdir().unwrap();
     let bare_path = bare.path();
-    Command::new("git").args(["init", "--bare"]).arg(bare_path).status().unwrap();
+    Command::new("git")
+        .args(["init", "--bare"])
+        .arg(bare_path)
+        .status()
+        .unwrap();
     let work = tempdir().unwrap();
     let work_path = work.path();
-    Command::new("git").args(["clone"]).arg(bare_path).arg(work_path).status().unwrap();
+    Command::new("git")
+        .args(["clone"])
+        .arg(bare_path)
+        .arg(work_path)
+        .status()
+        .unwrap();
     std::fs::create_dir_all(work_path.join("dummy-skill")).unwrap();
     std::fs::write(
         work_path.join("dummy-skill/SKILL.md"),
         b"---\nname: dummy-skill\ndescription: a test skill\n---\nbody\n",
     )
     .unwrap();
-    Command::new("git").current_dir(work_path).args(["add", "."]).status().unwrap();
     Command::new("git")
         .current_dir(work_path)
-        .args(["-c", "user.email=t@e", "-c", "user.name=t", "commit", "-m", "init"])
+        .args(["add", "."])
         .status()
         .unwrap();
-    Command::new("git").current_dir(work_path).args(["push", "origin", "HEAD:master"]).status().unwrap();
+    Command::new("git")
+        .current_dir(work_path)
+        .args([
+            "-c",
+            "user.email=t@e",
+            "-c",
+            "user.name=t",
+            "commit",
+            "-m",
+            "init",
+        ])
+        .status()
+        .unwrap();
+    Command::new("git")
+        .current_dir(work_path)
+        .args(["push", "origin", "HEAD:master"])
+        .status()
+        .unwrap();
     bare
 }
 
@@ -78,7 +103,6 @@ fn unreachable_url_returns_remote_unreachable() {
     let aenv_home = tempdir().unwrap();
     let layout = RegistryLayout::new(aenv_home.path().to_path_buf());
     let fs = RealFilesystem;
-    let err =
-        resolve_git(&fs, &layout, "file:///definitely/not/a/repo", None, "x").unwrap_err();
+    let err = resolve_git(&fs, &layout, "file:///definitely/not/a/repo", None, "x").unwrap_err();
     assert_eq!(err.exit_code(), 14);
 }

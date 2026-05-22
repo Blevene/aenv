@@ -5,9 +5,13 @@ use std::path::PathBuf;
 #[test]
 fn resolves_when_skill_md_exists() {
     let fs = MockFilesystem::new();
-    fs.create_dir_all(&PathBuf::from("/local/my-skill")).unwrap();
-    fs.write(&PathBuf::from("/local/my-skill/SKILL.md"), b"---\nname: x\n---\nbody")
+    fs.create_dir_all(&PathBuf::from("/local/my-skill"))
         .unwrap();
+    fs.write(
+        &PathBuf::from("/local/my-skill/SKILL.md"),
+        b"---\nname: x\n---\nbody",
+    )
+    .unwrap();
 
     let r = resolve_local(&fs, &PathBuf::from("/local/my-skill"), "my-skill").unwrap();
     assert_eq!(r.source_path, PathBuf::from("/local/my-skill"));
@@ -40,8 +44,7 @@ fn errors_when_directory_missing() {
     let fs = MockFilesystem::new();
     let err = resolve_local(&fs, &PathBuf::from("/does/not/exist"), "x").unwrap_err();
     assert!(
-        err.to_string().contains("does not exist")
-            || err.to_string().contains("not found"),
+        err.to_string().contains("does not exist") || err.to_string().contains("not found"),
         "msg = {err}"
     );
 }

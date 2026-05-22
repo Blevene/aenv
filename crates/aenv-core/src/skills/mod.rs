@@ -77,10 +77,7 @@ pub fn resolve_imported_skill<F: Filesystem>(
         )));
     }
     let source_str = decl.source.as_deref().ok_or_else(|| {
-        AenvError::ManifestInvalid(format!(
-            "imported skill '{}' has no source",
-            decl.name
-        ))
+        AenvError::ManifestInvalid(format!("imported skill '{}' has no source", decl.name))
     })?;
     let kind = SourceKind::parse(source_str)?;
     match kind {

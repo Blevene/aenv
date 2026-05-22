@@ -2,6 +2,7 @@ use std::path::Path;
 use std::process::Command;
 use tempfile::tempdir;
 
+#[allow(dead_code)]
 struct Harness {
     _aenv_home_guard: tempfile::TempDir,
     _project_guard: tempfile::TempDir,
@@ -14,22 +15,35 @@ impl Harness {
         let project_guard = tempdir().unwrap();
         let aenv_home = std::fs::canonicalize(aenv_home_guard.path()).unwrap();
         let project = std::fs::canonicalize(project_guard.path()).unwrap();
-        Self { _aenv_home_guard: aenv_home_guard, _project_guard: project_guard, aenv_home, project }
+        Self {
+            _aenv_home_guard: aenv_home_guard,
+            _project_guard: project_guard,
+            aenv_home,
+            project,
+        }
     }
     fn cmd(&self) -> Command {
         let mut c = Command::new(env!("CARGO_BIN_EXE_aenv"));
         c.env("AENV_HOME", &self.aenv_home);
         c
     }
-    fn aenv_home(&self) -> &Path { &self.aenv_home }
-    fn project(&self) -> &Path { &self.project }
+    fn aenv_home(&self) -> &Path {
+        &self.aenv_home
+    }
+    #[allow(dead_code)]
+    fn project(&self) -> &Path {
+        &self.project
+    }
 }
 
 #[test]
 fn list_prints_all_skills_across_namespaces() {
     let h = Harness::new();
     h.cmd().args(["create", "experiments"]).output().unwrap();
-    h.cmd().args(["create", "detailed-execution"]).output().unwrap();
+    h.cmd()
+        .args(["create", "detailed-execution"])
+        .output()
+        .unwrap();
     std::fs::write(
         h.aenv_home().join("envs/experiments/aenv.toml"),
         r#"
@@ -69,7 +83,11 @@ ref = "v1.2.0"
     .unwrap();
 
     let out = h.cmd().args(["skill", "list"]).output().unwrap();
-    assert!(out.status.success(), "stderr={}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("experiments"));
     assert!(stdout.contains("compare-approaches"));
@@ -96,7 +114,11 @@ fn list_filters_by_ns() {
     )
     .unwrap();
 
-    let out = h.cmd().args(["skill", "list", "--ns", "a"]).output().unwrap();
+    let out = h
+        .cmd()
+        .args(["skill", "list", "--ns", "a"])
+        .output()
+        .unwrap();
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("alpha"));
     assert!(!stdout.contains("beta"));

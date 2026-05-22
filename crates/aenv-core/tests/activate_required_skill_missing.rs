@@ -81,5 +81,7 @@ fn unrequired_unreachable_warns_but_activates() {
     assert_eq!(state.active_namespace, "base");
     // CLAUDE.md materialized; skill is absent.
     assert!(fs.exists(&project.join("CLAUDE.md")).unwrap());
-    assert!(!fs.exists(&project.join(".claude/skills/optional/SKILL.md")).unwrap());
+    assert!(!fs
+        .exists(&project.join(".claude/skills/optional/SKILL.md"))
+        .unwrap());
 }

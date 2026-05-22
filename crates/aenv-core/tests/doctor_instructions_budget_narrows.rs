@@ -18,7 +18,8 @@ fn ns(s: &str) -> NamespaceId {
 fn instructions_budget_narrows_effective_limit() {
     let fs = MockFilesystem::new();
     let body = "x".repeat(4000);
-    fs.write(&PathBuf::from("/h/envs/base/CLAUDE.md"), body.as_bytes()).unwrap();
+    fs.write(&PathBuf::from("/h/envs/base/CLAUDE.md"), body.as_bytes())
+        .unwrap();
 
     let mut adapters = AdapterRegistry::new();
     let mut roles = BTreeMap::new();

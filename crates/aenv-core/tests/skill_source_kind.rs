@@ -20,8 +20,8 @@ fn parses_local_tilde_unexpanded() {
 
 #[test]
 fn parses_git_url_with_fragment_ref() {
-    let s = SourceKind::parse("git+https://github.com/acme/aenv-skills.git#match-conventions")
-        .unwrap();
+    let s =
+        SourceKind::parse("git+https://github.com/acme/aenv-skills.git#match-conventions").unwrap();
     match s {
         SourceKind::Git { url, ref_spec } => {
             assert_eq!(url, "https://github.com/acme/aenv-skills.git");

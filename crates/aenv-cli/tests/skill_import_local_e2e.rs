@@ -68,8 +68,7 @@ fn import_local_path_adds_manifest_entry() {
         String::from_utf8_lossy(&out.stderr)
     );
 
-    let manifest =
-        std::fs::read_to_string(h.aenv_home().join("envs/base/aenv.toml")).unwrap();
+    let manifest = std::fs::read_to_string(h.aenv_home().join("envs/base/aenv.toml")).unwrap();
     assert!(manifest.contains("[[skills]]"));
     assert!(manifest.contains("mode = \"imported\""));
     assert!(manifest.contains(canonical_source.to_str().unwrap()));

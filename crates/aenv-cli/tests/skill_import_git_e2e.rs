@@ -72,7 +72,15 @@ fn make_repo_with_skill() -> tempfile::TempDir {
         .unwrap();
     Command::new("git")
         .current_dir(work.path())
-        .args(["-c", "user.email=t@e", "-c", "user.name=t", "commit", "-m", "init"])
+        .args([
+            "-c",
+            "user.email=t@e",
+            "-c",
+            "user.name=t",
+            "commit",
+            "-m",
+            "init",
+        ])
         .status()
         .unwrap();
     Command::new("git")
@@ -104,7 +112,14 @@ fn import_git_pinned_writes_resolved_ref() {
         .cmd()
         .args(["skill", "import"])
         .arg(&url)
-        .args(["--ns", "base", "--adapter", "claude-code", "--pin", "master"])
+        .args([
+            "--ns",
+            "base",
+            "--adapter",
+            "claude-code",
+            "--pin",
+            "master",
+        ])
         .output()
         .unwrap();
     assert!(
@@ -113,8 +128,7 @@ fn import_git_pinned_writes_resolved_ref() {
         String::from_utf8_lossy(&out.stderr)
     );
 
-    let manifest =
-        std::fs::read_to_string(h.aenv_home().join("envs/base/aenv.toml")).unwrap();
+    let manifest = std::fs::read_to_string(h.aenv_home().join("envs/base/aenv.toml")).unwrap();
     // Some git SHA was written as the pinned ref.
     assert!(manifest.contains("ref ="));
     // It should be a 40-char hex string (full SHA) or the branch name as a fallback.

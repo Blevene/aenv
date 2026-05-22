@@ -6,11 +6,7 @@ use aenv_core::home::RegistryLayout;
 use aenv_core::manifest::AenvManifest;
 use aenv_core::skills::SkillMode;
 
-pub fn run<F: Filesystem>(
-    fs: &F,
-    layout: &RegistryLayout,
-    ns_filter: Option<&str>,
-) -> Result<()> {
+pub fn run<F: Filesystem>(fs: &F, layout: &RegistryLayout, ns_filter: Option<&str>) -> Result<()> {
     let envs_dir = layout.namespaces_dir();
     let namespaces: Vec<String> = if !fs.exists(&envs_dir)? {
         Vec::new()
@@ -26,8 +22,8 @@ pub fn run<F: Filesystem>(
     };
 
     println!(
-        "{:<20}  {:<30}  {:<10}  {:<60}  {}",
-        "ENV", "SKILL", "MODE", "SOURCE", "PIN"
+        "{:<20}  {:<30}  {:<10}  {:<60}  PIN",
+        "ENV", "SKILL", "MODE", "SOURCE"
     );
     for ns in &namespaces {
         let manifest_path = layout.manifest_path(ns);

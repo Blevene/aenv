@@ -16,7 +16,8 @@ fn ns(s: &str) -> NamespaceId {
 fn auto_fires_when_manifest_silent_and_oversized() {
     let fs = MockFilesystem::new();
     let body = "x".repeat(8000);
-    fs.write(&PathBuf::from("/h/envs/base/CLAUDE.md"), body.as_bytes()).unwrap();
+    fs.write(&PathBuf::from("/h/envs/base/CLAUDE.md"), body.as_bytes())
+        .unwrap();
 
     let mut adapters = AdapterRegistry::new();
     let mut roles = BTreeMap::new();
@@ -72,7 +73,8 @@ fn does_not_fire_when_manifest_declares_explicitly() {
     use aenv_core::policies::{PolicyValue, ResolvedPolicy};
     let fs = MockFilesystem::new();
     let body = "x".repeat(8000);
-    fs.write(&PathBuf::from("/h/envs/base/CLAUDE.md"), body.as_bytes()).unwrap();
+    fs.write(&PathBuf::from("/h/envs/base/CLAUDE.md"), body.as_bytes())
+        .unwrap();
 
     let mut adapters = AdapterRegistry::new();
     let mut roles = BTreeMap::new();

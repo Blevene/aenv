@@ -68,8 +68,8 @@ pub fn run<F: Filesystem>(
     // resolution failure surfaces as an error.
     if pin.is_some() {
         decl.required = true;
-        let resolution = apply_required_rule(fs, layout, &decl)?
-            .expect("required=true should propagate errors");
+        let resolution =
+            apply_required_rule(fs, layout, &decl)?.expect("required=true should propagate errors");
         decl.required = false;
         if let Some(sha) = resolution.resolved_ref {
             decl.ref_ = Some(sha);

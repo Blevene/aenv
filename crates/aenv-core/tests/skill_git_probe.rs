@@ -42,16 +42,29 @@ fn ls_remote_resolves_local_bare_repo_head() {
         .status()
         .unwrap();
     std::fs::write(work_path.join("README.md"), b"hi").unwrap();
-    Command::new("git").current_dir(work_path).args(["add", "."]).status().unwrap();
+    Command::new("git")
+        .current_dir(work_path)
+        .args(["add", "."])
+        .status()
+        .unwrap();
     Command::new("git")
         .current_dir(work_path)
         .args([
-            "-c", "user.email=t@e", "-c", "user.name=t",
-            "commit", "-m", "init",
+            "-c",
+            "user.email=t@e",
+            "-c",
+            "user.name=t",
+            "commit",
+            "-m",
+            "init",
         ])
         .status()
         .unwrap();
-    Command::new("git").current_dir(work_path).args(["push", "origin", "HEAD:master"]).status().unwrap();
+    Command::new("git")
+        .current_dir(work_path)
+        .args(["push", "origin", "HEAD:master"])
+        .status()
+        .unwrap();
 
     let url = format!("file://{}", bare_path.display());
     let sha = git_resolve_ref(&url, None).unwrap();
@@ -68,18 +81,43 @@ fn clone_to_destination_returns_resolved_sha() {
     // Set up a tiny bare repo as in the ls_remote test.
     let bare = tempdir().unwrap();
     let bare_path = bare.path();
-    Command::new("git").args(["init", "--bare"]).arg(bare_path).status().unwrap();
-    let work = tempdir().unwrap();
-    let work_path = work.path();
-    Command::new("git").args(["clone"]).arg(bare_path).arg(work_path).status().unwrap();
-    std::fs::write(work_path.join("SKILL.md"), b"---\nname: x\n---\n").unwrap();
-    Command::new("git").current_dir(work_path).args(["add", "."]).status().unwrap();
     Command::new("git")
-        .current_dir(work_path)
-        .args(["-c", "user.email=t@e", "-c", "user.name=t", "commit", "-m", "init"])
+        .args(["init", "--bare"])
+        .arg(bare_path)
         .status()
         .unwrap();
-    Command::new("git").current_dir(work_path).args(["push", "origin", "HEAD:master"]).status().unwrap();
+    let work = tempdir().unwrap();
+    let work_path = work.path();
+    Command::new("git")
+        .args(["clone"])
+        .arg(bare_path)
+        .arg(work_path)
+        .status()
+        .unwrap();
+    std::fs::write(work_path.join("SKILL.md"), b"---\nname: x\n---\n").unwrap();
+    Command::new("git")
+        .current_dir(work_path)
+        .args(["add", "."])
+        .status()
+        .unwrap();
+    Command::new("git")
+        .current_dir(work_path)
+        .args([
+            "-c",
+            "user.email=t@e",
+            "-c",
+            "user.name=t",
+            "commit",
+            "-m",
+            "init",
+        ])
+        .status()
+        .unwrap();
+    Command::new("git")
+        .current_dir(work_path)
+        .args(["push", "origin", "HEAD:master"])
+        .status()
+        .unwrap();
 
     let url = format!("file://{}", bare_path.display());
     let dest = tempdir().unwrap();

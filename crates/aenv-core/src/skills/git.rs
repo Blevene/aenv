@@ -31,18 +31,16 @@ pub fn git_available() -> bool {
 /// When `ref_spec` is `None`, returns the SHA for HEAD.
 pub fn git_resolve_ref(url: &str, ref_spec: Option<&str>) -> Result<String> {
     if !git_available() {
-        return Err(AenvError::RemoteUnreachable(
-            "git not on PATH".to_string(),
-        ));
+        return Err(AenvError::RemoteUnreachable("git not on PATH".to_string()));
     }
     let mut cmd = Command::new("git");
     cmd.arg("ls-remote").arg(url);
     if let Some(r) = ref_spec {
         cmd.arg(r);
     }
-    let output = cmd.output().map_err(|e| {
-        AenvError::RemoteUnreachable(format!("git ls-remote {url}: {e}"))
-    })?;
+    let output = cmd
+        .output()
+        .map_err(|e| AenvError::RemoteUnreachable(format!("git ls-remote {url}: {e}")))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(AenvError::RemoteUnreachable(format!(
@@ -56,9 +54,7 @@ pub fn git_resolve_ref(url: &str, ref_spec: Option<&str>) -> Result<String> {
         .lines()
         .find_map(|line| line.split_whitespace().next())
         .ok_or_else(|| {
-            AenvError::RemoteUnreachable(format!(
-                "git ls-remote {url} returned no matching refs"
-            ))
+            AenvError::RemoteUnreachable(format!("git ls-remote {url} returned no matching refs"))
         })?;
     Ok(sha.to_string())
 }
@@ -67,9 +63,7 @@ pub fn git_resolve_ref(url: &str, ref_spec: Option<&str>) -> Result<String> {
 /// resolved commit SHA. `dest` must not exist (git will create it).
 pub fn git_clone(url: &str, ref_spec: Option<&str>, dest: &Path) -> Result<String> {
     if !git_available() {
-        return Err(AenvError::RemoteUnreachable(
-            "git not on PATH".to_string(),
-        ));
+        return Err(AenvError::RemoteUnreachable("git not on PATH".to_string()));
     }
     let mut cmd = Command::new("git");
     cmd.arg("clone").arg("--depth").arg("1");
@@ -77,9 +71,9 @@ pub fn git_clone(url: &str, ref_spec: Option<&str>, dest: &Path) -> Result<Strin
         cmd.arg("--branch").arg(r);
     }
     cmd.arg(url).arg(dest);
-    let output = cmd.output().map_err(|e| {
-        AenvError::RemoteUnreachable(format!("git clone {url}: {e}"))
-    })?;
+    let output = cmd
+        .output()
+        .map_err(|e| AenvError::RemoteUnreachable(format!("git clone {url}: {e}")))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(AenvError::RemoteUnreachable(format!(

@@ -53,9 +53,15 @@ fn skill_new_scaffolds_skill_md_and_appends_manifest() {
         .args(["skill", "new", "my-skill", "--ns", "base"])
         .output()
         .unwrap();
-    assert!(out.status.success(), "stderr={}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 
-    let skill_md = h.aenv_home().join("envs/base/.claude/skills/my-skill/SKILL.md");
+    let skill_md = h
+        .aenv_home()
+        .join("envs/base/.claude/skills/my-skill/SKILL.md");
     assert!(skill_md.exists(), "SKILL.md not created");
     let body = std::fs::read_to_string(&skill_md).unwrap();
     assert!(body.contains("name: my-skill"));

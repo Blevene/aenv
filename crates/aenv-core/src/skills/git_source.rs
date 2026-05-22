@@ -66,11 +66,7 @@ pub fn resolve_git<F: Filesystem>(
 ///
 /// Looks for `<cache_dir>/<skill_name>/SKILL.md` first, then
 /// `<cache_dir>/SKILL.md` as a fallback (repos that put the skill at root).
-fn compute_skill_hash<F: Filesystem>(
-    fs: &F,
-    cache_dir: &Path,
-    skill_name: &str,
-) -> Result<String> {
+fn compute_skill_hash<F: Filesystem>(fs: &F, cache_dir: &Path, skill_name: &str) -> Result<String> {
     let subdir_skill_md = cache_dir.join(skill_name).join("SKILL.md");
     let root_skill_md = cache_dir.join("SKILL.md");
 

@@ -394,19 +394,21 @@ fn gather_skill_candidates<F: Filesystem>(
             }
         };
 
-        let adapter = adapters.get(&adapter_name).ok_or_else(|| {
-            ResolutionError::AdapterMissing(adapter_name.clone())
-        })?;
+        let adapter = adapters
+            .get(&adapter_name)
+            .ok_or_else(|| ResolutionError::AdapterMissing(adapter_name.clone()))?;
 
-        let skills_dir = adapter.skills_dir.as_deref().ok_or_else(|| {
-            ResolutionError::ManifestInvalid {
-                namespace: ns.clone(),
-                reason: format!(
-                    "adapter '{}' has no skills_dir; cannot materialize skill '{}'",
-                    adapter_name, decl.name
-                ),
-            }
-        })?;
+        let skills_dir =
+            adapter
+                .skills_dir
+                .as_deref()
+                .ok_or_else(|| ResolutionError::ManifestInvalid {
+                    namespace: ns.clone(),
+                    reason: format!(
+                        "adapter '{}' has no skills_dir; cannot materialize skill '{}'",
+                        adapter_name, decl.name
+                    ),
+                })?;
 
         // Destination directory in project: <skills_dir>/<skill_name>/
         let dest_prefix = format!("{}/{}", skills_dir, decl.name);
@@ -416,32 +418,40 @@ fn gather_skill_candidates<F: Filesystem>(
                 // Walk the namespace directory at <ns_root>/<dest_prefix>/
                 let ns_root = registry.namespace_dir(ns.as_str());
                 let skill_dir_abs = ns_root.join(&dest_prefix);
-                if !fs.exists(&skill_dir_abs).map_err(|e| ResolutionError::Io(e.to_string()))? {
+                if !fs
+                    .exists(&skill_dir_abs)
+                    .map_err(|e| ResolutionError::Io(e.to_string()))?
+                {
                     // No skill directory present; skip silently.
                     continue;
                 }
                 // Walk all files under the skill directory.
                 let mut rel_files: Vec<String> = Vec::new();
-                walk_dir(fs, &ns_root, std::path::Path::new(&dest_prefix), &mut rel_files)
-                    .map_err(|e| ResolutionError::Io(e.to_string()))?;
+                walk_dir(
+                    fs,
+                    &ns_root,
+                    std::path::Path::new(&dest_prefix),
+                    &mut rel_files,
+                )
+                .map_err(|e| ResolutionError::Io(e.to_string()))?;
                 for rel_str in rel_files {
                     let source_path = ns_root.join(&rel_str);
                     // Compute skill_provenance only for the SKILL.md file.
-                    let skill_provenance =
-                        if std::path::Path::new(&rel_str).file_name() == Some("SKILL.md".as_ref())
-                        {
-                            let bytes = fs
-                                .read(&source_path)
-                                .map_err(|e| ResolutionError::Io(e.to_string()))?;
-                            let hash = sha256_hex(&bytes);
-                            Some(SkillProvenance {
-                                source: format!("authored:{}", ns.as_str()),
-                                resolved_ref: None,
-                                resolved_hash: format!("sha256:{hash}"),
-                            })
-                        } else {
-                            None
-                        };
+                    let skill_provenance = if std::path::Path::new(&rel_str).file_name()
+                        == Some("SKILL.md".as_ref())
+                    {
+                        let bytes = fs
+                            .read(&source_path)
+                            .map_err(|e| ResolutionError::Io(e.to_string()))?;
+                        let hash = sha256_hex(&bytes);
+                        Some(SkillProvenance {
+                            source: format!("authored:{}", ns.as_str()),
+                            resolved_ref: None,
+                            resolved_hash: format!("sha256:{hash}"),
+                        })
+                    } else {
+                        None
+                    };
                     out.push(Candidate {
                         namespace: ns.clone(),
                         path: PathBuf::from(&rel_str),

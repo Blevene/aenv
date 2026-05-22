@@ -226,11 +226,25 @@ fn main() -> ExitCode {
                         &fs,
                         &layout.adapters_dir(),
                     )?;
-                    cmd::skill::new::run(&fs, &layout, &adapters_reg, &ns, &name, adapter.as_deref())
+                    cmd::skill::new::run(
+                        &fs,
+                        &layout,
+                        &adapters_reg,
+                        &ns,
+                        &name,
+                        adapter.as_deref(),
+                    )
                 }
-                SkillAction::Import { source, ns, adapter, pin } => {
-                    let adapters_reg =
-                        aenv_core::adapter::AdapterRegistry::load_from_dir(&fs, &layout.adapters_dir())?;
+                SkillAction::Import {
+                    source,
+                    ns,
+                    adapter,
+                    pin,
+                } => {
+                    let adapters_reg = aenv_core::adapter::AdapterRegistry::load_from_dir(
+                        &fs,
+                        &layout.adapters_dir(),
+                    )?;
                     cmd::skill::import::run(
                         &fs,
                         &layout,

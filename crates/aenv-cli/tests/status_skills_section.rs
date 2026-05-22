@@ -60,21 +60,58 @@ adapter = "claude-code"
     std::fs::write(h.aenv_home().join("envs/base/CLAUDE.md"), "hi").unwrap();
     std::fs::create_dir_all(h.aenv_home().join("envs/base/.claude/skills/my-skill")).unwrap();
     std::fs::write(
-        h.aenv_home().join("envs/base/.claude/skills/my-skill/SKILL.md"),
+        h.aenv_home()
+            .join("envs/base/.claude/skills/my-skill/SKILL.md"),
         "---\nname: my-skill\ndescription: y\n---\nbody\n",
     )
     .unwrap();
 
-    let out = h.cmd().args(["use", "base", "--project"]).arg(h.project()).output().unwrap();
-    assert!(out.status.success(), "use failed: stderr={}", String::from_utf8_lossy(&out.stderr));
+    let out = h
+        .cmd()
+        .args(["use", "base", "--project"])
+        .arg(h.project())
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "use failed: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 
-    let out = h.cmd().args(["activate", "--project"]).arg(h.project()).output().unwrap();
-    assert!(out.status.success(), "activate failed: stderr={}", String::from_utf8_lossy(&out.stderr));
+    let out = h
+        .cmd()
+        .args(["activate", "--project"])
+        .arg(h.project())
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "activate failed: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 
-    let out = h.cmd().args(["status", "--project"]).arg(h.project()).output().unwrap();
-    assert!(out.status.success(), "stderr={}", String::from_utf8_lossy(&out.stderr));
+    let out = h
+        .cmd()
+        .args(["status", "--project"])
+        .arg(h.project())
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("Skills"), "stdout missing Skills section: {stdout}");
-    assert!(stdout.contains("my-skill"), "stdout missing skill name: {stdout}");
-    assert!(stdout.contains("authored"), "stdout missing 'authored' mode: {stdout}");
+    assert!(
+        stdout.contains("Skills"),
+        "stdout missing Skills section: {stdout}"
+    );
+    assert!(
+        stdout.contains("my-skill"),
+        "stdout missing skill name: {stdout}"
+    );
+    assert!(
+        stdout.contains("authored"),
+        "stdout missing 'authored' mode: {stdout}"
+    );
 }

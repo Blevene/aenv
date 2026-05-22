@@ -72,9 +72,7 @@ pub fn format_status(state: &ActivationState, chain: &[NamespaceId]) -> String {
     let skill_files: Vec<&ManagedFile> = state
         .managed_files
         .iter()
-        .filter(|m| {
-            m.skill_provenance.is_some() && m.path.file_name() == Some("SKILL.md".as_ref())
-        })
+        .filter(|m| m.skill_provenance.is_some() && m.path.file_name() == Some("SKILL.md".as_ref()))
         .collect();
     if !skill_files.is_empty() {
         let authored_count = skill_files
