@@ -56,6 +56,16 @@ fn parse_spec(spec: &str) -> Result<(&str, &str)> {
     Ok((ns, param))
 }
 
+/// Best-effort type inference from a raw CLI string literal.
+///
+/// Precedence: `true`/`false` (case-insensitive) → bool; `i64`-parseable →
+/// integer; `[a, b, c]` → list-of-string; everything else → string.
+///
+/// **Limitation:** the list parser splits on bare commas and only strips one
+/// pair of outer `"`. Quoted commas inside list items (`["a,b", "c"]`) are
+/// mis-tokenized into three items. For complex list literals, edit the
+/// namespace's `aenv.toml` directly — `aenv set` is an ergonomic shortcut,
+/// not a full TOML expression evaluator.
 fn infer_value(literal: &str) -> ParameterValue {
     let trimmed = literal.trim();
     if trimmed.eq_ignore_ascii_case("true") {
