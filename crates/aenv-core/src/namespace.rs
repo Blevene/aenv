@@ -134,6 +134,7 @@ pub fn create_namespace_from_project<F: Filesystem>(
         adapters: manifest_adapters,
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        skills: Vec::new(),
     };
     let body =
         toml::to_string_pretty(&manifest).map_err(|e| AenvError::ManifestInvalid(e.to_string()))?;

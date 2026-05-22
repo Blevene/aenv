@@ -8,6 +8,7 @@
 use crate::error::{AenvError, Result};
 use crate::parameters::ParameterValue;
 use crate::policies::{policy_table_from_toml, PolicyDecl};
+use crate::skills::SkillDecl;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -34,6 +35,10 @@ pub struct AenvManifest {
     /// and whether the policy is enforced.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub policies: BTreeMap<String, PolicyDecl>,
+
+    /// Skill declarations from `[[skills]]` entries.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skills: Vec<SkillDecl>,
 }
 
 /// Per-adapter manifest entry.
@@ -66,6 +71,8 @@ impl AenvManifest {
             parameters: BTreeMap<String, toml::Value>,
             #[serde(default)]
             policies: BTreeMap<String, toml::Value>,
+            #[serde(default)]
+            skills: Vec<SkillDecl>,
         }
         let raw: Raw =
             toml::from_str(input).map_err(|e| AenvError::ManifestInvalid(format!("{e}")))?;
@@ -85,12 +92,16 @@ impl AenvManifest {
         // Stage 3: validate each policy entry.
         let policies = policy_table_from_toml(&raw.policies)?;
 
+        // Stage 4: validate skills (duplicates, mode/source coherence).
+        validate_skills(&raw.skills)?;
+
         Ok(AenvManifest {
             name: raw.name,
             extends: raw.extends,
             adapters: raw.adapters,
             parameters,
             policies,
+            skills: raw.skills,
         })
     }
 
@@ -107,6 +118,39 @@ impl AenvManifest {
             adapters: BTreeMap::new(),
             parameters: BTreeMap::new(),
             policies: BTreeMap::new(),
+            skills: Vec::new(),
         }
     }
+}
+
+fn validate_skills(skills: &[crate::skills::SkillDecl]) -> crate::error::Result<()> {
+    let mut seen: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
+    for s in skills {
+        if !seen.insert(s.name.as_str()) {
+            return Err(crate::error::AenvError::ManifestInvalid(format!(
+                "skill '{}' declared more than once",
+                s.name
+            )));
+        }
+        match s.mode {
+            crate::skills::SkillMode::Authored => {
+                if s.source.is_some() {
+                    return Err(crate::error::AenvError::ManifestInvalid(format!(
+                        "skill '{}' is authored but declares a source; \
+                         remove `source` or change mode to 'imported'",
+                        s.name
+                    )));
+                }
+            }
+            crate::skills::SkillMode::Imported => {
+                if s.source.is_none() {
+                    return Err(crate::error::AenvError::ManifestInvalid(format!(
+                        "skill '{}' is imported but declares no source",
+                        s.name
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
 }
