@@ -82,6 +82,14 @@ enum Command {
         /// Parameter spec: `<namespace>.<param>` or `.<param>`.
         spec: String,
     },
+    /// Set a parameter on a namespace.
+    Set {
+        /// `<namespace>.<parameter>`
+        spec: String,
+        /// Value literal (type inferred: true/false → bool, digits → int,
+        /// "[a, b]" → list-of-string, else string).
+        value: String,
+    },
     /// Detach a file (or whole project) from namespace management.
     ///
     /// With no argument: detach all managed files and remove .aenv-state/.
@@ -149,6 +157,7 @@ fn main() -> ExitCode {
                 // outside a project directory (no .aenv pin needed).
                 cmd::get::run(&fs, &layout, &adapters, None, &spec)
             }
+            Command::Set { spec, value } => cmd::set::run(&fs, &layout, &spec, &value),
             Command::Which { path, project } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;
                 cmd::which::run(project_root, path)
