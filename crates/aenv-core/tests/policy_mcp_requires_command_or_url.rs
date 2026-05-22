@@ -24,6 +24,7 @@ fn make_adapters() -> AdapterRegistry {
         default_merge: BTreeMap::new(),
         parameters: vec![],
         skills_dir: None,
+        soft_limits: BTreeMap::new(),
     });
     adapters
 }
@@ -173,6 +174,7 @@ fn skips_non_mcp_files() {
         default_merge: BTreeMap::new(),
         parameters: vec![],
         skills_dir: None,
+        soft_limits: BTreeMap::new(),
     });
     let resolved = ResolutionResult {
         chain: vec![ns("base")],

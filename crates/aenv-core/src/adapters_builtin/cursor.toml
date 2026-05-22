@@ -3,3 +3,6 @@ files = [".cursorrules", ".cursor/**/*"]
 
 [roles]
 ".cursorrules" = "instructions"
+
+[soft_limits]
+instructions = 5000

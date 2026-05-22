@@ -3,3 +3,6 @@ files = [".windsurfrules"]
 
 [roles]
 ".windsurfrules" = "instructions"
+
+[soft_limits]
+instructions = 6000

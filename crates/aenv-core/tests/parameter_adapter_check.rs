@@ -31,6 +31,7 @@ fn ad(name: &str, params: Vec<(&str, AdapterParameterType)>) -> Adapter {
             })
             .collect(),
         skills_dir: None,
+        soft_limits: BTreeMap::new(),
     }
 }
 

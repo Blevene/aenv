@@ -3,3 +3,6 @@ files = [".clinerules"]
 
 [roles]
 ".clinerules" = "instructions"
+
+[soft_limits]
+instructions = 5000

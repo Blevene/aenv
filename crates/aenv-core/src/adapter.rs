@@ -73,6 +73,11 @@ pub struct Adapter {
     /// For claude-code this is `.claude/skills`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skills_dir: Option<String>,
+    /// Per-role character soft limits. Currently used only for the
+    /// "instructions" role (R-24 / R-25). Empty for adapters that don't
+    /// declare any role with a size guard.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub soft_limits: BTreeMap<String, usize>,
 }
 
 impl Adapter {

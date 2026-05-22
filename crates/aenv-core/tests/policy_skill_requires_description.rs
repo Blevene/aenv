@@ -22,6 +22,7 @@ fn make_registry() -> AdapterRegistry {
         default_merge: BTreeMap::new(),
         parameters: vec![],
         skills_dir: None,
+        soft_limits: BTreeMap::new(),
     });
     adapters
 }

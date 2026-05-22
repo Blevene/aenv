@@ -3,3 +3,6 @@ files = [".aider.conf.yml", ".aiderignore"]
 
 [default_merge]
 ".aider.conf.yml" = "deep"
+
+[soft_limits]
+instructions = 5000

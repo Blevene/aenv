@@ -52,6 +52,7 @@ fn registry_insert_then_lookup() {
         default_merge: Default::default(),
         parameters: vec![],
         skills_dir: None,
+        soft_limits: Default::default(),
     };
     reg.insert(a.clone());
     assert_eq!(reg.get("claude-code"), Some(&a));

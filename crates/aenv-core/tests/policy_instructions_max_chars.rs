@@ -24,6 +24,7 @@ fn make_registry_with_claude() -> AdapterRegistry {
         default_merge: BTreeMap::new(),
         parameters: vec![],
         skills_dir: None,
+        soft_limits: BTreeMap::new(),
     });
     adapters
 }

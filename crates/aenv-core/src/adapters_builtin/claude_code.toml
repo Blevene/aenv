@@ -4,3 +4,6 @@ skills_dir = ".claude/skills"
 
 [roles]
 "CLAUDE.md" = "instructions"
+
+[soft_limits]
+instructions = 5000
