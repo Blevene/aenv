@@ -1,0 +1,100 @@
+//! Typed parameters declared in a namespace's `[parameters]` table.
+//!
+//! Phase 3 supports four TOML types — string, integer, boolean, list-of-string
+//! — and rejects everything else (`float`, `datetime`, `table`, mixed-type
+//! arrays) at parse time. Adapters declare which parameters they consume via
+//! `Adapter::parameters`; the resolver then enforces type-compat (R-71).
+
+use crate::error::{AenvError, Result};
+use serde::{Deserialize, Serialize};
+use std::fmt;
+
+/// A typed parameter value, parsed from a `[parameters]` table entry.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ParameterValue {
+    /// String value, e.g. `default_model = "claude-opus-4.7"`.
+    String(String),
+    /// Integer value, e.g. `instructions_budget = 3000`.
+    Integer(i64),
+    /// Boolean value, e.g. `auto_invoke_subagents = true`.
+    Boolean(bool),
+    /// Homogeneous list of strings, e.g. `forbid_tools = ["edit", "write"]`.
+    ListString(Vec<String>),
+}
+
+impl ParameterValue {
+    /// Convert a `toml::Value` into a `ParameterValue`, rejecting unsupported
+    /// shapes. Returns `ManifestInvalid` with a human-readable reason.
+    pub fn from_toml_value(v: &toml::Value) -> Result<Self> {
+        match v {
+            toml::Value::String(s) => Ok(ParameterValue::String(s.clone())),
+            toml::Value::Integer(i) => Ok(ParameterValue::Integer(*i)),
+            toml::Value::Boolean(b) => Ok(ParameterValue::Boolean(*b)),
+            toml::Value::Array(arr) => {
+                let mut out = Vec::with_capacity(arr.len());
+                for (i, elem) in arr.iter().enumerate() {
+                    match elem {
+                        toml::Value::String(s) => out.push(s.clone()),
+                        other => {
+                            return Err(AenvError::ManifestInvalid(format!(
+                                "parameter list element {i} is {} but only list-of-string is supported",
+                                toml_type_name(other)
+                            )));
+                        }
+                    }
+                }
+                Ok(ParameterValue::ListString(out))
+            }
+            toml::Value::Float(_) => Err(AenvError::ManifestInvalid(
+                "parameter has float type; only string, integer, boolean, list-of-string are supported"
+                    .into(),
+            )),
+            toml::Value::Datetime(_) => Err(AenvError::ManifestInvalid(
+                "parameter has datetime type; only string, integer, boolean, list-of-string are supported"
+                    .into(),
+            )),
+            toml::Value::Table(_) => Err(AenvError::ManifestInvalid(
+                "parameter has table type; only string, integer, boolean, list-of-string are supported"
+                    .into(),
+            )),
+        }
+    }
+
+    /// One of "string", "integer", "boolean", "list-of-string". Used in
+    /// error messages and for type-compat checks against adapter declarations.
+    pub fn type_tag(&self) -> &'static str {
+        match self {
+            ParameterValue::String(_) => "string",
+            ParameterValue::Integer(_) => "integer",
+            ParameterValue::Boolean(_) => "boolean",
+            ParameterValue::ListString(_) => "list-of-string",
+        }
+    }
+}
+
+impl fmt::Display for ParameterValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ParameterValue::String(s) => write!(f, "{s}"),
+            ParameterValue::Integer(i) => write!(f, "{i}"),
+            ParameterValue::Boolean(b) => write!(f, "{b}"),
+            ParameterValue::ListString(xs) => {
+                let parts: Vec<String> = xs.iter().map(|s| format!("\"{s}\"")).collect();
+                write!(f, "[{}]", parts.join(", "))
+            }
+        }
+    }
+}
+
+fn toml_type_name(v: &toml::Value) -> &'static str {
+    match v {
+        toml::Value::String(_) => "string",
+        toml::Value::Integer(_) => "integer",
+        toml::Value::Float(_) => "float",
+        toml::Value::Boolean(_) => "boolean",
+        toml::Value::Datetime(_) => "datetime",
+        toml::Value::Array(_) => "array",
+        toml::Value::Table(_) => "table",
+    }
+}
