@@ -216,7 +216,7 @@ extends = ["left", "right"]
         resolved
             .chain
             .iter()
-            .map(|n| n.as_str())
+            .map(aenv_core::identity::NamespaceId::as_str)
             .collect::<Vec<_>>(),
         vec!["shared", "left", "right", "top"]
     );

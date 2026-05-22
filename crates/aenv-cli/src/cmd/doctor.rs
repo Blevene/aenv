@@ -62,7 +62,11 @@ pub fn run<F: Filesystem>(
 /// - Footer summary line
 fn print_report(leaf: &str, report: &aenv_core::doctor::DoctorReport) {
     // Header line.
-    let chain_str: Vec<&str> = report.chain.iter().map(|n| n.as_str()).collect();
+    let chain_str: Vec<&str> = report
+        .chain
+        .iter()
+        .map(aenv_core::identity::NamespaceId::as_str)
+        .collect();
     println!("Namespace '{leaf}' (resolution: {})", chain_str.join(" → "));
     println!();
 
@@ -162,9 +166,9 @@ fn print_issue_target(target: &Option<aenv_core::identity::QualifiedName>) {
     let parts: Vec<&str> = short.split('/').collect();
     if parts.len() == 4 && parts[0] == ".claude" && parts[1] == "skills" && parts[3] == "SKILL.md" {
         println!("    skill:   {}::{}", qn.namespace(), parts[2]);
-        println!("    file:    {}", short);
+        println!("    file:    {short}");
     } else {
-        println!("    file:    {}", short);
+        println!("    file:    {short}");
     }
 }
 

@@ -72,7 +72,7 @@ fn format_from_path(path: &Path) -> Result<DeepMergeFormat, AenvError> {
     match path
         .extension()
         .and_then(|e| e.to_str())
-        .map(|e| e.to_ascii_lowercase())
+        .map(str::to_ascii_lowercase)
         .as_deref()
     {
         Some("json") => Ok(DeepMergeFormat::Json),

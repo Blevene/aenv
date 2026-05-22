@@ -272,8 +272,7 @@ fn main() -> ExitCode {
                                     aenv_core::state::ActivationState::from_json(&s).ok()
                                 })
                             })
-                            .map(|state| state.managed_files.iter().any(|m| m.path == rel))
-                            .unwrap_or(false);
+                            .is_some_and(|state| state.managed_files.iter().any(|m| m.path == rel));
                         if is_managed || project_path.exists() {
                             cmd::fork::run_file(project_root, rel)
                         } else {

@@ -41,10 +41,8 @@ pub fn evaluate<F: Filesystem>(
                 ShortName::new("?".to_string()).expect("trivial short name is valid")
             }),
         );
-        let msg = format!(
-            "{} matches forbid_paths pattern; namespace must not declare this path.",
-            rel
-        );
+        let msg =
+            format!("{rel} matches forbid_paths pattern; namespace must not declare this path.");
         outcomes.push(if policy.enforce {
             PolicyOutcome::fail(KEY, Some(target), msg)
         } else {

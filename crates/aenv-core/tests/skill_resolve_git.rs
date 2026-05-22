@@ -72,7 +72,7 @@ fn resolves_git_source_to_cache_directory() {
     let result = resolve_git(&fs, &layout, &url, Some("master"), "dummy-skill").unwrap();
     assert!(result.source_path.exists());
     assert!(result.source_path.join("dummy-skill/SKILL.md").exists());
-    assert_eq!(result.resolved_ref.as_deref().map(|s| s.len()), Some(40));
+    assert_eq!(result.resolved_ref.as_deref().map(str::len), Some(40));
     assert!(result.resolved_hash.starts_with("sha256:"));
 }
 

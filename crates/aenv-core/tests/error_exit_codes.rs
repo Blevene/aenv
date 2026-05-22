@@ -69,13 +69,9 @@ fn display_includes_namespace_in_not_found_message() {
     // PRD-driven: error messages should use the "namespace" vocabulary in
     // user-visible output (engineering doc §3 rationale).
     let err = AenvError::NamespaceNotFound("foo".to_string());
-    let msg = format!("{}", err);
-    assert!(
-        msg.contains("namespace"),
-        "expected 'namespace' in {:?}",
-        msg
-    );
-    assert!(msg.contains("foo"), "expected 'foo' in {:?}", msg);
+    let msg = format!("{err}");
+    assert!(msg.contains("namespace"), "expected 'namespace' in {msg:?}");
+    assert!(msg.contains("foo"), "expected 'foo' in {msg:?}");
 }
 
 #[test]
@@ -91,12 +87,11 @@ fn io_error_round_trips_via_question_mark_with_exit_one() {
     let err = might_fail().expect_err("read of nonexistent path must fail");
     assert!(
         matches!(err, AenvError::Io(_)),
-        "expected Io variant, got {:?}",
-        err
+        "expected Io variant, got {err:?}"
     );
     assert_eq!(err.exit_code(), 1);
     // The Display impl includes the underlying io::Error message.
-    assert!(format!("{}", err).contains("io error"));
+    assert!(format!("{err}").contains("io error"));
 }
 
 #[test]
@@ -120,8 +115,7 @@ fn all_exit_codes_are_pairwise_distinct() {
     assert_eq!(
         unique.len(),
         codes.len(),
-        "exit codes must be pairwise distinct; got duplicates in {:?}",
-        codes
+        "exit codes must be pairwise distinct; got duplicates in {codes:?}"
     );
     // Sanity: none are zero (0 is success).
     for c in codes {

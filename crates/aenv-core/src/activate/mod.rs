@@ -47,11 +47,10 @@ pub fn activate_namespace<F: Filesystem>(
         let mut details: Vec<String> = Vec::new();
         for o in &report.outcomes {
             if let crate::policies::builtin::OutcomeStatus::Fail { msg } = &o.status {
-                let target_label = o
-                    .target
-                    .as_ref()
-                    .map(|qn| qn.to_string())
-                    .unwrap_or_else(|| "<namespace>".to_string());
+                let target_label = o.target.as_ref().map_or_else(
+                    || "<namespace>".to_string(),
+                    std::string::ToString::to_string,
+                );
                 details.push(format!("[{}] {target_label}: {msg}", o.key));
             }
         }
@@ -431,8 +430,7 @@ fn backup_timestamp() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
+        .map_or(0, |d| d.as_nanos());
     format!("epoch-{nanos}")
 }
 

@@ -15,7 +15,10 @@ pub fn format_status(state: &ActivationState, chain: &[NamespaceId]) -> String {
     let mut out = String::new();
     out.push_str(&format!("Active namespace: {}\n", state.active_namespace));
     out.push_str("Resolution:       ");
-    let rendered: Vec<&str> = chain.iter().map(|n| n.as_str()).collect();
+    let rendered: Vec<&str> = chain
+        .iter()
+        .map(aenv_core::identity::NamespaceId::as_str)
+        .collect();
     out.push_str(&rendered.join(" → "));
     out.push('\n');
     out.push('\n');
@@ -80,8 +83,7 @@ pub fn format_status(state: &ActivationState, chain: &[NamespaceId]) -> String {
             .filter(|m| {
                 m.skill_provenance
                     .as_ref()
-                    .map(|p| p.source.starts_with("authored:"))
-                    .unwrap_or(false)
+                    .is_some_and(|p| p.source.starts_with("authored:"))
             })
             .count();
         let imported_count = skill_files.len() - authored_count;

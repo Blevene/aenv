@@ -38,7 +38,7 @@ pub fn list_namespaces<F: Filesystem>(fs: &F, layout: &RegistryLayout) -> Result
         let name = entry
             .file_name()
             .and_then(|n| n.to_str())
-            .map(|s| s.to_string());
+            .map(std::string::ToString::to_string);
         let Some(name) = name else { continue };
         if fs.exists(&layout.manifest_path(&name))? {
             names.push(name);

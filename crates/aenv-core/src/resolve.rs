@@ -167,7 +167,7 @@ impl From<ResolutionError> for AenvError {
             ResolutionError::Cycle(chain) => {
                 let rendered = chain
                     .iter()
-                    .map(|id| id.as_str())
+                    .map(super::identity::NamespaceId::as_str)
                     .collect::<Vec<_>>()
                     .join(" -> ");
                 AenvError::ExtendsCycle(rendered)

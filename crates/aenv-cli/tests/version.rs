@@ -13,11 +13,7 @@ fn version_long_flag_prints_crate_version() {
         .arg("--version")
         .output()
         .expect("failed to run aenv --version");
-    assert!(
-        output.status.success(),
-        "expected success, got {:?}",
-        output
-    );
+    assert!(output.status.success(), "expected success, got {output:?}");
     let stdout = String::from_utf8(output.stdout).expect("stdout not utf-8");
     let expected = format!("aenv {}", env!("CARGO_PKG_VERSION"));
     assert!(

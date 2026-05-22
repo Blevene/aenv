@@ -157,18 +157,12 @@ fn parse(input: &str) -> ParsedInput {
         }
     }
 
-    let preamble_end = headings
-        .first()
-        .map(|(_, r)| r.start)
-        .unwrap_or(input.len());
+    let preamble_end = headings.first().map_or(input.len(), |(_, r)| r.start);
     let preamble = input[..preamble_end].to_string();
     let mut sections = Vec::with_capacity(headings.len());
     for (i, (key, range)) in headings.iter().enumerate() {
         let body_start = range.end;
-        let body_end = headings
-            .get(i + 1)
-            .map(|(_, r2)| r2.start)
-            .unwrap_or(input.len());
+        let body_end = headings.get(i + 1).map_or(input.len(), |(_, r2)| r2.start);
         let raw_body = &input[body_start..body_end];
 
         let trimmed = raw_body.trim_start_matches(['\n', ' ']);

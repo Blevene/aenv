@@ -133,8 +133,7 @@ fn synthesize_instructions_limit(
         let role = adapter
             .roles
             .get(c.path.to_string_lossy().as_ref())
-            .map(String::as_str)
-            .unwrap_or("");
+            .map_or("", String::as_str);
         if role != "instructions" {
             continue;
         }

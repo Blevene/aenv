@@ -141,7 +141,7 @@ fn write_over_existing_directory_errors() {
     let fs = MockFilesystem::new();
     fs.create_dir_all(&p("/dir")).unwrap();
     let err = fs.write(&p("/dir"), b"x").expect_err("must error");
-    assert!(err.to_string().contains("is a directory"), "got: {}", err);
+    assert!(err.to_string().contains("is a directory"), "got: {err}");
 }
 
 #[test]
@@ -150,7 +150,7 @@ fn remove_dir_all_on_file_errors() {
     let fs = MockFilesystem::new();
     fs.write(&p("/file"), b"x").unwrap();
     let err = fs.remove_dir_all(&p("/file")).expect_err("must error");
-    assert!(err.to_string().contains("not a directory"), "got: {}", err);
+    assert!(err.to_string().contains("not a directory"), "got: {err}");
 }
 
 #[test]
@@ -164,8 +164,7 @@ fn list_dir_distinguishes_missing_from_not_a_directory() {
     let not_a_dir = fs.list_dir(&p("/file")).expect_err("must error");
     assert!(
         not_a_dir.to_string().contains("not a directory"),
-        "got: {}",
-        not_a_dir
+        "got: {not_a_dir}"
     );
 }
 

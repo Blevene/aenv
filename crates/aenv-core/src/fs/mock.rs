@@ -82,8 +82,7 @@ impl MockState {
                         // parent directory.
                         current
                             .parent()
-                            .map(|p| p.join(target))
-                            .unwrap_or_else(|| target.clone())
+                            .map_or_else(|| target.clone(), |p| p.join(target))
                     };
                     current = normalize(&current);
                 }

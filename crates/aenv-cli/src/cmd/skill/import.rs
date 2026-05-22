@@ -62,18 +62,10 @@ pub fn run<F: Filesystem>(
         required: false,
     };
 
-    // If --pin was specified, resolve to verify reachability + write the
-    // resolved ref. If the user said `--pin master`, we want the actual SHA,
-    // not the branch name. Use `apply_required_rule` with required=true so
-    // resolution failure surfaces as an error.
     if let Some(pin_ref) = pin {
         eprintln!("Resolving {source} @ {pin_ref}...");
-        decl.required = true;
-        let resolution =
-            apply_required_rule(fs, layout, &decl)?.expect("required=true should propagate errors");
-        decl.required = false;
-        if let Some(sha) = resolution.resolved_ref {
-            decl.ref_ = Some(sha);
+        if let Some(resolved_sha) = resolve_pin(fs, layout, &decl)? {
+            decl.ref_ = Some(resolved_sha);
         }
     }
 
@@ -90,6 +82,27 @@ pub fn run<F: Filesystem>(
     }
     println!("  - registered in {}", manifest_path.display());
     Ok(())
+}
+
+/// Resolve an imported skill once to verify reachability and capture the
+/// concrete commit SHA when the user pinned by branch or tag. Returns
+/// `Ok(Some(sha))` when a git source returned a resolved ref, or
+/// `Ok(None)` for local / registry sources that have no SHA. Propagates
+/// errors so the import fails before writing the manifest.
+///
+/// Internally promotes the decl to `required = true` so resolution failure
+/// surfaces as `Err`; this is the only call site that does this transient
+/// promotion, and it never escapes the function.
+fn resolve_pin<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    decl: &SkillDecl,
+) -> Result<Option<String>> {
+    let mut required_decl = decl.clone();
+    required_decl.required = true;
+    let resolution = apply_required_rule(fs, layout, &required_decl)?
+        .expect("required=true should propagate errors as Err");
+    Ok(resolution.resolved_ref)
 }
 
 /// Derive a default skill name from the source string.
@@ -119,7 +132,7 @@ fn derive_skill_name(source: &str) -> Option<String> {
     std::path::Path::new(source)
         .file_name()
         .and_then(|s| s.to_str())
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
 }
 
 #[cfg(test)]

@@ -6,8 +6,7 @@ fn skip_unless_git() -> bool {
     Command::new("git")
         .arg("--version")
         .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
+        .is_ok_and(|o| o.status.success())
 }
 
 #[test]

@@ -15,7 +15,7 @@ pub fn run<F: Filesystem>(fs: &F, layout: &RegistryLayout, ns_filter: Option<&st
             .list_dir(&envs_dir)?
             .into_iter()
             .filter_map(|p| p.file_name().and_then(|n| n.to_str()).map(String::from))
-            .filter(|name| ns_filter.map(|f| f == name).unwrap_or(true))
+            .filter(|name| ns_filter.is_none_or(|f| f == name))
             .collect();
         names.sort();
         names

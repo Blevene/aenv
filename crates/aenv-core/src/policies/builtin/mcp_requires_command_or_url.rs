@@ -41,8 +41,7 @@ pub fn evaluate<F: Filesystem>(
         let role = adapter
             .roles
             .get(c.path.to_string_lossy().as_ref())
-            .map(String::as_str)
-            .unwrap_or("");
+            .map_or("", String::as_str);
         if role != "mcp" {
             continue;
         }
@@ -87,8 +86,7 @@ pub fn evaluate<F: Filesystem>(
         for (name, body) in servers {
             let ok = body
                 .as_object()
-                .map(|o| o.contains_key("command") || o.contains_key("url"))
-                .unwrap_or(false);
+                .is_some_and(|o| o.contains_key("command") || o.contains_key("url"));
             if !ok {
                 violations.push(name.clone());
             }
