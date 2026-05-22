@@ -39,6 +39,25 @@ pub fn activate_namespace<F: Filesystem>(
 
     let resolution = crate::resolve::resolve_namespace(fs, layout, adapters, leaf)?;
 
+    // PRD R-74 / R-82: run doctor before materializing anything. If any enforced
+    // policy is violated, abort with PolicyViolation (exit 17) so the project
+    // stays exactly as we found it (R-63).
+    let report = crate::doctor::evaluate(fs, layout, adapters, &resolution);
+    if report.has_enforce_violations() {
+        let mut details: Vec<String> = Vec::new();
+        for o in &report.outcomes {
+            if let crate::policies::builtin::OutcomeStatus::Fail { msg } = &o.status {
+                let target_label = o
+                    .target
+                    .as_ref()
+                    .map(|qn| qn.to_string())
+                    .unwrap_or_else(|| "<namespace>".to_string());
+                details.push(format!("[{}] {target_label}: {msg}", o.key));
+            }
+        }
+        return Err(AenvError::PolicyViolation(details.join("; ")));
+    }
+
     // Extract parameters and policies before consuming candidates.
     let resolved_parameters = resolution.parameters.clone();
     let resolved_policies = resolution.policies.clone();
