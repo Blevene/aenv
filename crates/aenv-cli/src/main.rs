@@ -141,6 +141,17 @@ enum SkillAction {
         #[arg(long)]
         adapter: Option<String>,
     },
+    /// Import a skill from a local path, git URL, or registry.
+    Import {
+        /// Source: /abs/path, ~/path, git+URL[#ref], or registry:<name>.
+        source: String,
+        #[arg(long)]
+        ns: String,
+        #[arg(long)]
+        adapter: Option<String>,
+        #[arg(long)]
+        pin: Option<String>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -211,6 +222,19 @@ fn main() -> ExitCode {
                         &layout.adapters_dir(),
                     )?;
                     cmd::skill::new::run(&fs, &layout, &adapters_reg, &ns, &name, adapter.as_deref())
+                }
+                SkillAction::Import { source, ns, adapter, pin } => {
+                    let adapters_reg =
+                        aenv_core::adapter::AdapterRegistry::load_from_dir(&fs, &layout.adapters_dir())?;
+                    cmd::skill::import::run(
+                        &fs,
+                        &layout,
+                        &adapters_reg,
+                        &ns,
+                        &source,
+                        adapter.as_deref(),
+                        pin.as_deref(),
+                    )
                 }
             },
             Command::Fork { target, project } => {
