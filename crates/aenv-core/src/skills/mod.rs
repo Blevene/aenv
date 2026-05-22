@@ -54,3 +54,75 @@ pub enum SkillMode {
     /// Skill files come from a resolved `source` at activation time.
     Imported,
 }
+
+use crate::error::{AenvError, Result};
+use crate::fs::Filesystem;
+use crate::home::RegistryLayout;
+use crate::skills::local::LocalResolution;
+use crate::skills::source::SourceKind;
+
+/// Resolve an imported skill decl into a `LocalResolution`.
+///
+/// Dispatches by `SourceKind`. Errors propagate; the caller decides whether
+/// to apply the `required = true` rule (see `apply_required_rule`).
+pub fn resolve_imported_skill<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    decl: &SkillDecl,
+) -> Result<LocalResolution> {
+    if !matches!(decl.mode, SkillMode::Imported) {
+        return Err(AenvError::ManifestInvalid(format!(
+            "skill '{}' is authored — use authored-skill resolution instead",
+            decl.name
+        )));
+    }
+    let source_str = decl.source.as_deref().ok_or_else(|| {
+        AenvError::ManifestInvalid(format!(
+            "imported skill '{}' has no source",
+            decl.name
+        ))
+    })?;
+    let kind = SourceKind::parse(source_str)?;
+    match kind {
+        SourceKind::Local(path) => crate::skills::local::resolve_local(fs, &path, &decl.name),
+        SourceKind::Git { url, ref_spec } => {
+            // Use the decl's ref if provided; else use the URL fragment ref.
+            let chosen = decl.ref_.as_deref().or(ref_spec.as_deref());
+            crate::skills::git_source::resolve_git(fs, layout, &url, chosen, &decl.name)
+        }
+        SourceKind::Registry(name) => {
+            crate::skills::registry::resolve_registry(&name, decl.ref_.as_deref())
+        }
+    }
+}
+
+/// Resolve, then apply the `required = true` rule.
+///
+/// Returns:
+/// * `Ok(Some(resolution))` when resolution succeeded.
+/// * `Ok(None)` when resolution failed AND the skill is not required —
+///   caller should emit a warning and continue.
+/// * `Err(_)` when resolution failed AND the skill is required.
+pub fn apply_required_rule<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    decl: &SkillDecl,
+) -> Result<Option<LocalResolution>> {
+    // Authored decls are always an error — the caller passed the wrong kind.
+    if matches!(decl.mode, SkillMode::Authored) {
+        return Err(AenvError::ManifestInvalid(format!(
+            "skill '{}' is authored — use authored-skill resolution instead",
+            decl.name
+        )));
+    }
+    match resolve_imported_skill(fs, layout, decl) {
+        Ok(r) => Ok(Some(r)),
+        Err(e) => {
+            if decl.required {
+                Err(e)
+            } else {
+                Ok(None)
+            }
+        }
+    }
+}
