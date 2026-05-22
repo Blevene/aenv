@@ -10,6 +10,7 @@
 //! every evaluator to take a long argument list.
 
 pub mod instructions_max_chars;
+pub mod mcp_requires_command_or_url;
 pub mod skill_requires_description;
 
 use crate::adapter::AdapterRegistry;
@@ -125,6 +126,7 @@ pub fn dispatch<F: Filesystem>(
 ) -> Vec<PolicyOutcome> {
     match key {
         "instructions_max_chars" => instructions_max_chars::evaluate(policy, ctx),
+        "mcp_requires_command_or_url" => mcp_requires_command_or_url::evaluate(policy, ctx),
         "skill_requires_description" => skill_requires_description::evaluate(policy, ctx),
         other => vec![PolicyOutcome::warn_skip(
             other.to_owned(),
