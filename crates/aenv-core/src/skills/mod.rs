@@ -8,6 +8,8 @@
 //! struct here is the wire shape that lands in `aenv.toml`'s `[[skills]]`
 //! table.
 
+pub mod source;
+
 use serde::{Deserialize, Serialize};
 
 /// One `[[skills]]` entry in a manifest.
