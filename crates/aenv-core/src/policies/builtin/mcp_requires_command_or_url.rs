@@ -109,5 +109,10 @@ pub fn evaluate<F: Filesystem>(
             });
         }
     }
+    // Emit a targetless Pass when no MCP-role files matched, so `aenv doctor`
+    // always shows a signal per evaluated policy.
+    if outcomes.is_empty() {
+        outcomes.push(PolicyOutcome::pass(KEY, None));
+    }
     outcomes
 }

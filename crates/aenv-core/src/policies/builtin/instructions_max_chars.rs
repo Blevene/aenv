@@ -90,5 +90,11 @@ pub fn evaluate<F: Filesystem>(
             });
         }
     }
+    // Match `forbid_paths`'s convention: emit a single targetless Pass when no
+    // candidate applies, so `aenv doctor` always shows a signal per evaluated
+    // policy rather than silently emitting nothing.
+    if outcomes.is_empty() {
+        outcomes.push(PolicyOutcome::pass(KEY, None));
+    }
     outcomes
 }

@@ -198,9 +198,11 @@ fn skips_non_instructions_files() {
         source: ns("base"),
     };
     let out = dispatch("instructions_max_chars", &rp, &ctx);
+    assert_eq!(out.len(), 1);
+    assert!(matches!(out[0].status, OutcomeStatus::Pass));
     assert!(
-        out.is_empty(),
-        "expected zero outcomes when no instructions files match; got {out:?}"
+        out[0].target.is_none(),
+        "expected targetless Pass when no instructions files match; got {out:?}"
     );
 }
 

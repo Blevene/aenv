@@ -254,7 +254,12 @@ fn skips_non_skill_files() {
         source: ns("base"),
     };
     let out = dispatch("skill_requires_description", &rp, &ctx);
-    assert!(out.is_empty());
+    assert_eq!(out.len(), 1);
+    assert!(matches!(out[0].status, OutcomeStatus::Pass));
+    assert!(
+        out[0].target.is_none(),
+        "expected targetless Pass when no skill files match; got {out:?}"
+    );
 }
 
 #[test]

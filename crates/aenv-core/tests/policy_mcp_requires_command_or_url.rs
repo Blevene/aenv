@@ -190,7 +190,12 @@ fn skips_non_mcp_files() {
         resolved: &resolved,
     };
     let out = dispatch("mcp_requires_command_or_url", &advisory(), &ctx);
-    assert!(out.is_empty());
+    assert_eq!(out.len(), 1);
+    assert!(matches!(out[0].status, OutcomeStatus::Pass));
+    assert!(
+        out[0].target.is_none(),
+        "expected targetless Pass when no MCP files match; got {out:?}"
+    );
 }
 
 #[test]
