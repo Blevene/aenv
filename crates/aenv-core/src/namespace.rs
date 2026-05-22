@@ -9,6 +9,7 @@ use crate::error::{AenvError, Result};
 use crate::fs::Filesystem;
 use crate::home::RegistryLayout;
 use crate::manifest::AenvManifest;
+use std::collections::BTreeMap;
 
 /// Create a new namespace by writing a default manifest. Errors if a
 /// manifest already exists for `name` (PRD R-5).
@@ -131,6 +132,7 @@ pub fn create_namespace_from_project<F: Filesystem>(
         name: new_name.to_string(),
         extends: vec![],
         adapters: manifest_adapters,
+        parameters: BTreeMap::new(),
     };
     let body =
         toml::to_string_pretty(&manifest).map_err(|e| AenvError::ManifestInvalid(e.to_string()))?;
