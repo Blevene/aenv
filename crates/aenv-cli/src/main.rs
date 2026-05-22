@@ -74,6 +74,14 @@ enum Command {
         #[arg(long)]
         project: Option<PathBuf>,
     },
+    /// Print the effective value of a parameter plus provenance.
+    ///
+    /// SPEC is either `<namespace>.<param>` (explicit namespace) or
+    /// `.<param>` (active project's pinned namespace).
+    Get {
+        /// Parameter spec: `<namespace>.<param>` or `.<param>`.
+        spec: String,
+    },
     /// Detach a file (or whole project) from namespace management.
     ///
     /// With no argument: detach all managed files and remove .aenv-state/.
@@ -134,6 +142,13 @@ fn main() -> ExitCode {
                 AdapterAction::Add { path } => cmd::adapter::run_add(&fs, &layout, &path),
                 AdapterAction::List => cmd::adapter::run_list(&fs, &layout),
             },
+            Command::Get { spec } => {
+                let adapters =
+                    aenv_core::adapter::AdapterRegistry::load_from_dir(&fs, &layout.adapters_dir())?;
+                // Defer project-root resolution so `aenv get ns.param` works
+                // outside a project directory (no .aenv pin needed).
+                cmd::get::run(&fs, &layout, &adapters, None, &spec)
+            }
             Command::Which { path, project } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;
                 cmd::which::run(project_root, path)

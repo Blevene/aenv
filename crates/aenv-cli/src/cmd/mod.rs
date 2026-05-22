@@ -6,6 +6,7 @@ pub mod create;
 pub mod deactivate;
 pub mod delete;
 pub mod fork;
+pub mod get;
 pub mod list;
 pub mod restore;
 pub mod status;
