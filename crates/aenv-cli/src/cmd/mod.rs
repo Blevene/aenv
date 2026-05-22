@@ -12,5 +12,6 @@ pub mod list;
 pub mod restore;
 pub mod set;
 pub mod status;
+pub mod skill;
 pub mod use_;
 pub mod which;

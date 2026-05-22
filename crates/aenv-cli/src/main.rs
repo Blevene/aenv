@@ -110,6 +110,11 @@ enum Command {
         #[arg(long)]
         project: Option<PathBuf>,
     },
+    /// Skill operations.
+    Skill {
+        #[command(subcommand)]
+        action: SkillAction,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -121,6 +126,21 @@ enum AdapterAction {
     },
     /// List installed adapters.
     List,
+}
+
+#[derive(Debug, Subcommand)]
+enum SkillAction {
+    /// Scaffold a new authored skill in a namespace.
+    New {
+        /// Skill name (becomes the directory name).
+        name: String,
+        /// Target namespace.
+        #[arg(long)]
+        ns: String,
+        /// Adapter (defaults to the namespace's only adapter if exactly one).
+        #[arg(long)]
+        adapter: Option<String>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -184,6 +204,15 @@ fn main() -> ExitCode {
                 let project_root = paths::resolve_project_root(&fs, project)?;
                 cmd::which::run(project_root, path)
             }
+            Command::Skill { action } => match action {
+                SkillAction::New { name, ns, adapter } => {
+                    let adapters_reg = aenv_core::adapter::AdapterRegistry::load_from_dir(
+                        &fs,
+                        &layout.adapters_dir(),
+                    )?;
+                    cmd::skill::new::run(&fs, &layout, &adapters_reg, &ns, &name, adapter.as_deref())
+                }
+            },
             Command::Fork { target, project } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;
                 match target {
