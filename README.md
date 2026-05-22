@@ -87,4 +87,4 @@ Requires Rust stable 1.85 or later. No external runtime dependencies.
 
 ## License
 
-Dual-licensed under MIT or Apache 2.0.
+MIT. See [`LICENSE`](./LICENSE).
