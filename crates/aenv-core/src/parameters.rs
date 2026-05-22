@@ -99,6 +99,7 @@ fn toml_type_name(v: &toml::Value) -> &'static str {
     }
 }
 
+use crate::adapter::AdapterRegistry;
 use crate::identity::NamespaceId;
 use std::collections::BTreeMap;
 
@@ -158,4 +159,55 @@ pub fn resolve_parameters(
         }
     }
     Ok(out)
+}
+
+/// Verify that every adapter-declared parameter has a manifest value of the
+/// adapter-declared type (PRD R-71). Manifest-only parameters (not declared
+/// by any adapter) are allowed.
+///
+/// Also rejects the case where two adapters declare the same parameter name
+/// with different types — that's a configuration bug.
+pub fn check_against_adapters(
+    resolved: &BTreeMap<String, ResolvedParameter>,
+    adapters: &AdapterRegistry,
+) -> Result<()> {
+    // Build a map: parameter name -> (adapter_name, type_tag).
+    let mut decls: BTreeMap<&str, (&str, &'static str)> = BTreeMap::new();
+    for (adapter_name, adapter) in adapters.iter() {
+        for p in &adapter.parameters {
+            if let Some((other_adapter, other_type)) = decls.get(p.name.as_str()) {
+                if *other_type != p.r#type.type_tag() {
+                    return Err(AenvError::ManifestInvalid(format!(
+                        "parameter '{}' is declared by adapters '{}' ({}) \
+                         and '{}' ({}) with conflicting types",
+                        p.name,
+                        other_adapter,
+                        other_type,
+                        adapter_name,
+                        p.r#type.type_tag()
+                    )));
+                }
+            } else {
+                decls.insert(p.name.as_str(), (adapter_name.as_str(), p.r#type.type_tag()));
+            }
+        }
+    }
+
+    for (name, rp) in resolved {
+        if let Some((adapter_name, decl_type)) = decls.get(name.as_str()) {
+            if *decl_type != rp.value.type_tag() {
+                return Err(AenvError::ManifestInvalid(format!(
+                    "parameter '{}' has type {} in namespace {} but adapter '{}' \
+                     declared it as {}",
+                    name,
+                    rp.value.type_tag(),
+                    rp.source,
+                    adapter_name,
+                    decl_type
+                )));
+            }
+        }
+    }
+
+    Ok(())
 }
