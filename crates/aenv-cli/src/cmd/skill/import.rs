@@ -83,6 +83,18 @@ pub fn run<F: Filesystem>(
     Ok(())
 }
 
+/// Derive a default skill name from the source string.
+///
+/// Convention (per functional spec §5.10):
+/// * `git+<url>#<fragment>` → the fragment. The spec example
+///   `git+...aenv-skills.git#match-conventions` imports the skill named
+///   `match-conventions` from the repo. Pinning uses `--pin <ref>` for the
+///   git ref, not the fragment. If your fragment happens to look like a
+///   branch name (e.g. `#main`), you'll get a skill literally named "main" —
+///   edit the manifest by hand or omit the fragment to use the repo name.
+/// * `git+<url>` (no fragment) → last path component, with `.git` stripped.
+/// * `registry:<name>` → `<name>`.
+/// * Local path → last path component.
 fn derive_skill_name(source: &str) -> Option<String> {
     if let Some(rest) = source.strip_prefix("git+") {
         if let Some((_, after_hash)) = rest.split_once('#') {
@@ -99,4 +111,50 @@ fn derive_skill_name(source: &str) -> Option<String> {
         .file_name()
         .and_then(|s| s.to_str())
         .map(|s| s.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::derive_skill_name;
+
+    #[test]
+    fn fragment_becomes_skill_name() {
+        // Spec §5.10 convention: the fragment names the skill within the repo.
+        assert_eq!(
+            derive_skill_name("git+https://github.com/acme/aenv-skills.git#match-conventions"),
+            Some("match-conventions".into())
+        );
+    }
+
+    #[test]
+    fn git_no_fragment_uses_repo_name_minus_dot_git() {
+        assert_eq!(
+            derive_skill_name("git+https://github.com/user/my-skill.git"),
+            Some("my-skill".into())
+        );
+        assert_eq!(
+            derive_skill_name("git+https://github.com/user/my-skill"),
+            Some("my-skill".into())
+        );
+    }
+
+    #[test]
+    fn registry_uses_bare_name() {
+        assert_eq!(
+            derive_skill_name("registry:cite-evidence"),
+            Some("cite-evidence".into())
+        );
+    }
+
+    #[test]
+    fn local_path_uses_last_component() {
+        assert_eq!(
+            derive_skill_name("/home/user/team-skills/check-before-submit"),
+            Some("check-before-submit".into())
+        );
+        assert_eq!(
+            derive_skill_name("~/team-skills/foo"),
+            Some("foo".into())
+        );
+    }
 }

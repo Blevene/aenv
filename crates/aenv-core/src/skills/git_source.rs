@@ -9,7 +9,7 @@ use crate::error::{AenvError, Result};
 use crate::fs::Filesystem;
 use crate::home::RegistryLayout;
 use crate::skills::cache::skill_cache_path;
-use crate::skills::git::{git_clone, git_resolve_ref};
+use crate::skills::git::git_clone;
 use crate::skills::local::LocalResolution;
 use sha2::{Digest, Sha256};
 use std::path::Path;
@@ -51,7 +51,6 @@ pub fn resolve_git<F: Filesystem>(
         })?;
     }
     let resolved_sha = git_clone(url, ref_spec, &cache_dir)?;
-    let _ = git_resolve_ref; // intentionally unused: clone returns the SHA we need
 
     let resolved_hash = compute_skill_hash(fs, &cache_dir, skill_name)?;
 
