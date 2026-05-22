@@ -98,3 +98,64 @@ fn toml_type_name(v: &toml::Value) -> &'static str {
         toml::Value::Table(_) => "table",
     }
 }
+
+use crate::identity::NamespaceId;
+use std::collections::BTreeMap;
+
+/// One resolved parameter: value + the namespace in the `extends` chain that
+/// supplied it.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ResolvedParameter {
+    /// Effective value after `extends`-chain resolution.
+    pub value: ParameterValue,
+    /// Latest namespace in the chain that declared this key.
+    pub source: NamespaceId,
+}
+
+/// Collapse per-namespace `[parameters]` tables into a single map of effective
+/// values. `chain` is in root → leaf order (the order `resolve_namespace`
+/// produces). `per_ns` must contain an entry for every namespace in `chain`,
+/// even if that entry is empty.
+///
+/// Semantics:
+/// * Last-wins per-key (PRD R-67). The leaf overrides the root.
+/// * Type-incompat across the chain (parent declares `int`, child declares
+///   `string`) is a `ManifestInvalid` error. Same-type overrides are fine.
+///
+/// This function does NOT consult adapter declarations; that's Task 5
+/// (full R-71 enforcement).
+pub fn resolve_parameters(
+    chain: &[NamespaceId],
+    per_ns: &BTreeMap<NamespaceId, BTreeMap<String, ParameterValue>>,
+) -> Result<BTreeMap<String, ResolvedParameter>> {
+    let mut out: BTreeMap<String, ResolvedParameter> = BTreeMap::new();
+    for ns in chain {
+        let table = match per_ns.get(ns) {
+            Some(t) => t,
+            None => continue,
+        };
+        for (k, v) in table {
+            if let Some(prev) = out.get(k) {
+                if prev.value.type_tag() != v.type_tag() {
+                    return Err(AenvError::ManifestInvalid(format!(
+                        "parameter '{}' has incompatible types across chain: \
+                         {} declared {} but {} declared {}",
+                        k,
+                        prev.source,
+                        prev.value.type_tag(),
+                        ns,
+                        v.type_tag()
+                    )));
+                }
+            }
+            out.insert(
+                k.clone(),
+                ResolvedParameter {
+                    value: v.clone(),
+                    source: ns.clone(),
+                },
+            );
+        }
+    }
+    Ok(out)
+}
