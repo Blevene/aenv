@@ -67,6 +67,49 @@ pub fn format_status(state: &ActivationState, chain: &[NamespaceId]) -> String {
         }
     }
 
+    // Skills section: group managed files by skill_provenance (only SKILL.md
+    // files carry provenance, per Task 9's gather_skill_candidates).
+    let skill_files: Vec<&ManagedFile> = state
+        .managed_files
+        .iter()
+        .filter(|m| {
+            m.skill_provenance.is_some() && m.path.file_name() == Some("SKILL.md".as_ref())
+        })
+        .collect();
+    if !skill_files.is_empty() {
+        let authored_count = skill_files
+            .iter()
+            .filter(|m| {
+                m.skill_provenance
+                    .as_ref()
+                    .map(|p| p.source.starts_with("authored:"))
+                    .unwrap_or(false)
+            })
+            .count();
+        let imported_count = skill_files.len() - authored_count;
+        out.push('\n');
+        out.push_str(&format!(
+            "Skills ({authored_count} authored, {imported_count} imported):\n"
+        ));
+        for m in &skill_files {
+            let prov = m.skill_provenance.as_ref().unwrap();
+            let (mode, source) = if prov.source.starts_with("authored:") {
+                ("authored", "-".to_string())
+            } else {
+                ("imported", prov.source.clone())
+            };
+            let ref_part = prov
+                .resolved_ref
+                .as_ref()
+                .map(|r| format!(" @ {r}"))
+                .unwrap_or_default();
+            out.push_str(&format!(
+                "  {}  {mode}  {source}{ref_part}\n",
+                m.qualified_name
+            ));
+        }
+    }
+
     out
 }
 
