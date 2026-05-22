@@ -152,6 +152,11 @@ enum SkillAction {
         #[arg(long)]
         pin: Option<String>,
     },
+    /// List every skill in every namespace (or one if --ns).
+    List {
+        #[arg(long)]
+        ns: Option<String>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -236,6 +241,7 @@ fn main() -> ExitCode {
                         pin.as_deref(),
                     )
                 }
+                SkillAction::List { ns } => cmd::skill::list::run(&fs, &layout, ns.as_deref()),
             },
             Command::Fork { target, project } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;
