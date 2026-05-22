@@ -3,6 +3,7 @@
 
 use crate::fs::Filesystem;
 use crate::identity::{QualifiedName, ShortName};
+use crate::parameters::ParameterValue;
 use crate::policies::builtin::{PolicyContext, PolicyOutcome};
 use crate::policies::{PolicyValue, ResolvedPolicy};
 
@@ -13,7 +14,7 @@ pub fn evaluate<F: Filesystem>(
     policy: &ResolvedPolicy,
     ctx: &PolicyContext<F>,
 ) -> Vec<PolicyOutcome> {
-    let limit = match &policy.value {
+    let policy_limit = match &policy.value {
         PolicyValue::Integer(n) if *n >= 0 => *n as usize,
         _ => {
             return vec![PolicyOutcome::warn_skip(
@@ -25,6 +26,17 @@ pub fn evaluate<F: Filesystem>(
                 ),
             )];
         }
+    };
+    let budget_limit = match ctx.resolved.parameters.get("instructions_budget") {
+        Some(rp) => match &rp.value {
+            ParameterValue::Integer(n) if *n >= 0 => Some(*n as usize),
+            _ => None,
+        },
+        None => None,
+    };
+    let effective = match budget_limit {
+        Some(b) => policy_limit.min(b),
+        None => policy_limit,
     };
 
     let mut outcomes: Vec<PolicyOutcome> = Vec::new();
@@ -75,11 +87,11 @@ pub fn evaluate<F: Filesystem>(
             }
         };
         let chars = text.chars().count();
-        if chars <= limit {
+        if chars <= effective {
             outcomes.push(PolicyOutcome::pass(KEY, Some(target)));
         } else {
             let msg = format!(
-                "{} has {chars} chars (budget {limit}). Refactor procedural content into \
+                "{} has {chars} chars (budget {effective}). Refactor procedural content into \
                  skills, dispositional content into subagents, or use @-imports.",
                 c.path.display()
             );

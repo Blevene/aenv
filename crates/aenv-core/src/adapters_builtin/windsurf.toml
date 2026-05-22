@@ -6,3 +6,7 @@ files = [".windsurfrules"]
 
 [soft_limits]
 instructions = 6000
+
+[[parameters]]
+name = "instructions_budget"
+type = "integer"

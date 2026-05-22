@@ -6,3 +6,7 @@ files = [".continue/config.json"]
 
 [soft_limits]
 instructions = 5000
+
+[[parameters]]
+name = "instructions_budget"
+type = "integer"
