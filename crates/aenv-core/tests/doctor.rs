@@ -23,6 +23,7 @@ fn claude_adapter() -> Adapter {
         roles,
         default_merge: BTreeMap::new(),
         parameters: vec![],
+        skills_dir: None,
     }
 }
 
@@ -46,6 +47,7 @@ fn clean_report_when_all_pass() {
             source_path: PathBuf::from("/h/envs/base/CLAUDE.md"),
             adapter: "claude-code".into(),
             merge_override: None,
+            skill_provenance: None,
         }],
         parameters: BTreeMap::new(),
         policies: BTreeMap::from([(
@@ -87,6 +89,7 @@ fn enforce_violation_is_flagged() {
             source_path: PathBuf::from("/h/envs/base/CLAUDE.md"),
             adapter: "claude-code".into(),
             merge_override: None,
+            skill_provenance: None,
         }],
         parameters: BTreeMap::new(),
         policies: BTreeMap::from([(

@@ -9,11 +9,26 @@ use crate::error::{AenvError, Result};
 use std::path::PathBuf;
 
 /// Current schema version. Bump when changing the on-disk shape.
-pub const SCHEMA_VERSION: u32 = 3;
+pub const SCHEMA_VERSION: u32 = 4;
 
 /// Materialization strategy — re-exported from `crate::resolve` so callers
 /// only need one import path.
 pub use crate::resolve::MaterializeStrategy;
+
+/// Provenance record for a skill-managed file.
+///
+/// Attached to the SKILL.md of imported skills so `aenv status` can display
+/// the origin and hash without re-reading the source.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct SkillProvenance {
+    /// Source identifier: a local path, a git URL, or `"authored:<ns>"`.
+    pub source: String,
+    /// For git sources: the resolved commit SHA. `None` for local/authored.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved_ref: Option<String>,
+    /// `"sha256:<hex>"` of the SKILL.md body at resolution time.
+    pub resolved_hash: String,
+}
 
 /// One file managed by the current activation.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -31,6 +46,9 @@ pub struct ManagedFile {
     /// merged artifacts.
     #[serde(default)]
     pub shadows: Vec<crate::identity::QualifiedName>,
+    /// Skill provenance for skill SKILL.md files. `None` for regular files.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skill_provenance: Option<SkillProvenance>,
 }
 
 impl<'de> serde::Deserialize<'de> for ManagedFile {
@@ -45,6 +63,8 @@ impl<'de> serde::Deserialize<'de> for ManagedFile {
             contributors: Vec<crate::identity::QualifiedName>,
             #[serde(default)]
             shadows: Vec<crate::identity::QualifiedName>,
+            #[serde(default)]
+            skill_provenance: Option<SkillProvenance>,
         }
         let raw = Raw::deserialize(d)?;
         // Absence of `qualified_name` means this is a schema-1 file. We use a
@@ -63,6 +83,7 @@ impl<'de> serde::Deserialize<'de> for ManagedFile {
             strategy: raw.strategy,
             contributors: raw.contributors,
             shadows: raw.shadows,
+            skill_provenance: raw.skill_provenance,
         })
     }
 }

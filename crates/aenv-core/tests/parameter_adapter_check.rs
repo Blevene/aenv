@@ -30,6 +30,7 @@ fn ad(name: &str, params: Vec<(&str, AdapterParameterType)>) -> Adapter {
                 projects_to: None,
             })
             .collect(),
+        skills_dir: None,
     }
 }
 

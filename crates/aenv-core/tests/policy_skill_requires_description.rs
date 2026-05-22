@@ -21,6 +21,7 @@ fn make_registry() -> AdapterRegistry {
         roles: BTreeMap::new(),
         default_merge: BTreeMap::new(),
         parameters: vec![],
+        skills_dir: None,
     });
     adapters
 }
@@ -36,6 +37,7 @@ fn skill_candidate(ns_name: &str, skill: &str, source: PathBuf) -> Candidate {
         source_path: source,
         adapter: "claude-code".into(),
         merge_override: None,
+        skill_provenance: None,
     }
 }
 
@@ -238,6 +240,7 @@ fn skips_non_skill_files() {
             source_path: PathBuf::from("/aenv-home/envs/base/CLAUDE.md"),
             adapter: "claude-code".into(),
             merge_override: None,
+            skill_provenance: None,
         }],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),

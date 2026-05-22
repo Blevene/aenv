@@ -7,8 +7,8 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 #[test]
-fn schema_version_is_3() {
-    assert_eq!(SCHEMA_VERSION, 3);
+fn schema_version_is_4() {
+    assert_eq!(SCHEMA_VERSION, 4);
 }
 
 #[test]
@@ -44,6 +44,7 @@ fn schema_3_roundtrip_with_params_and_policies() {
             strategy: MaterializeStrategy::Symlink,
             contributors: vec![],
             shadows: vec![],
+            skill_provenance: None,
         }],
         backed_up: vec![],
         parameters,
@@ -73,12 +74,12 @@ fn reads_schema_2_with_default_empty_maps() {
 #[test]
 fn rejects_unknown_higher_schema_version() {
     let json = r#"{
-        "schema_version": 4,
+        "schema_version": 5,
         "active_namespace": "base",
         "project_root": "/p",
         "managed_files": [],
         "backed_up": []
     }"#;
     let err = ActivationState::from_json(json).unwrap_err();
-    assert!(err.to_string().contains("schema_version 4"));
+    assert!(err.to_string().contains("schema_version 5"));
 }

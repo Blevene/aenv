@@ -68,6 +68,11 @@ pub struct Adapter {
     /// Parameters this adapter consumes. Empty for adapters that take none.
     #[serde(default, rename = "parameters", skip_serializing_if = "Vec::is_empty")]
     pub parameters: Vec<AdapterParameterDecl>,
+    /// Adapter-specific directory under which skills are materialized in the
+    /// project. Defaults to `None` (the adapter has no skill convention).
+    /// For claude-code this is `.claude/skills`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skills_dir: Option<String>,
 }
 
 impl Adapter {

@@ -23,6 +23,7 @@ fn make_adapters() -> AdapterRegistry {
         roles,
         default_merge: BTreeMap::new(),
         parameters: vec![],
+        skills_dir: None,
     });
     adapters
 }
@@ -36,6 +37,7 @@ fn make_resolved(ns_name: &str, source: PathBuf) -> ResolutionResult {
             source_path: source,
             adapter: "mcp".into(),
             merge_override: None,
+            skill_provenance: None,
         }],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
@@ -170,6 +172,7 @@ fn skips_non_mcp_files() {
         roles: BTreeMap::new(),
         default_merge: BTreeMap::new(),
         parameters: vec![],
+        skills_dir: None,
     });
     let resolved = ResolutionResult {
         chain: vec![ns("base")],
@@ -179,6 +182,7 @@ fn skips_non_mcp_files() {
             source_path: PathBuf::from("/h/envs/base/CLAUDE.md"),
             adapter: "claude-code".into(),
             merge_override: None,
+            skill_provenance: None,
         }],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),

@@ -23,6 +23,7 @@ fn make_registry_with_claude() -> AdapterRegistry {
         roles,
         default_merge: BTreeMap::new(),
         parameters: vec![],
+        skills_dir: None,
     });
     adapters
 }
@@ -40,6 +41,7 @@ fn make_resolution(ns_name: &str, source_path: PathBuf) -> ResolutionResult {
             source_path,
             adapter: "claude-code".into(),
             merge_override: None,
+            skill_provenance: None,
         }],
         parameters: std::collections::BTreeMap::new(),
         policies: std::collections::BTreeMap::new(),
@@ -182,6 +184,7 @@ fn skips_non_instructions_files() {
             source_path: PathBuf::from("/aenv-home/envs/base/.mcp.json"),
             adapter: "claude-code".into(),
             merge_override: None,
+            skill_provenance: None,
         }],
         parameters: std::collections::BTreeMap::new(),
         policies: std::collections::BTreeMap::new(),

@@ -182,6 +182,7 @@ fn materialize_one<F: Filesystem>(
                 &short,
                 path,
                 shadows,
+                latest.skill_provenance.clone(),
                 undo_log,
                 managed,
                 backed_up,
@@ -208,6 +209,7 @@ fn materialize_one<F: Filesystem>(
                     .map(crate::shadow::qualified_from_candidate)
                     .collect::<Result<Vec<_>>>()?,
                 shadows: vec![],
+                skill_provenance: None,
             });
         }
         MaterializeStrategy::DeepMerge(format) => {
@@ -241,6 +243,7 @@ fn materialize_one<F: Filesystem>(
                     .map(crate::shadow::qualified_from_candidate)
                     .collect::<Result<Vec<_>>>()?,
                 shadows: vec![],
+                skill_provenance: None,
             });
         }
         MaterializeStrategy::Copy => {

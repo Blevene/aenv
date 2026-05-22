@@ -27,6 +27,7 @@ fn status_prints_resolution_chain_and_managed_provenance() {
                 strategy: MaterializeStrategy::SectionMerge,
                 contributors: vec![qn("base", "CLAUDE.md"), qn("leaf", "CLAUDE.md")],
                 shadows: vec![],
+                skill_provenance: None,
             },
             ManagedFile {
                 path: PathBuf::from(".claude/skills/write-tests/SKILL.md"),
@@ -34,6 +35,7 @@ fn status_prints_resolution_chain_and_managed_provenance() {
                 strategy: MaterializeStrategy::Symlink,
                 contributors: vec![],
                 shadows: vec![qn("base", ".claude/skills/write-tests/SKILL.md")],
+                skill_provenance: None,
             },
             ManagedFile {
                 path: PathBuf::from(".mcp.json"),
@@ -41,6 +43,7 @@ fn status_prints_resolution_chain_and_managed_provenance() {
                 strategy: MaterializeStrategy::DeepMerge(DeepMergeFormat::Json),
                 contributors: vec![qn("base", ".mcp.json"), qn("leaf", ".mcp.json")],
                 shadows: vec![],
+                skill_provenance: None,
             },
         ],
         backed_up: vec![],

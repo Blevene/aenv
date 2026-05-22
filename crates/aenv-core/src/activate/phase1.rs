@@ -7,7 +7,7 @@
 use crate::error::{AenvError, Result};
 use crate::fs::Filesystem;
 use crate::identity::{NamespaceId, QualifiedName, ShortName};
-use crate::state::{BackedUpFile, ManagedFile, MaterializeStrategy};
+use crate::state::{BackedUpFile, ManagedFile, MaterializeStrategy, SkillProvenance};
 use std::path::Path;
 
 use super::UndoStep;
@@ -28,6 +28,7 @@ pub(super) fn materialize_symlink<F: Filesystem>(
     short: &ShortName,
     rel: &Path,
     shadows: Vec<QualifiedName>,
+    skill_provenance: Option<SkillProvenance>,
     undo_log: &mut Vec<UndoStep>,
     managed: &mut Vec<ManagedFile>,
     backed_up: &mut Vec<BackedUpFile>,
@@ -48,6 +49,7 @@ pub(super) fn materialize_symlink<F: Filesystem>(
                 strategy: MaterializeStrategy::Symlink,
                 contributors: vec![],
                 shadows,
+                skill_provenance: skill_provenance.clone(),
             });
         }
         super::ProjectPathState::AlreadyOurSymlink => {
@@ -57,6 +59,7 @@ pub(super) fn materialize_symlink<F: Filesystem>(
                 strategy: MaterializeStrategy::Symlink,
                 contributors: vec![],
                 shadows,
+                skill_provenance: skill_provenance.clone(),
             });
         }
         super::ProjectPathState::ByteIdenticalRegular => {
@@ -66,6 +69,7 @@ pub(super) fn materialize_symlink<F: Filesystem>(
                 strategy: MaterializeStrategy::Identical,
                 contributors: vec![],
                 shadows,
+                skill_provenance: skill_provenance.clone(),
             });
         }
         super::ProjectPathState::Displaced => {
@@ -113,6 +117,7 @@ pub(super) fn materialize_symlink<F: Filesystem>(
                 strategy: MaterializeStrategy::Symlink,
                 contributors: vec![],
                 shadows,
+                skill_provenance,
             });
         }
     }

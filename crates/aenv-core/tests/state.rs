@@ -25,6 +25,7 @@ fn sample_state() -> ActivationState {
             strategy: MaterializeStrategy::Symlink,
             contributors: vec![],
             shadows: vec![],
+            skill_provenance: None,
         }],
         backed_up: vec![BackedUpFile {
             original_path: PathBuf::from("CLAUDE.md"),
@@ -109,6 +110,7 @@ fn managed_file_serializes_qualified_name_and_shadows() {
         strategy: MaterializeStrategy::Symlink,
         contributors: vec![],
         shadows: vec![qn("base", "CLAUDE.md")],
+        skill_provenance: None,
     };
     let json = serde_json::to_string(&mf).unwrap();
     assert!(json.contains("\"qualified_name\""));
@@ -124,6 +126,7 @@ fn managed_file_serializes_contributors_for_merged() {
         strategy: MaterializeStrategy::DeepMerge(aenv_core::resolve::DeepMergeFormat::Json),
         contributors: vec![qn("base", ".mcp.json"), qn("leaf", ".mcp.json")],
         shadows: vec![],
+        skill_provenance: None,
     };
     let json = serde_json::to_string(&mf).unwrap();
     assert!(json.contains("\"contributors\""));

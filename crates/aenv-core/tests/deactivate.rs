@@ -22,6 +22,7 @@ fn registry_with_claude() -> AdapterRegistry {
         roles: Default::default(),
         default_merge: Default::default(),
         parameters: vec![],
+        skills_dir: None,
     });
     r
 }

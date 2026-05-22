@@ -102,6 +102,7 @@ use crate::home::RegistryLayout;
 use crate::manifest::AenvManifest;
 use crate::parameters::{resolve_parameters, ResolvedParameter};
 use crate::policies::{resolve_policies, ResolvedPolicy};
+use crate::state::SkillProvenance;
 use crate::AenvError;
 
 /// One candidate contribution from a single namespace for a single path.
@@ -117,6 +118,8 @@ pub struct Candidate {
     pub adapter: String,
     /// Per-file merge strategy override from the manifest, if any.
     pub merge_override: Option<String>,
+    /// Skill provenance for skill SKILL.md files. `None` for regular files.
+    pub skill_provenance: Option<SkillProvenance>,
 }
 
 /// Output of `resolve_namespace`.
@@ -208,6 +211,7 @@ pub fn resolve_namespace<F: Filesystem>(
             }
         }
         gather_candidates(fs, registry, ns, &manifest, &mut candidates)?;
+        gather_skill_candidates(fs, registry, ns, &manifest, adapters, &mut candidates)?;
         params_per_ns.insert(ns.clone(), manifest.parameters.clone());
         policies_per_ns.insert(ns.clone(), manifest.policies.clone());
     }
@@ -331,6 +335,7 @@ fn gather_candidates<F: Filesystem>(
                                 .merge
                                 .as_ref()
                                 .and_then(|m| m.get(&literal).cloned()),
+                            skill_provenance: None,
                         })
                     });
             } else {
@@ -347,11 +352,166 @@ fn gather_candidates<F: Filesystem>(
                     source_path: source,
                     adapter: adapter_name.clone(),
                     merge_override: entry.merge.as_ref().and_then(|m| m.get(rel).cloned()),
+                    skill_provenance: None,
                 });
             }
         }
     }
     Ok(())
+}
+
+fn gather_skill_candidates<F: Filesystem>(
+    fs: &F,
+    registry: &RegistryLayout,
+    ns: &NamespaceId,
+    manifest: &AenvManifest,
+    adapters: &AdapterRegistry,
+    out: &mut Vec<Candidate>,
+) -> Result<(), ResolutionError> {
+    use crate::skills::SkillMode;
+
+    for decl in &manifest.skills {
+        // Determine adapter name for this skill.
+        let adapter_name = match &decl.adapter {
+            Some(a) => a.clone(),
+            None => {
+                if manifest.adapters.len() == 1 {
+                    manifest.adapters.keys().next().unwrap().clone()
+                } else {
+                    return Err(ResolutionError::ManifestInvalid {
+                        namespace: ns.clone(),
+                        reason: format!(
+                            "skill '{}' has no adapter and namespace has {} adapters; \
+                             specify adapter explicitly",
+                            decl.name,
+                            manifest.adapters.len()
+                        ),
+                    });
+                }
+            }
+        };
+
+        let adapter = adapters.get(&adapter_name).ok_or_else(|| {
+            ResolutionError::AdapterMissing(adapter_name.clone())
+        })?;
+
+        let skills_dir = adapter.skills_dir.as_deref().ok_or_else(|| {
+            ResolutionError::ManifestInvalid {
+                namespace: ns.clone(),
+                reason: format!(
+                    "adapter '{}' has no skills_dir; cannot materialize skill '{}'",
+                    adapter_name, decl.name
+                ),
+            }
+        })?;
+
+        // Destination directory in project: <skills_dir>/<skill_name>/
+        let dest_prefix = format!("{}/{}", skills_dir, decl.name);
+
+        match decl.mode {
+            SkillMode::Authored => {
+                // Walk the namespace directory at <ns_root>/<dest_prefix>/
+                let ns_root = registry.namespace_dir(ns.as_str());
+                let skill_dir_abs = ns_root.join(&dest_prefix);
+                if !fs.exists(&skill_dir_abs).map_err(|e| ResolutionError::Io(e.to_string()))? {
+                    // No skill directory present; skip silently.
+                    continue;
+                }
+                // Walk all files under the skill directory.
+                let mut rel_files: Vec<String> = Vec::new();
+                walk_dir(fs, &ns_root, std::path::Path::new(&dest_prefix), &mut rel_files)
+                    .map_err(|e| ResolutionError::Io(e.to_string()))?;
+                for rel_str in rel_files {
+                    let source_path = ns_root.join(&rel_str);
+                    // Compute skill_provenance only for the SKILL.md file.
+                    let skill_provenance =
+                        if std::path::Path::new(&rel_str).file_name() == Some("SKILL.md".as_ref())
+                        {
+                            let bytes = fs
+                                .read(&source_path)
+                                .map_err(|e| ResolutionError::Io(e.to_string()))?;
+                            let hash = sha256_hex(&bytes);
+                            Some(SkillProvenance {
+                                source: format!("authored:{}", ns.as_str()),
+                                resolved_ref: None,
+                                resolved_hash: format!("sha256:{hash}"),
+                            })
+                        } else {
+                            None
+                        };
+                    out.push(Candidate {
+                        namespace: ns.clone(),
+                        path: PathBuf::from(&rel_str),
+                        source_path,
+                        adapter: adapter_name.clone(),
+                        merge_override: None,
+                        skill_provenance,
+                    });
+                }
+            }
+            SkillMode::Imported => {
+                match crate::skills::apply_required_rule(fs, registry, decl) {
+                    Ok(Some(resolution)) => {
+                        // Walk all files under resolution.source_path.
+                        let source_dir = &resolution.source_path;
+                        let mut rel_files: Vec<String> = Vec::new();
+                        walk_dir(fs, source_dir, std::path::Path::new(""), &mut rel_files)
+                            .map_err(|e| ResolutionError::Io(e.to_string()))?;
+                        for rel_str in rel_files {
+                            let source_path = source_dir.join(&rel_str);
+                            // Attach provenance only to SKILL.md.
+                            let skill_provenance = if std::path::Path::new(&rel_str).file_name()
+                                == Some("SKILL.md".as_ref())
+                            {
+                                Some(SkillProvenance {
+                                    source: decl
+                                        .source
+                                        .clone()
+                                        .unwrap_or_else(|| "<unknown>".into()),
+                                    resolved_ref: resolution.resolved_ref.clone(),
+                                    resolved_hash: resolution.resolved_hash.clone(),
+                                })
+                            } else {
+                                None
+                            };
+                            // Destination path: <skills_dir>/<skill_name>/<rel_str>
+                            let dest_path = format!("{dest_prefix}/{rel_str}");
+                            out.push(Candidate {
+                                namespace: ns.clone(),
+                                path: PathBuf::from(&dest_path),
+                                source_path,
+                                adapter: adapter_name.clone(),
+                                merge_override: None,
+                                skill_provenance,
+                            });
+                        }
+                    }
+                    Ok(None) => {
+                        eprintln!(
+                            "[aenv] skill '{}' from '{}' unreachable; skipping (not required)",
+                            decl.name,
+                            decl.source.as_deref().unwrap_or("<no source>")
+                        );
+                    }
+                    Err(e) => {
+                        return Err(ResolutionError::ManifestInvalid {
+                            namespace: ns.clone(),
+                            reason: format!("skill '{}': {e}", decl.name),
+                        });
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    let digest = hasher.finalize();
+    digest.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 fn expand_glob<F: Filesystem>(

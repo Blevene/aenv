@@ -20,6 +20,7 @@ fn dummy_adapter() -> Adapter {
         roles: BTreeMap::new(),
         default_merge: BTreeMap::new(),
         parameters: vec![],
+        skills_dir: None,
     }
 }
 
@@ -30,6 +31,7 @@ fn candidate(rel: &str) -> Candidate {
         source_path: PathBuf::from(format!("/h/envs/base/{rel}")),
         adapter: "claude-code".into(),
         merge_override: None,
+        skill_provenance: None,
     }
 }
 

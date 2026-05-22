@@ -24,6 +24,7 @@ fn claude_adapter() -> Adapter {
         roles: Default::default(),
         default_merge: Default::default(),
         parameters: vec![],
+        skills_dir: None,
     }
 }
 

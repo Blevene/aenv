@@ -34,6 +34,7 @@ fn which_for_symlinked_file_with_shadow() {
         strategy: MaterializeStrategy::Symlink,
         contributors: vec![],
         shadows: vec![qn("base", "CLAUDE.md")],
+        skill_provenance: None,
     });
     let out = format_which(&state, Path::new("CLAUDE.md")).unwrap();
     assert!(out.contains("Qualified name:  leaf::CLAUDE.md"));
@@ -50,6 +51,7 @@ fn which_for_merged_file_lists_contributors() {
         strategy: MaterializeStrategy::DeepMerge(aenv_core::resolve::DeepMergeFormat::Json),
         contributors: vec![qn("base", ".mcp.json"), qn("leaf", ".mcp.json")],
         shadows: vec![],
+        skill_provenance: None,
     });
     let out = format_which(&state, Path::new(".mcp.json")).unwrap();
     assert!(out.contains("Qualified name:  (merged)"));
