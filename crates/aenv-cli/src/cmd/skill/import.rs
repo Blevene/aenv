@@ -152,9 +152,6 @@ mod tests {
             derive_skill_name("/home/user/team-skills/check-before-submit"),
             Some("check-before-submit".into())
         );
-        assert_eq!(
-            derive_skill_name("~/team-skills/foo"),
-            Some("foo".into())
-        );
+        assert_eq!(derive_skill_name("~/team-skills/foo"), Some("foo".into()));
     }
 }

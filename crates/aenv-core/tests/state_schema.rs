@@ -49,6 +49,7 @@ fn schema_3_roundtrip_with_params_and_policies() {
         backed_up: vec![],
         parameters,
         policies,
+        warnings: Vec::new(),
     };
     let s = state.to_json().unwrap();
     let parsed = ActivationState::from_json(&s).unwrap();

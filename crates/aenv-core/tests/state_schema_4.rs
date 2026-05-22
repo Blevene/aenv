@@ -34,6 +34,7 @@ fn schema_4_roundtrips_with_skill_provenance() {
         backed_up: vec![],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let s = state.to_json().unwrap();
     let parsed = ActivationState::from_json(&s).unwrap();

@@ -42,6 +42,7 @@ fn make_resolved(ns_name: &str, source: PathBuf) -> ResolutionResult {
         }],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     }
 }
 
@@ -188,6 +189,7 @@ fn skips_non_mcp_files() {
         }],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let ctx = PolicyContext {
         fs: &fs,

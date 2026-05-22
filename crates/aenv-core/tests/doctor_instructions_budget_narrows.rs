@@ -64,6 +64,7 @@ fn instructions_budget_narrows_effective_limit() {
                 source: ns("base"),
             },
         )]),
+        warnings: Vec::new(),
     };
 
     let report = evaluate(&fs, &layout, &adapters, &resolved);

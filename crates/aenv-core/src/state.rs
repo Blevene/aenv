@@ -116,6 +116,13 @@ pub struct ActivationState {
     /// Effective policies after `extends` resolution (Phase 3).
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub policies: std::collections::BTreeMap<String, crate::policies::ResolvedPolicy>,
+    /// Non-fatal warnings produced during this activation (e.g. an
+    /// unrequired imported skill was unreachable and skipped). Skipped
+    /// during serialization — these describe the activation event, not
+    /// the project's persisted state, and should be consumed by the CLI
+    /// (printed to stderr) and not survive across activations.
+    #[serde(skip)]
+    pub warnings: Vec<String>,
 }
 
 impl<'de> serde::Deserialize<'de> for ActivationState {
@@ -159,6 +166,7 @@ impl<'de> serde::Deserialize<'de> for ActivationState {
             backed_up: raw.backed_up,
             parameters: raw.parameters,
             policies: raw.policies,
+            warnings: Vec::new(),
         })
     }
 }

@@ -25,6 +25,9 @@ pub fn run<F: Filesystem>(
         .map_err(|e| aenv_core::AenvError::ManifestInvalid(format!("namespace id: {e}")))?;
     let adapters = AdapterRegistry::load_from_dir(fs, &layout.adapters_dir())?;
     let state = activate_namespace(fs, layout, &adapters, project_root, &leaf)?;
+    for w in &state.warnings {
+        eprintln!("[aenv] warning: {w}");
+    }
     println!("Activated '{}' in {}", name, project_root.display());
     for file in &state.managed_files {
         println!("  + {} ({:?})", file.path.display(), file.strategy);

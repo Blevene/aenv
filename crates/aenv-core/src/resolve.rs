@@ -123,7 +123,7 @@ pub struct Candidate {
 }
 
 /// Output of `resolve_namespace`.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct ResolutionResult {
     /// Ordered chain from root ancestor to leaf (the namespace the user pinned).
     pub chain: Vec<NamespaceId>,
@@ -133,6 +133,10 @@ pub struct ResolutionResult {
     pub parameters: BTreeMap<String, ResolvedParameter>,
     /// Effective policies after `extends`-chain resolution.
     pub policies: BTreeMap<String, ResolvedPolicy>,
+    /// Non-fatal warnings produced during resolution (e.g. an unrequired
+    /// imported skill was unreachable and skipped). The library never prints
+    /// these; the CLI consumes them after activation and emits to stderr.
+    pub warnings: Vec<String>,
 }
 
 /// Errors specific to the resolution phase.
@@ -200,6 +204,7 @@ pub fn resolve_namespace<F: Filesystem>(
     walk(fs, registry, leaf, &mut chain, &mut visiting, &mut visited)?;
 
     let mut candidates: Vec<Candidate> = Vec::new();
+    let mut warnings: Vec<String> = Vec::new();
     let mut params_per_ns: BTreeMap<
         NamespaceId,
         BTreeMap<String, crate::parameters::ParameterValue>,
@@ -214,7 +219,15 @@ pub fn resolve_namespace<F: Filesystem>(
             }
         }
         gather_candidates(fs, registry, ns, &manifest, &mut candidates)?;
-        gather_skill_candidates(fs, registry, ns, &manifest, adapters, &mut candidates)?;
+        gather_skill_candidates(
+            fs,
+            registry,
+            ns,
+            &manifest,
+            adapters,
+            &mut candidates,
+            &mut warnings,
+        )?;
         params_per_ns.insert(ns.clone(), manifest.parameters.clone());
         policies_per_ns.insert(ns.clone(), manifest.policies.clone());
     }
@@ -241,6 +254,7 @@ pub fn resolve_namespace<F: Filesystem>(
         candidates,
         parameters,
         policies,
+        warnings,
     })
 }
 
@@ -370,6 +384,7 @@ fn gather_skill_candidates<F: Filesystem>(
     manifest: &AenvManifest,
     adapters: &AdapterRegistry,
     out: &mut Vec<Candidate>,
+    warnings: &mut Vec<String>,
 ) -> Result<(), ResolutionError> {
     use crate::skills::SkillMode;
 
@@ -443,7 +458,7 @@ fn gather_skill_candidates<F: Filesystem>(
                         let bytes = fs
                             .read(&source_path)
                             .map_err(|e| ResolutionError::Io(e.to_string()))?;
-                        let hash = sha256_hex(&bytes);
+                        let hash = crate::skills::cache::sha256_hex(&bytes);
                         Some(SkillProvenance {
                             source: format!("authored:{}", ns.as_str()),
                             resolved_ref: None,
@@ -500,11 +515,11 @@ fn gather_skill_candidates<F: Filesystem>(
                         }
                     }
                     Ok(None) => {
-                        eprintln!(
-                            "[aenv] skill '{}' from '{}' unreachable; skipping (not required)",
+                        warnings.push(format!(
+                            "skill '{}' from '{}' unreachable; skipping (not required)",
                             decl.name,
                             decl.source.as_deref().unwrap_or("<no source>")
-                        );
+                        ));
                     }
                     Err(e) => {
                         return Err(ResolutionError::ActivationConflict(format!(
@@ -517,14 +532,6 @@ fn gather_skill_candidates<F: Filesystem>(
         }
     }
     Ok(())
-}
-
-fn sha256_hex(bytes: &[u8]) -> String {
-    use sha2::{Digest, Sha256};
-    let mut hasher = Sha256::new();
-    hasher.update(bytes);
-    let digest = hasher.finalize();
-    digest.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 fn expand_glob<F: Filesystem>(

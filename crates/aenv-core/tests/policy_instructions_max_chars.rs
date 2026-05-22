@@ -46,6 +46,7 @@ fn make_resolution(ns_name: &str, source_path: PathBuf) -> ResolutionResult {
         }],
         parameters: std::collections::BTreeMap::new(),
         policies: std::collections::BTreeMap::new(),
+        warnings: Vec::new(),
     }
 }
 
@@ -189,6 +190,7 @@ fn skips_non_instructions_files() {
         }],
         parameters: std::collections::BTreeMap::new(),
         policies: std::collections::BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let ctx = PolicyContext {
         fs: &fs,
@@ -220,6 +222,7 @@ fn wrong_value_type_warn_skips() {
         candidates: vec![],
         parameters: std::collections::BTreeMap::new(),
         policies: std::collections::BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let ctx = PolicyContext {
         fs: &fs,

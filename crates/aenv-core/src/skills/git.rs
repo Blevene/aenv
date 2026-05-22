@@ -118,10 +118,7 @@ fn is_full_sha(s: &str) -> bool {
 /// Used because `git clone --branch <SHA>` is not supported.
 fn clone_by_sha(url: &str, sha: &str, dest: &Path) -> Result<String> {
     std::fs::create_dir_all(dest).map_err(|e| {
-        AenvError::RemoteUnreachable(format!(
-            "create clone dest {}: {e}",
-            dest.display()
-        ))
+        AenvError::RemoteUnreachable(format!("create clone dest {}: {e}", dest.display()))
     })?;
     run_git_in(dest, &["init", "--quiet"], url)?;
     run_git_in(dest, &["remote", "add", "origin", url], url)?;

@@ -59,6 +59,7 @@ fn clean_report_when_all_pass() {
                 source: ns("base"),
             },
         )]),
+        warnings: Vec::new(),
     };
 
     let report = evaluate(&fs, &layout, &adapters, &resolved);
@@ -101,6 +102,7 @@ fn enforce_violation_is_flagged() {
                 source: ns("base"),
             },
         )]),
+        warnings: Vec::new(),
     };
 
     let report = evaluate(&fs, &layout, &adapters, &resolved);
@@ -120,6 +122,7 @@ fn empty_policies_means_pass() {
         candidates: vec![],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     };
 
     let report = evaluate(&fs, &layout, &adapters, &resolved);
@@ -137,6 +140,7 @@ fn report_records_chain_and_namespace_count() {
         candidates: vec![],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let report: DoctorReport = evaluate(&fs, &layout, &adapters, &resolved);
     assert_eq!(report.chain.len(), 2);

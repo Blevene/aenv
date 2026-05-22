@@ -62,6 +62,7 @@ fn pass_when_description_present() {
         )],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let ctx = PolicyContext {
         fs: &fs,
@@ -99,6 +100,7 @@ fn warn_when_description_missing() {
         )],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let ctx = PolicyContext {
         fs: &fs,
@@ -140,6 +142,7 @@ fn fail_when_enforced_and_description_missing() {
         )],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let ctx = PolicyContext {
         fs: &fs,
@@ -176,6 +179,7 @@ fn fail_when_description_empty() {
         )],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let ctx = PolicyContext {
         fs: &fs,
@@ -212,6 +216,7 @@ fn warn_when_no_frontmatter_at_all() {
         )],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let ctx = PolicyContext {
         fs: &fs,
@@ -245,6 +250,7 @@ fn skips_non_skill_files() {
         }],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let ctx = PolicyContext {
         fs: &fs,
@@ -281,6 +287,7 @@ fn disabled_when_false() {
         )],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let ctx = PolicyContext {
         fs: &fs,

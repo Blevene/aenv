@@ -154,6 +154,7 @@ impl<'a> PolicyContext<'a, crate::fs::MockFilesystem> {
             candidates: vec![],
             parameters: std::collections::BTreeMap::new(),
             policies: std::collections::BTreeMap::new(),
+            warnings: Vec::new(),
         }));
         PolicyContext {
             fs,

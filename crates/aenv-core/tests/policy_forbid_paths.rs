@@ -69,6 +69,7 @@ fn exact_match_advisory_warns() {
         candidates: vec![candidate(".env")],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let policy = forbid(vec![".env"], false);
     let out = dispatch(
@@ -95,6 +96,7 @@ fn exact_match_enforced_fails() {
         candidates: vec![candidate(".env")],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let policy = forbid(vec![".env"], true);
     let out = dispatch(
@@ -116,6 +118,7 @@ fn star_suffix_matches() {
         candidates: vec![candidate(".env.production")],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let policy = forbid(vec![".env*"], false);
     let out = dispatch(
@@ -137,6 +140,7 @@ fn glob_double_star_matches_subtree() {
         candidates: vec![candidate("secrets/db.json")],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let policy = forbid(vec!["secrets/**"], false);
     let out = dispatch(
@@ -158,6 +162,7 @@ fn pass_outcome_when_no_match() {
         candidates: vec![candidate("CLAUDE.md")],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let policy = forbid(vec![".env*", "secrets/**"], false);
     let out = dispatch(
@@ -180,6 +185,7 @@ fn empty_list_passes() {
         candidates: vec![candidate(".env")],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let policy = forbid(vec![], false);
     let out = dispatch(
@@ -200,6 +206,7 @@ fn wrong_value_type_warn_skips() {
         candidates: vec![],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let policy = ResolvedPolicy {
         value: PolicyValue::Boolean(true),

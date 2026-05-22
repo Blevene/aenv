@@ -58,10 +58,10 @@ pub enum SkillMode {
 use crate::error::{AenvError, Result};
 use crate::fs::Filesystem;
 use crate::home::RegistryLayout;
-use crate::skills::local::LocalResolution;
+use crate::skills::local::ResolvedSkill;
 use crate::skills::source::SourceKind;
 
-/// Resolve an imported skill decl into a `LocalResolution`.
+/// Resolve an imported skill decl into a `ResolvedSkill`.
 ///
 /// Dispatches by `SourceKind`. Errors propagate; the caller decides whether
 /// to apply the `required = true` rule (see `apply_required_rule`).
@@ -69,7 +69,7 @@ pub fn resolve_imported_skill<F: Filesystem>(
     fs: &F,
     layout: &RegistryLayout,
     decl: &SkillDecl,
-) -> Result<LocalResolution> {
+) -> Result<ResolvedSkill> {
     if !matches!(decl.mode, SkillMode::Imported) {
         return Err(AenvError::ManifestInvalid(format!(
             "skill '{}' is authored — use authored-skill resolution instead",
@@ -104,7 +104,7 @@ pub fn apply_required_rule<F: Filesystem>(
     fs: &F,
     layout: &RegistryLayout,
     decl: &SkillDecl,
-) -> Result<Option<LocalResolution>> {
+) -> Result<Option<ResolvedSkill>> {
     // Authored decls are always an error — the caller passed the wrong kind.
     if matches!(decl.mode, SkillMode::Authored) {
         return Err(AenvError::ManifestInvalid(format!(

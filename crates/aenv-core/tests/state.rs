@@ -33,6 +33,7 @@ fn sample_state() -> ActivationState {
         }],
         parameters: std::collections::BTreeMap::new(),
         policies: std::collections::BTreeMap::new(),
+        warnings: Vec::new(),
     }
 }
 
@@ -97,6 +98,7 @@ fn schema_version_is_2_for_new_states() {
         backed_up: vec![],
         parameters: std::collections::BTreeMap::new(),
         policies: std::collections::BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let json = serde_json::to_string(&s).unwrap();
     assert!(json.contains("\"schema_version\":2"));

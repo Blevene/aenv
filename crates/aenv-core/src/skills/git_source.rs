@@ -8,13 +8,13 @@
 use crate::error::{AenvError, Result};
 use crate::fs::Filesystem;
 use crate::home::RegistryLayout;
+use crate::skills::cache::sha256_hex;
 use crate::skills::cache::skill_cache_path;
 use crate::skills::git::git_clone;
-use crate::skills::local::LocalResolution;
-use sha2::{Digest, Sha256};
+use crate::skills::local::ResolvedSkill;
 use std::path::Path;
 
-/// Result is `LocalResolution` because, once cloned, a git source behaves
+/// Result is `ResolvedSkill` because, once cloned, a git source behaves
 /// like a local-path source for materialization purposes.
 ///
 /// `source_path` is always the clone root (`cache_dir`). The content hash is
@@ -26,7 +26,7 @@ pub fn resolve_git<F: Filesystem>(
     url: &str,
     ref_spec: Option<&str>,
     skill_name: &str,
-) -> Result<LocalResolution> {
+) -> Result<ResolvedSkill> {
     let ref_label = ref_spec.unwrap_or("head").to_string();
     let cache_dir = skill_cache_path(layout, url, &ref_label);
 
@@ -34,7 +34,7 @@ pub fn resolve_git<F: Filesystem>(
         // Cached. Read the resolved SHA from the existing clone via shell-out.
         let resolved_sha = git_head_sha(&cache_dir)?;
         let resolved_hash = compute_skill_hash(fs, &cache_dir, skill_name)?;
-        return Ok(LocalResolution {
+        return Ok(ResolvedSkill {
             source_path: cache_dir,
             resolved_ref: Some(resolved_sha),
             resolved_hash,
@@ -54,7 +54,7 @@ pub fn resolve_git<F: Filesystem>(
 
     let resolved_hash = compute_skill_hash(fs, &cache_dir, skill_name)?;
 
-    Ok(LocalResolution {
+    Ok(ResolvedSkill {
         source_path: cache_dir,
         resolved_ref: Some(resolved_sha),
         resolved_hash,
@@ -81,11 +81,7 @@ fn compute_skill_hash<F: Filesystem>(fs: &F, cache_dir: &Path, skill_name: &str)
     };
 
     let bytes = fs.read(&skill_md)?;
-    let mut hasher = Sha256::new();
-    hasher.update(&bytes);
-    let digest = hasher.finalize();
-    let hex: String = digest.iter().map(|b| format!("{b:02x}")).collect();
-    Ok(format!("sha256:{hex}"))
+    Ok(format!("sha256:{}", sha256_hex(&bytes)))
 }
 
 fn git_head_sha(dir: &Path) -> Result<String> {

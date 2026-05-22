@@ -37,7 +37,7 @@ pub fn activate_namespace<F: Filesystem>(
 ) -> Result<ActivationState> {
     probe_rename_atomicity(fs, project_root)?;
 
-    let resolution = crate::resolve::resolve_namespace(fs, layout, adapters, leaf)?;
+    let mut resolution = crate::resolve::resolve_namespace(fs, layout, adapters, leaf)?;
 
     // PRD R-74 / R-82: run doctor before materializing anything. If any enforced
     // policy is violated, abort with PolicyViolation (exit 17) so the project
@@ -58,9 +58,10 @@ pub fn activate_namespace<F: Filesystem>(
         return Err(AenvError::PolicyViolation(details.join("; ")));
     }
 
-    // Extract parameters and policies before consuming candidates.
+    // Extract parameters, policies, and warnings before consuming candidates.
     let resolved_parameters = resolution.parameters.clone();
     let resolved_policies = resolution.policies.clone();
+    let resolution_warnings = std::mem::take(&mut resolution.warnings);
 
     // Group candidates by project-relative path, preserving chain order within
     // each group. BTreeMap gives us lexicographic iteration order (deterministic
@@ -107,6 +108,7 @@ pub fn activate_namespace<F: Filesystem>(
         backed_up,
         parameters: resolved_parameters,
         policies: resolved_policies,
+        warnings: resolution_warnings,
     };
     let state_path = project_root.join(".aenv-state/state.json");
     let body = serde_json::to_vec_pretty(&state)

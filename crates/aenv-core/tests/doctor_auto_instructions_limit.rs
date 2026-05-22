@@ -47,6 +47,7 @@ fn auto_fires_when_manifest_silent_and_oversized() {
         parameters: BTreeMap::new(),
         // CRITICAL: no policy declared. R-24 says we should still warn.
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     };
 
     let report = evaluate(&fs, &layout, &adapters, &resolved);
@@ -112,6 +113,7 @@ fn does_not_fire_when_manifest_declares_explicitly() {
         }],
         parameters: BTreeMap::new(),
         policies,
+        warnings: Vec::new(),
     };
 
     let report = evaluate(&fs, &layout, &adapters, &resolved);
@@ -138,6 +140,7 @@ fn does_not_fire_when_no_instructions_role_present() {
         candidates: vec![],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
+        warnings: Vec::new(),
     };
     let report = evaluate(&fs, &layout, &adapters, &resolved);
     assert!(
