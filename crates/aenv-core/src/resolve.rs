@@ -151,6 +151,8 @@ pub enum ResolutionError {
         /// Human-readable explanation of the failure.
         reason: String,
     },
+    /// A required skill could not be resolved. Maps to exit 13.
+    ActivationConflict(String),
     /// An I/O error occurred while reading the registry.
     Io(String),
 }
@@ -173,6 +175,7 @@ impl From<ResolutionError> for AenvError {
             ResolutionError::ManifestInvalid { namespace, reason } => {
                 AenvError::ManifestInvalid(format!("{namespace}: {reason}"))
             }
+            ResolutionError::ActivationConflict(msg) => AenvError::ActivationConflict(msg),
             ResolutionError::Io(msg) => AenvError::Io(std::io::Error::other(msg)),
         }
     }
@@ -494,10 +497,10 @@ fn gather_skill_candidates<F: Filesystem>(
                         );
                     }
                     Err(e) => {
-                        return Err(ResolutionError::ManifestInvalid {
-                            namespace: ns.clone(),
-                            reason: format!("skill '{}': {e}", decl.name),
-                        });
+                        return Err(ResolutionError::ActivationConflict(format!(
+                            "required skill '{}' unreachable: {}",
+                            decl.name, e
+                        )));
                     }
                 }
             }
