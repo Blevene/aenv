@@ -105,7 +105,7 @@ use std::collections::BTreeMap;
 
 /// One resolved parameter: value + the namespace in the `extends` chain that
 /// supplied it.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ResolvedParameter {
     /// Effective value after `extends`-chain resolution.
     pub value: ParameterValue,

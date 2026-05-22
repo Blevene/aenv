@@ -39,6 +39,10 @@ pub fn activate_namespace<F: Filesystem>(
 
     let resolution = crate::resolve::resolve_namespace(fs, layout, adapters, leaf)?;
 
+    // Extract parameters and policies before consuming candidates.
+    let resolved_parameters = resolution.parameters.clone();
+    let resolved_policies = resolution.policies.clone();
+
     // Group candidates by project-relative path, preserving chain order within
     // each group. BTreeMap gives us lexicographic iteration order (deterministic
     // activation and rollback).
@@ -82,6 +86,8 @@ pub fn activate_namespace<F: Filesystem>(
         project_root: project_root.to_path_buf(),
         managed_files: managed,
         backed_up,
+        parameters: resolved_parameters,
+        policies: resolved_policies,
     };
     let state_path = project_root.join(".aenv-state/state.json");
     let body = serde_json::to_vec_pretty(&state)

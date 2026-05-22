@@ -158,6 +158,8 @@ impl<'a> PolicyContext<'a, crate::fs::MockFilesystem> {
         let resolved: &'static ResolutionResult = Box::leak(Box::new(ResolutionResult {
             chain: vec![],
             candidates: vec![],
+            parameters: std::collections::BTreeMap::new(),
+            policies: std::collections::BTreeMap::new(),
         }));
         PolicyContext {
             fs,

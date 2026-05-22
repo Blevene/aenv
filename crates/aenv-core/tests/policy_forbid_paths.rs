@@ -64,6 +64,8 @@ fn exact_match_advisory_warns() {
     let resolved = ResolutionResult {
         chain: vec![ns("base")],
         candidates: vec![candidate(".env")],
+        parameters: BTreeMap::new(),
+        policies: BTreeMap::new(),
     };
     let policy = forbid(vec![".env"], false);
     let out = dispatch("forbid_paths", &policy, &ctx(&fs, &layout, &adapters, &resolved));
@@ -84,6 +86,8 @@ fn exact_match_enforced_fails() {
     let resolved = ResolutionResult {
         chain: vec![ns("base")],
         candidates: vec![candidate(".env")],
+        parameters: BTreeMap::new(),
+        policies: BTreeMap::new(),
     };
     let policy = forbid(vec![".env"], true);
     let out = dispatch("forbid_paths", &policy, &ctx(&fs, &layout, &adapters, &resolved));
@@ -99,6 +103,8 @@ fn star_suffix_matches() {
     let resolved = ResolutionResult {
         chain: vec![ns("base")],
         candidates: vec![candidate(".env.production")],
+        parameters: BTreeMap::new(),
+        policies: BTreeMap::new(),
     };
     let policy = forbid(vec![".env*"], false);
     let out = dispatch("forbid_paths", &policy, &ctx(&fs, &layout, &adapters, &resolved));
@@ -114,6 +120,8 @@ fn glob_double_star_matches_subtree() {
     let resolved = ResolutionResult {
         chain: vec![ns("base")],
         candidates: vec![candidate("secrets/db.json")],
+        parameters: BTreeMap::new(),
+        policies: BTreeMap::new(),
     };
     let policy = forbid(vec!["secrets/**"], false);
     let out = dispatch("forbid_paths", &policy, &ctx(&fs, &layout, &adapters, &resolved));
@@ -129,6 +137,8 @@ fn pass_outcome_when_no_match() {
     let resolved = ResolutionResult {
         chain: vec![ns("base")],
         candidates: vec![candidate("CLAUDE.md")],
+        parameters: BTreeMap::new(),
+        policies: BTreeMap::new(),
     };
     let policy = forbid(vec![".env*", "secrets/**"], false);
     let out = dispatch("forbid_paths", &policy, &ctx(&fs, &layout, &adapters, &resolved));
@@ -145,6 +155,8 @@ fn empty_list_passes() {
     let resolved = ResolutionResult {
         chain: vec![ns("base")],
         candidates: vec![candidate(".env")],
+        parameters: BTreeMap::new(),
+        policies: BTreeMap::new(),
     };
     let policy = forbid(vec![], false);
     let out = dispatch("forbid_paths", &policy, &ctx(&fs, &layout, &adapters, &resolved));
@@ -159,6 +171,8 @@ fn wrong_value_type_warn_skips() {
     let resolved = ResolutionResult {
         chain: vec![ns("base")],
         candidates: vec![],
+        parameters: BTreeMap::new(),
+        policies: BTreeMap::new(),
     };
     let policy = ResolvedPolicy {
         value: PolicyValue::Boolean(true),

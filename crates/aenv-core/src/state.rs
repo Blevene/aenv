@@ -9,7 +9,7 @@ use crate::error::{AenvError, Result};
 use std::path::PathBuf;
 
 /// Current schema version. Bump when changing the on-disk shape.
-pub const SCHEMA_VERSION: u32 = 2;
+pub const SCHEMA_VERSION: u32 = 3;
 
 /// Materialization strategy — re-exported from `crate::resolve` so callers
 /// only need one import path.
@@ -89,10 +89,17 @@ pub struct ActivationState {
     pub managed_files: Vec<ManagedFile>,
     /// Files this activation backed up before materializing over them.
     pub backed_up: Vec<BackedUpFile>,
+    /// Effective parameters after `extends` resolution (Phase 3).
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub parameters: std::collections::BTreeMap<String, crate::parameters::ResolvedParameter>,
+    /// Effective policies after `extends` resolution (Phase 3).
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub policies: std::collections::BTreeMap<String, crate::policies::ResolvedPolicy>,
 }
 
 impl<'de> serde::Deserialize<'de> for ActivationState {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
+        use std::collections::BTreeMap;
         #[derive(serde::Deserialize)]
         struct Raw {
             schema_version: u32,
@@ -102,6 +109,10 @@ impl<'de> serde::Deserialize<'de> for ActivationState {
             managed_files: Vec<ManagedFile>,
             #[serde(default)]
             backed_up: Vec<BackedUpFile>,
+            #[serde(default)]
+            parameters: BTreeMap<String, crate::parameters::ResolvedParameter>,
+            #[serde(default)]
+            policies: BTreeMap<String, crate::policies::ResolvedPolicy>,
         }
         let mut raw = Raw::deserialize(d)?;
         // For schema-1 files the ManagedFile deserializer used a sentinel
@@ -125,6 +136,8 @@ impl<'de> serde::Deserialize<'de> for ActivationState {
             project_root: raw.project_root,
             managed_files: raw.managed_files,
             backed_up: raw.backed_up,
+            parameters: raw.parameters,
+            policies: raw.policies,
         })
     }
 }

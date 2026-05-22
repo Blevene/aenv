@@ -21,6 +21,8 @@ fn state_with(mf: ManagedFile) -> ActivationState {
         project_root: PathBuf::from("/p"),
         managed_files: vec![mf],
         backed_up: vec![],
+        parameters: std::collections::BTreeMap::new(),
+        policies: std::collections::BTreeMap::new(),
     }
 }
 
@@ -65,6 +67,8 @@ fn which_for_unmanaged_path_reports_error() {
         project_root: PathBuf::from("/p"),
         managed_files: vec![],
         backed_up: vec![],
+        parameters: std::collections::BTreeMap::new(),
+        policies: std::collections::BTreeMap::new(),
     };
     let err = format_which(&state, Path::new("unmanaged.txt")).unwrap_err();
     assert!(err.to_string().contains("not managed"));

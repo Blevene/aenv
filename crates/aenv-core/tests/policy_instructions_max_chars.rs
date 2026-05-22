@@ -41,6 +41,8 @@ fn make_resolution(ns_name: &str, source_path: PathBuf) -> ResolutionResult {
             adapter: "claude-code".into(),
             merge_override: None,
         }],
+        parameters: std::collections::BTreeMap::new(),
+        policies: std::collections::BTreeMap::new(),
     }
 }
 
@@ -178,6 +180,8 @@ fn skips_non_instructions_files() {
             adapter: "claude-code".into(),
             merge_override: None,
         }],
+        parameters: std::collections::BTreeMap::new(),
+        policies: std::collections::BTreeMap::new(),
     };
     let ctx = PolicyContext {
         fs: &fs,
@@ -205,6 +209,8 @@ fn wrong_value_type_warn_skips() {
     let resolved = ResolutionResult {
         chain: vec![ns("base")],
         candidates: vec![],
+        parameters: std::collections::BTreeMap::new(),
+        policies: std::collections::BTreeMap::new(),
     };
     let ctx = PolicyContext {
         fs: &fs,

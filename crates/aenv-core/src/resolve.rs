@@ -93,12 +93,15 @@ pub enum DeepMergeFormat {
 
 // ---- Task 3: extends-chain resolver ----
 
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use crate::adapter::AdapterRegistry;
 use crate::fs::Filesystem;
 use crate::home::RegistryLayout;
 use crate::manifest::AenvManifest;
+use crate::parameters::{resolve_parameters, ResolvedParameter};
+use crate::policies::{resolve_policies, ResolvedPolicy};
 use crate::AenvError;
 
 /// One candidate contribution from a single namespace for a single path.
@@ -123,6 +126,10 @@ pub struct ResolutionResult {
     pub chain: Vec<NamespaceId>,
     /// All candidate artifacts gathered across the chain, in chain order.
     pub candidates: Vec<Candidate>,
+    /// Effective parameters after `extends`-chain resolution.
+    pub parameters: BTreeMap<String, ResolvedParameter>,
+    /// Effective policies after `extends`-chain resolution.
+    pub policies: BTreeMap<String, ResolvedPolicy>,
 }
 
 /// Errors specific to the resolution phase.
@@ -187,6 +194,8 @@ pub fn resolve_namespace<F: Filesystem>(
     walk(fs, registry, leaf, &mut chain, &mut visiting, &mut visited)?;
 
     let mut candidates: Vec<Candidate> = Vec::new();
+    let mut params_per_ns: BTreeMap<NamespaceId, BTreeMap<String, crate::parameters::ParameterValue>> = BTreeMap::new();
+    let mut policies_per_ns: BTreeMap<NamespaceId, BTreeMap<String, crate::policies::PolicyDecl>> = BTreeMap::new();
     for ns in &chain {
         let manifest = load_manifest(fs, registry, ns)?;
         for adapter_name in manifest.adapters.keys() {
@@ -195,8 +204,30 @@ pub fn resolve_namespace<F: Filesystem>(
             }
         }
         gather_candidates(fs, registry, ns, &manifest, &mut candidates)?;
+        params_per_ns.insert(ns.clone(), manifest.parameters.clone());
+        policies_per_ns.insert(ns.clone(), manifest.policies.clone());
     }
-    Ok(ResolutionResult { chain, candidates })
+    let parameters = resolve_parameters(&chain, &params_per_ns)
+        .map_err(|e| ResolutionError::ManifestInvalid {
+            namespace: leaf.clone(),
+            reason: e.to_string(),
+        })?;
+    let policies = resolve_policies(&chain, &policies_per_ns)
+        .map_err(|e| ResolutionError::ManifestInvalid {
+            namespace: leaf.clone(),
+            reason: e.to_string(),
+        })?;
+    crate::parameters::check_against_adapters(&parameters, adapters)
+        .map_err(|e| ResolutionError::ManifestInvalid {
+            namespace: leaf.clone(),
+            reason: e.to_string(),
+        })?;
+    Ok(ResolutionResult {
+        chain,
+        candidates,
+        parameters,
+        policies,
+    })
 }
 
 fn walk<F: Filesystem>(
@@ -252,9 +283,9 @@ fn load_manifest<F: Filesystem>(
         reason: format!("manifest is not valid UTF-8: {e}"),
     })?;
     let manifest: AenvManifest =
-        toml::from_str(&text).map_err(|e| ResolutionError::ManifestInvalid {
+        AenvManifest::from_toml(&text).map_err(|e| ResolutionError::ManifestInvalid {
             namespace: ns.clone(),
-            reason: format!("toml parse failure: {e}"),
+            reason: e.to_string(),
         })?;
     if manifest.name != ns.as_str() {
         return Err(ResolutionError::ManifestInvalid {

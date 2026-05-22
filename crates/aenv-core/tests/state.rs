@@ -30,6 +30,8 @@ fn sample_state() -> ActivationState {
             original_path: PathBuf::from("CLAUDE.md"),
             backup_path: PathBuf::from(".aenv-state/backup/2026-05-20T14-22-03/CLAUDE.md"),
         }],
+        parameters: std::collections::BTreeMap::new(),
+        policies: std::collections::BTreeMap::new(),
     }
 }
 
@@ -92,6 +94,8 @@ fn schema_version_is_2_for_new_states() {
         project_root: PathBuf::from("/p"),
         managed_files: vec![],
         backed_up: vec![],
+        parameters: std::collections::BTreeMap::new(),
+        policies: std::collections::BTreeMap::new(),
     };
     let json = serde_json::to_string(&s).unwrap();
     assert!(json.contains("\"schema_version\":2"));

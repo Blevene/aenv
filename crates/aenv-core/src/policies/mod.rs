@@ -145,7 +145,7 @@ pub fn parse_policy_table(
 }
 
 /// One resolved policy after `extends`-chain resolution.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ResolvedPolicy {
     /// Effective value after `extends`-chain resolution.
     pub value: PolicyValue,

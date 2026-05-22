@@ -44,6 +44,8 @@ fn status_prints_resolution_chain_and_managed_provenance() {
             },
         ],
         backed_up: vec![],
+        parameters: std::collections::BTreeMap::new(),
+        policies: std::collections::BTreeMap::new(),
     };
     let chain = vec![
         NamespaceId::new("base").unwrap(),
@@ -68,6 +70,8 @@ fn status_no_active_namespace() {
         project_root: PathBuf::from("/p"),
         managed_files: vec![],
         backed_up: vec![],
+        parameters: std::collections::BTreeMap::new(),
+        policies: std::collections::BTreeMap::new(),
     };
     let chain = vec![NamespaceId::new("alone").unwrap()];
     let out = format_status(&state, &chain);

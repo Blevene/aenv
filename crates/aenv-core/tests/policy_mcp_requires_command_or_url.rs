@@ -37,6 +37,8 @@ fn make_resolved(ns_name: &str, source: PathBuf) -> ResolutionResult {
             adapter: "mcp".into(),
             merge_override: None,
         }],
+        parameters: BTreeMap::new(),
+        policies: BTreeMap::new(),
     }
 }
 
@@ -178,6 +180,8 @@ fn skips_non_mcp_files() {
             adapter: "claude-code".into(),
             merge_override: None,
         }],
+        parameters: BTreeMap::new(),
+        policies: BTreeMap::new(),
     };
     let ctx = PolicyContext {
         fs: &fs,

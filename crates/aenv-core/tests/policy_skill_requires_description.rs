@@ -57,6 +57,8 @@ fn pass_when_description_present() {
             "write-tests",
             PathBuf::from("/aenv-home/envs/base/.claude/skills/write-tests/SKILL.md"),
         )],
+        parameters: BTreeMap::new(),
+        policies: BTreeMap::new(),
     };
     let ctx = PolicyContext {
         fs: &fs,
@@ -92,6 +94,8 @@ fn warn_when_description_missing() {
             "half-baked",
             PathBuf::from("/aenv-home/envs/x/.claude/skills/half-baked/SKILL.md"),
         )],
+        parameters: BTreeMap::new(),
+        policies: BTreeMap::new(),
     };
     let ctx = PolicyContext {
         fs: &fs,
@@ -131,6 +135,8 @@ fn fail_when_enforced_and_description_missing() {
             "half-baked",
             PathBuf::from("/aenv-home/envs/x/.claude/skills/half-baked/SKILL.md"),
         )],
+        parameters: BTreeMap::new(),
+        policies: BTreeMap::new(),
     };
     let ctx = PolicyContext {
         fs: &fs,
@@ -165,6 +171,8 @@ fn fail_when_description_empty() {
             "x",
             PathBuf::from("/aenv-home/envs/x/.claude/skills/x/SKILL.md"),
         )],
+        parameters: BTreeMap::new(),
+        policies: BTreeMap::new(),
     };
     let ctx = PolicyContext {
         fs: &fs,
@@ -199,6 +207,8 @@ fn warn_when_no_frontmatter_at_all() {
             "raw",
             PathBuf::from("/aenv-home/envs/x/.claude/skills/raw/SKILL.md"),
         )],
+        parameters: BTreeMap::new(),
+        policies: BTreeMap::new(),
     };
     let ctx = PolicyContext {
         fs: &fs,
@@ -229,6 +239,8 @@ fn skips_non_skill_files() {
             adapter: "claude-code".into(),
             merge_override: None,
         }],
+        parameters: BTreeMap::new(),
+        policies: BTreeMap::new(),
     };
     let ctx = PolicyContext {
         fs: &fs,
@@ -258,6 +270,8 @@ fn disabled_when_false() {
             "x",
             PathBuf::from("/aenv-home/envs/base/.claude/skills/x/SKILL.md"),
         )],
+        parameters: BTreeMap::new(),
+        policies: BTreeMap::new(),
     };
     let ctx = PolicyContext {
         fs: &fs,
