@@ -9,6 +9,8 @@
 //! `PolicyContext` carries the references an evaluator needs without forcing
 //! every evaluator to take a long argument list.
 
+pub mod instructions_max_chars;
+
 use crate::adapter::AdapterRegistry;
 use crate::fs::Filesystem;
 use crate::home::RegistryLayout;
@@ -114,18 +116,19 @@ pub trait PolicyEvaluator<F: Filesystem> {
     fn evaluate(&self, policy: &ResolvedPolicy, ctx: &PolicyContext<F>) -> Vec<PolicyOutcome>;
 }
 
-/// Route a resolved policy to its evaluator. Tasks 9–12 add the actual
-/// evaluators; for now everything is unknown and produces `WarnSkip`.
+/// Route a resolved policy to its evaluator.
 pub fn dispatch<F: Filesystem>(
     key: &str,
-    _policy: &ResolvedPolicy,
-    _ctx: &PolicyContext<F>,
+    policy: &ResolvedPolicy,
+    ctx: &PolicyContext<F>,
 ) -> Vec<PolicyOutcome> {
-    // Tasks 9–12 will add `match` arms for the four built-in keys.
-    vec![PolicyOutcome::warn_skip(
-        key.to_owned(),
-        format!("no built-in evaluator for policy key '{key}'"),
-    )]
+    match key {
+        "instructions_max_chars" => instructions_max_chars::evaluate(policy, ctx),
+        other => vec![PolicyOutcome::warn_skip(
+            other.to_owned(),
+            format!("no built-in evaluator for policy key '{other}'"),
+        )],
+    }
 }
 
 impl<'a> PolicyContext<'a, crate::fs::MockFilesystem> {
