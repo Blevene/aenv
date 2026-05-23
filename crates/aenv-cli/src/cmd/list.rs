@@ -2,6 +2,7 @@
 
 use aenv_core::fs::Filesystem;
 use aenv_core::home::RegistryLayout;
+use aenv_core::manifest::AenvManifest;
 use aenv_core::Result;
 
 pub fn run<F: Filesystem>(fs: &F, layout: &RegistryLayout, json: bool) -> Result<()> {
@@ -26,9 +27,32 @@ pub fn run<F: Filesystem>(fs: &F, layout: &RegistryLayout, json: bool) -> Result
         println!("No namespaces in registry at {}", layout.root().display());
         return Ok(());
     }
-    println!("NAME");
-    for name in names {
-        println!("{name}");
+
+    // Text mode: three columns — NAME, EXTENDS, ADAPTERS (R-3).
+    println!("{:<22} {:<30} ADAPTERS", "NAME", "EXTENDS");
+    for name in &names {
+        let manifest = fs
+            .read(&layout.manifest_path(name))
+            .ok()
+            .and_then(|b| String::from_utf8(b).ok())
+            .and_then(|s| AenvManifest::from_toml(&s).ok());
+        let (extends_str, adapters_str) = match manifest {
+            None => ("<error>".to_string(), "<error>".to_string()),
+            Some(m) => {
+                let ext = if m.extends.is_empty() {
+                    "-".to_string()
+                } else {
+                    m.extends.join(", ")
+                };
+                let adp = if m.adapters.is_empty() {
+                    "-".to_string()
+                } else {
+                    m.adapters.keys().cloned().collect::<Vec<_>>().join(", ")
+                };
+                (ext, adp)
+            }
+        };
+        println!("{name:<22} {extends_str:<30} {adapters_str}");
     }
     Ok(())
 }
