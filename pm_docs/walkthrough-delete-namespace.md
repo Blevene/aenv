@@ -57,14 +57,14 @@ echo "exit: $?"
 ```
 
 ```
-warning: cannot verify namespace 'scratch' is unused; Phase 1 lacks project-tracking. Delete is irreversible.
+warning: aenv cannot yet verify namespace 'scratch' isn't actively pinned in a project. Delete is irreversible — if any project is using it, run `aenv unpin --project <path>` there first to avoid an orphan state file.
 Deleted namespace 'scratch'
 exit: 0
 ```
 
 Two things to notice:
 
-1. **The warning fires on every delete.** It's printed before the delete runs and is not conditional on anything. Phase 6 will add the project-tracking registry that allows `aenv delete` to refuse on actually-active namespaces (PRD R-4); until then, the warning is your reminder.
+1. **The warning fires on every delete.** It's printed before the delete runs and is not conditional on anything. Phase 6's project-tracking registry will turn this warning into a hard refusal for actively-pinned namespaces (PRD R-4); until then, the warning and `aenv unpin` are your only protection.
 2. **Exit code is 0** for a successful delete. The warning is informational, not a refusal.
 
 After delete:
@@ -91,12 +91,12 @@ echo "exit: $?"
 ```
 
 ```
-warning: cannot verify namespace 'does-not-exist' is unused; Phase 1 lacks project-tracking. Delete is irreversible.
+warning: aenv cannot yet verify namespace 'does-not-exist' isn't actively pinned in a project. Delete is irreversible — if any project is using it, run `aenv unpin --project <path>` there first to avoid an orphan state file.
 error: namespace not found: does-not-exist
 exit: 10
 ```
 
-The warning still fires (because the project-tracking check is unconditional today), then the actual not-found error returns exit 10.
+The warning still fires unconditionally, then the actual not-found error returns exit 10.
 
 ---
 
@@ -112,7 +112,7 @@ $BIN list
 ```
 
 ```
-warning: cannot verify namespace 'base' is unused; Phase 1 lacks project-tracking. Delete is irreversible.
+warning: aenv cannot yet verify namespace 'base' isn't actively pinned in a project. Delete is irreversible — if any project is using it, run `aenv unpin --project <path>` there first to avoid an orphan state file.
 Deleted namespace 'base'
 exit: 0
 
@@ -168,7 +168,7 @@ $BIN list
 ```
 
 ```
-warning: cannot verify namespace 'child' is unused; Phase 1 lacks project-tracking. Delete is irreversible.
+warning: aenv cannot yet verify namespace 'child' isn't actively pinned in a project. Delete is irreversible — if any project is using it, run `aenv unpin --project <path>` there first to avoid an orphan state file.
 Deleted namespace 'child'
 exit: 0
 
