@@ -1,0 +1,34 @@
+---
+source: crates/aenv-core/tests/json_snapshots.rs
+assertion_line: 295
+expression: report
+---
+{
+  "project": "[PROJECT_ROOT]",
+  "active_namespace": "leaf",
+  "resolution_chain": [
+    "base",
+    "leaf"
+  ],
+  "resolved_hash": "[HASH]",
+  "parameters": {
+    "default_model": {
+      "value": "claude-opus-4.7",
+      "source": "leaf"
+    }
+  },
+  "managed_files": [
+    {
+      "path": "[PATH]",
+      "qualified_name": "(merged)::CLAUDE.md",
+      "short_name": "CLAUDE.md",
+      "provided_by_namespace": null,
+      "strategy": "section-merge",
+      "contributors": [
+        "base::CLAUDE.md",
+        "leaf::CLAUDE.md"
+      ]
+    }
+  ],
+  "backed_up": []
+}

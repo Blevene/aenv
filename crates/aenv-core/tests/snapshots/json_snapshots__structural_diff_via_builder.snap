@@ -1,0 +1,44 @@
+---
+source: crates/aenv-core/tests/json_snapshots.rs
+assertion_line: 429
+expression: diff
+---
+{
+  "a": "base",
+  "b": "leaf",
+  "skills": {
+    "added": [],
+    "removed": [],
+    "common": []
+  },
+  "agents": {
+    "added": [],
+    "removed": [],
+    "common": []
+  },
+  "parameters": {
+    "added": [],
+    "removed": [],
+    "changed": [
+      {
+        "name": "default_model",
+        "a": "claude-sonnet-4.6",
+        "b": "claude-opus-4.7"
+      }
+    ]
+  },
+  "policies": {
+    "added": [],
+    "removed": [],
+    "changed": []
+  },
+  "instructions_sections": {
+    "added": [
+      "Disposition"
+    ],
+    "removed": [],
+    "common": [
+      "Project Facts"
+    ]
+  }
+}

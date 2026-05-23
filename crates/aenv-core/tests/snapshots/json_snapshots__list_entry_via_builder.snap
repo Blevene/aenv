@@ -1,0 +1,19 @@
+---
+source: crates/aenv-core/tests/json_snapshots.rs
+assertion_line: 313
+expression: entry
+---
+{
+  "name": "leaf",
+  "extends": [
+    "base"
+  ],
+  "adapters": [
+    "claude-code"
+  ],
+  "parameters_declared": [
+    "default_model"
+  ],
+  "policies_declared": [],
+  "resolved_hash": "[HASH]"
+}

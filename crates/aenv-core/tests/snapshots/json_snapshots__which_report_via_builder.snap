@@ -1,0 +1,16 @@
+---
+source: crates/aenv-core/tests/json_snapshots.rs
+assertion_line: 356
+expression: report
+---
+{
+  "path": "[PATH]",
+  "qualified_name": "(merged)::CLAUDE.md",
+  "short_name": "CLAUDE.md",
+  "provided_by_namespace": null,
+  "strategy": "section-merge",
+  "contributors": [
+    "base::CLAUDE.md",
+    "leaf::CLAUDE.md"
+  ]
+}

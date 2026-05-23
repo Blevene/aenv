@@ -26,7 +26,7 @@ sha2 = "0.10"
 
 # Dev
 tempfile = "3.10"
-insta = { version = "1.39", features = ["json"] }
+insta = { version = "1.39", features = ["json", "redactions"] }
 proptest = "1.4"
 
 [profile.release]

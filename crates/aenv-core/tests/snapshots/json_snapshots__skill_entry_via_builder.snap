@@ -1,0 +1,15 @@
+---
+source: crates/aenv-core/tests/json_snapshots.rs
+assertion_line: 341
+expression: entry
+---
+{
+  "namespace": "leaf",
+  "qualified_name": "leaf::write-tests",
+  "short_name": "write-tests",
+  "adapter": "claude-code",
+  "mode": "imported",
+  "source": "git+https://example.com/skills.git#write-tests",
+  "pin": "v1.2.0",
+  "required": true
+}

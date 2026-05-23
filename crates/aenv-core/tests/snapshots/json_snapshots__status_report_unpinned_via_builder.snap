@@ -1,0 +1,12 @@
+---
+source: crates/aenv-core/tests/json_snapshots.rs
+assertion_line: 305
+expression: report
+---
+{
+  "project": "/proj",
+  "active_namespace": null,
+  "resolution_chain": [],
+  "managed_files": [],
+  "backed_up": []
+}

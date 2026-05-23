@@ -1,0 +1,10 @@
+---
+source: crates/aenv-core/tests/json_snapshots.rs
+assertion_line: 419
+expression: report
+---
+{
+  "project": "[PROJECT_ROOT]",
+  "active_namespace": "leaf",
+  "drifted": []
+}
