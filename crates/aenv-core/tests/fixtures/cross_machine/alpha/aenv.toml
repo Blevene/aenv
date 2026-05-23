@@ -1,0 +1,4 @@
+name = "alpha"
+
+[adapters.claude-code]
+files = ["CLAUDE.md"]
