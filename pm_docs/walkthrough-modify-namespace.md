@@ -273,12 +273,10 @@ $BIN skill list --ns base
 ```
 
 ```
-ENV                   SKILL                           MODE        SOURCE                                                        PIN
+NAMESPACE             SKILL                           MODE        SOURCE                                                        PIN
 base                  write-tests                     authored    -                                                             -
 base                  match-conventions               imported    /tmp/skill-src-XXXXXX/match-conventions                       (head)
 ```
-
-(The header still says `ENV` for historical reasons; the data is per-namespace.)
 
 The scriptable form:
 

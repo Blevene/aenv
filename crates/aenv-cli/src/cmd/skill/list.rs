@@ -53,7 +53,7 @@ pub fn run<F: Filesystem>(
 
     println!(
         "{:<20}  {:<30}  {:<10}  {:<60}  PIN",
-        "ENV", "SKILL", "MODE", "SOURCE"
+        "NAMESPACE", "SKILL", "MODE", "SOURCE"
     );
     for ns in &namespaces {
         let manifest_path = layout.manifest_path(ns);

@@ -606,7 +606,7 @@ $ aenv status --json | jq '.managed_files[] | select(.skill_provenance != null)'
 
 ```bash
 $ aenv skill list
-ENV                  SKILL                  MODE       SOURCE                                              PIN
+NAMESPACE            SKILL                  MODE       SOURCE                                              PIN
 experiments          compare-approaches     authored   -                                                   -
 experiments          quick-prototype        authored   -                                                   -
 detailed-execution   write-tests            authored   -                                                   -
