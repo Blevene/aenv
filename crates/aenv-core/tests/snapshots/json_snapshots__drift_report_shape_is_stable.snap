@@ -1,0 +1,17 @@
+---
+source: crates/aenv-core/tests/json_snapshots.rs
+assertion_line: 158
+expression: r
+---
+{
+  "project": "/proj",
+  "active_namespace": "leaf",
+  "drifted": [
+    {
+      "path": "CLAUDE.md",
+      "qualified_name": "leaf::CLAUDE.md",
+      "kind": "symlink-replaced",
+      "summary": "420 bytes on disk vs 380 bytes expected"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+---
+source: crates/aenv-core/tests/json_snapshots.rs
+assertion_line: 185
+expression: d
+---
+{
+  "a": "alpha",
+  "b": "beta",
+  "skills": {
+    "added": [
+      "beta::write-tests"
+    ],
+    "removed": [
+      "alpha::quick-prototype"
+    ],
+    "common": [
+      "common-skill"
+    ]
+  },
+  "agents": {
+    "added": [],
+    "removed": [],
+    "common": []
+  },
+  "parameters": {
+    "added": [],
+    "removed": [],
+    "changed": [
+      {
+        "name": "default_model",
+        "a": "claude-sonnet-4.6",
+        "b": "claude-opus-4.7"
+      }
+    ]
+  },
+  "policies": {
+    "added": [],
+    "removed": [],
+    "changed": []
+  },
+  "instructions_sections": {
+    "added": [],
+    "removed": [],
+    "common": []
+  }
+}

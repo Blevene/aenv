@@ -141,3 +141,46 @@ fn doctor_report_shape_is_stable() {
     };
     insta::assert_json_snapshot!(r);
 }
+
+#[test]
+fn drift_report_shape_is_stable() {
+    use aenv_core::json::diff::{DriftReport, DriftedFile};
+    let r = DriftReport {
+        project: std::path::PathBuf::from("/proj"),
+        active_namespace: "leaf".into(),
+        drifted: vec![DriftedFile {
+            path: std::path::PathBuf::from("CLAUDE.md"),
+            qualified_name: "leaf::CLAUDE.md".into(),
+            kind: "symlink-replaced".into(),
+            summary: Some("420 bytes on disk vs 380 bytes expected".into()),
+        }],
+    };
+    insta::assert_json_snapshot!(r);
+}
+
+#[test]
+fn structural_diff_shape_is_stable() {
+    use aenv_core::json::diff::*;
+    let d = StructuralDiff {
+        a: "alpha".into(),
+        b: "beta".into(),
+        skills: SetDiff {
+            added: vec!["beta::write-tests".into()],
+            removed: vec!["alpha::quick-prototype".into()],
+            common: vec!["common-skill".into()],
+        },
+        agents: SetDiff::default(),
+        parameters: ValueDiff {
+            added: vec![],
+            removed: vec![],
+            changed: vec![ValueChange {
+                name: "default_model".into(),
+                a: serde_json::json!("claude-sonnet-4.6"),
+                b: serde_json::json!("claude-opus-4.7"),
+            }],
+        },
+        policies: ValueDiff::default(),
+        instructions_sections: SetDiff::default(),
+    };
+    insta::assert_json_snapshot!(d);
+}

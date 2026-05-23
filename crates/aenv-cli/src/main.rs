@@ -126,6 +126,17 @@ enum Command {
         #[command(subcommand)]
         action: SkillAction,
     },
+    /// Diff against the active namespace (drift) or between two namespaces.
+    Diff {
+        /// First namespace name for structural diff (omit for drift).
+        ns_a: Option<String>,
+        /// Second namespace name for structural diff.
+        ns_b: Option<String>,
+        #[arg(long)]
+        project: Option<PathBuf>,
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -285,6 +296,22 @@ fn main() -> ExitCode {
                 SkillAction::List { ns, json } => {
                     cmd::skill::list::run(&fs, &layout, ns.as_deref(), json)
                 }
+            },
+            Command::Diff {
+                ns_a,
+                ns_b,
+                project,
+                json,
+            } => match (ns_a, ns_b) {
+                (None, None) => {
+                    let project_root = paths::resolve_project_root(&fs, project)?;
+                    let aenv_home = paths::resolve_aenv_home()?;
+                    cmd::diff::run_drift(&fs, &project_root, &aenv_home, json)
+                }
+                (Some(a), Some(b)) => cmd::diff::run_structural(&fs, &layout, &a, &b, json),
+                _ => Err(aenv_core::AenvError::ManifestInvalid(
+                    "aenv diff needs either zero or two namespace arguments".into(),
+                )),
             },
             Command::Fork { target, project } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;
