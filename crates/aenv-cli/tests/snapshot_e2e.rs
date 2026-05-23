@@ -12,11 +12,8 @@ fn bin() -> &'static str {
     env!("CARGO_BIN_EXE_aenv")
 }
 
-/// Write a minimal claude-code adapter TOML into the adapters dir so the
-/// built-in ensure_written call doesn't need network/real-home access.
-/// Actually, `ensure_written` always runs — we just let it do its thing with
-/// AENV_HOME set to the tempdir. No manual adapter setup needed.
-
+// `ensure_written` always runs with AENV_HOME set to the tempdir, so no manual
+// adapter setup is needed.
 fn project_with_claude_md(content: &[u8]) -> TempDir {
     let dir = TempDir::new().unwrap();
     std::fs::write(dir.path().join("CLAUDE.md"), content).unwrap();
@@ -83,7 +80,10 @@ fn snapshot_captures_claude_md() {
 
     // The actual file should be copied into the namespace dir.
     let ns_claude = aenv_home.path().join("envs/from-proj/CLAUDE.md");
-    assert!(ns_claude.exists(), "CLAUDE.md should exist in namespace dir");
+    assert!(
+        ns_claude.exists(),
+        "CLAUDE.md should exist in namespace dir"
+    );
     let content = std::fs::read_to_string(&ns_claude).unwrap();
     assert_eq!(content, "# Hi from snapshot\n");
 
