@@ -1,0 +1,5 @@
+name = "gamma"
+extends = ["gamma_base"]
+
+[adapters.mcp]
+files = [".mcp.json"]

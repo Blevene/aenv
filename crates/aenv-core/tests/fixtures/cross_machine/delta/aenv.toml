@@ -1,0 +1,10 @@
+name = "delta"
+
+[adapters.claude-code]
+files = ["CLAUDE.md"]
+
+[parameters]
+some_string = "value"
+some_int = 42
+some_bool = true
+some_list = ["a", "b", "c"]

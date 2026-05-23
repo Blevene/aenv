@@ -96,8 +96,32 @@ fn beta_hash_matches_fixture() {
 }
 
 #[test]
+fn gamma_hash_matches_fixture() {
+    let h = compute_one("gamma");
+    let expected = expected();
+    assert_eq!(
+        h,
+        expected.get("gamma").expect("gamma line missing").as_str(),
+        "gamma hash drift — regenerate expected.txt or investigate"
+    );
+}
+
+#[test]
+fn delta_hash_matches_fixture() {
+    let h = compute_one("delta");
+    let expected = expected();
+    assert_eq!(
+        h,
+        expected.get("delta").expect("delta line missing").as_str(),
+        "delta hash drift — regenerate expected.txt or investigate"
+    );
+}
+
+#[test]
 #[ignore]
 fn print_hashes() {
     println!("alpha={}", compute_one("alpha"));
     println!("beta={}", compute_one("beta"));
+    println!("gamma={}", compute_one("gamma"));
+    println!("delta={}", compute_one("delta"));
 }
