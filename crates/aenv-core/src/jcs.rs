@@ -108,11 +108,7 @@ fn format_ecmascript_f64(f: f64) -> String {
     }
     let abs = f.abs();
     if (1e-6..1e21).contains(&abs) {
-        let s = format!("{f}");
-        if let Some(stripped) = s.strip_suffix(".0") {
-            return stripped.to_string();
-        }
-        s
+        format!("{f}")
     } else {
         let s = format!("{f:e}");
         normalize_exponent_sign(&s)
@@ -123,7 +119,6 @@ fn normalize_exponent_sign(s: &str) -> String {
     if let Some(epos) = s.find('e') {
         let (mantissa, exp) = s.split_at(epos);
         let exp_body = &exp[1..];
-        let mantissa = mantissa.strip_suffix(".0").unwrap_or(mantissa);
         if exp_body.starts_with('-') || exp_body.starts_with('+') {
             format!("{mantissa}e{exp_body}")
         } else {

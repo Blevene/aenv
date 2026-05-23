@@ -74,7 +74,7 @@ fn string_escaping_is_minimal() {
 }
 
 #[test]
-fn control_chars_below_0x20_get_uppercase_hex_escapes() {
+fn control_chars_below_0x20_get_lowercase_hex_escapes() {
     // RFC 8785 specifies \u escapes for control chars use lowercase hex.
     // Specifically \u00XX form. We test 0x01 and 0x1f.
     let v = json!("\u{01}");
@@ -92,8 +92,6 @@ fn rfc_8785_section_3_example() {
         "literals": [null, true, false]
     });
     let out = canonicalize(&v);
-    // Top-level keys are sorted: literals, numbers, string.
-    assert!(out.starts_with(r#"{"literals":"#));
-    assert!(out.contains(r#""numbers":"#));
-    assert!(out.ends_with(r#""string":"Hello world!"}"#));
+    let expected = r#"{"literals":[null,true,false],"numbers":[333333333.3333333,1e+30,4.5,0.000001,"10e+0"],"string":"Hello world!"}"#;
+    assert_eq!(out, expected);
 }
