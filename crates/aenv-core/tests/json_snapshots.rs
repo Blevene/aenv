@@ -10,9 +10,10 @@
 //!   (wrong field projections, missing strategy variants in From impls, etc.).
 
 use aenv_core::json::adapter::{AdapterEntryJson, AdapterParameterJson};
+use aenv_core::json::get::InheritanceEntry;
 use aenv_core::json::list::ListEntry;
 use aenv_core::json::skill::SkillEntry;
-use aenv_core::json::status::{ManagedFileJson, StatusReport};
+use aenv_core::json::status::{ManagedFileJson, ParameterEntryJson, StatusReport};
 use std::path::PathBuf;
 
 // ---- Shared fixture helpers ----
@@ -77,6 +78,24 @@ fn make_basic_layout() -> (
 
 #[test]
 fn status_report_shape_is_stable() {
+    let mut params = std::collections::BTreeMap::new();
+    params.insert(
+        "default_model".into(),
+        ParameterEntryJson {
+            value: serde_json::json!("claude-opus-4.7"),
+            source_namespace: "leaf".into(),
+            inheritance_chain: vec![
+                InheritanceEntry {
+                    namespace: "base".into(),
+                    value: serde_json::json!("claude-sonnet-4.6"),
+                },
+                InheritanceEntry {
+                    namespace: "leaf".into(),
+                    value: serde_json::json!("claude-opus-4.7"),
+                },
+            ],
+        },
+    );
     let report = StatusReport {
         project: PathBuf::from("/proj"),
         active_namespace: Some("solo".into()),
@@ -85,7 +104,7 @@ fn status_report_shape_is_stable() {
             "sha256-v1:0000000000000000000000000000000000000000000000000000000000000000".into(),
         ),
         resolved_hash_v2: None,
-        parameters: Default::default(),
+        parameters: params,
         policies: Default::default(),
         managed_files: vec![ManagedFileJson {
             path: PathBuf::from("CLAUDE.md"),
@@ -290,7 +309,14 @@ fn status_report_via_builder() {
         .unwrap();
     let mat = aenv_core::materialize::compute_material_set(&fs, &layout, &adapters, &leaf).unwrap();
     let hash = aenv_core::hash::hash_resolved_namespace(&mat);
-    let report = StatusReport::build(project.path().to_path_buf(), &state, &resolution, hash);
+    let report = StatusReport::build(
+        &fs,
+        &layout,
+        project.path().to_path_buf(),
+        &state,
+        &resolution,
+        hash,
+    );
     insta::assert_json_snapshot!(report, {
         ".project" => "[PROJECT_ROOT]",
         ".resolved_hash" => "[HASH]",

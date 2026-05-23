@@ -1,12 +1,28 @@
 //! Schema for `aenv status --json`. Matches functional spec §7.1.
 
-use crate::parameters::ResolvedParameter;
+use crate::fs::Filesystem;
+use crate::home::RegistryLayout;
+use crate::json::get::InheritanceEntry;
+use crate::parameters::{self, ParameterValue};
 use crate::policies::ResolvedPolicy;
 use crate::resolve::{DeepMergeFormat, MaterializeStrategy, ResolutionResult};
 use crate::state::{ActivationState, ManagedFile};
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+
+/// Per-parameter entry in the status JSON shape. Carries effective value,
+/// source namespace, and the full inheritance chain (each namespace that
+/// declared this parameter, in chain order).
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct ParameterEntryJson {
+    /// The effective (resolved) value for this parameter.
+    pub value: serde_json::Value,
+    /// Namespace in the `extends` chain that supplied the effective value.
+    pub source_namespace: String,
+    /// All contributions from root to leaf, in resolution order.
+    pub inheritance_chain: Vec<InheritanceEntry>,
+}
 
 /// JSON shape for `aenv status --json`.
 #[derive(Debug, Clone, Default, Serialize)]
@@ -26,7 +42,7 @@ pub struct StatusReport {
     pub resolved_hash_v2: Option<String>,
     /// Effective parameters after `extends`-chain resolution.
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
-    pub parameters: BTreeMap<String, ResolvedParameter>,
+    pub parameters: BTreeMap<String, ParameterEntryJson>,
     /// Effective policies after `extends`-chain resolution.
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub policies: BTreeMap<String, ResolvedPolicy>,
@@ -93,12 +109,37 @@ impl StatusReport {
     /// Build a `StatusReport` from a project's `ActivationState` plus the
     /// freshly-computed resolution and hash. `hash` is the
     /// `sha256-v1:<hex>` string from `hash::hash_resolved_namespace`.
-    pub fn build(
+    ///
+    /// `fs` and `layout` are needed to walk each namespace's manifest and
+    /// build the per-parameter `inheritance_chain`.
+    pub fn build<F: Filesystem>(
+        fs: &F,
+        layout: &RegistryLayout,
         project_root: PathBuf,
         state: &ActivationState,
         resolution: &ResolutionResult,
         hash: String,
     ) -> Self {
+        let params: BTreeMap<String, ParameterEntryJson> = resolution
+            .parameters
+            .iter()
+            .map(|(k, rp)| {
+                let chain = parameters::gather_inheritance_chain(fs, layout, &resolution.chain, k);
+                let entry = ParameterEntryJson {
+                    value: param_value_to_json(&rp.value),
+                    source_namespace: rp.source.as_str().to_string(),
+                    inheritance_chain: chain
+                        .into_iter()
+                        .map(|(ns, v)| InheritanceEntry {
+                            namespace: ns,
+                            value: param_value_to_json(&v),
+                        })
+                        .collect(),
+                };
+                (k.clone(), entry)
+            })
+            .collect();
+
         StatusReport {
             project: project_root,
             active_namespace: Some(state.active_namespace.clone()),
@@ -109,7 +150,7 @@ impl StatusReport {
                 .collect(),
             resolved_hash: Some(hash),
             resolved_hash_v2: None,
-            parameters: resolution.parameters.clone(),
+            parameters: params,
             policies: resolution.policies.clone(),
             managed_files: state
                 .managed_files
@@ -134,6 +175,19 @@ impl StatusReport {
             project: project_root,
             ..Default::default()
         }
+    }
+}
+
+fn param_value_to_json(v: &ParameterValue) -> serde_json::Value {
+    match v {
+        ParameterValue::String(s) => serde_json::Value::String(s.clone()),
+        ParameterValue::Integer(i) => serde_json::Value::Number((*i).into()),
+        ParameterValue::Boolean(b) => serde_json::Value::Bool(*b),
+        ParameterValue::ListString(xs) => serde_json::Value::Array(
+            xs.iter()
+                .map(|s| serde_json::Value::String(s.clone()))
+                .collect(),
+        ),
     }
 }
 

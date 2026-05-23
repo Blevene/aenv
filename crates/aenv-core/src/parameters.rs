@@ -100,7 +100,10 @@ fn toml_type_name(v: &toml::Value) -> &'static str {
 }
 
 use crate::adapter::AdapterRegistry;
+use crate::fs::Filesystem;
+use crate::home::RegistryLayout;
 use crate::identity::NamespaceId;
+use crate::manifest::AenvManifest;
 use std::collections::BTreeMap;
 
 /// One resolved parameter: value + the namespace in the `extends` chain that
@@ -213,4 +216,34 @@ pub fn check_against_adapters(
     }
 
     Ok(())
+}
+
+/// Returns each namespace in the chain that declared `param`, in chain order
+/// (root → leaf), with the value it declared.
+///
+/// Silently skips namespaces whose manifest cannot be read or parsed — those
+/// are non-fatal for the inheritance-chain display.
+pub fn gather_inheritance_chain<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    chain: &[NamespaceId],
+    param: &str,
+) -> Vec<(String, ParameterValue)> {
+    let mut out: Vec<(String, ParameterValue)> = Vec::new();
+    for ns in chain {
+        let manifest_path = layout.manifest_path(ns.as_str());
+        let Ok(bytes) = fs.read(&manifest_path) else {
+            continue;
+        };
+        let Ok(text) = String::from_utf8(bytes) else {
+            continue;
+        };
+        let Ok(manifest) = AenvManifest::from_toml(&text) else {
+            continue;
+        };
+        if let Some(pv) = manifest.parameters.get(param) {
+            out.push((ns.as_str().to_string(), pv.clone()));
+        }
+    }
+    out
 }

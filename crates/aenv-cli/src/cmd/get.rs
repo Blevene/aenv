@@ -6,8 +6,7 @@ use aenv_core::adapter::AdapterRegistry;
 use aenv_core::error::{AenvError, Result};
 use aenv_core::fs::Filesystem;
 use aenv_core::home::RegistryLayout;
-use aenv_core::identity::NamespaceId;
-use aenv_core::manifest::AenvManifest;
+use aenv_core::parameters;
 use aenv_core::parameters::ParameterValue;
 use aenv_core::resolve::resolve_namespace;
 use aenv_core::state::ActivationState;
@@ -43,33 +42,6 @@ fn parse_spec(spec: &str) -> Result<(Option<&str>, &str)> {
             Ok((ns, param))
         }
     }
-}
-
-/// Returns each namespace in the chain that declared `param`, in chain order
-/// (root → leaf), with the value it declared.
-fn gather_inheritance_chain<F: Filesystem>(
-    fs: &F,
-    layout: &RegistryLayout,
-    chain: &[NamespaceId],
-    param: &str,
-) -> Vec<(String, ParameterValue)> {
-    let mut out: Vec<(String, ParameterValue)> = Vec::new();
-    for ns in chain {
-        let manifest_path = layout.manifest_path(ns.as_str());
-        let Ok(bytes) = fs.read(&manifest_path) else {
-            continue;
-        };
-        let Ok(text) = String::from_utf8(bytes) else {
-            continue;
-        };
-        let Ok(manifest) = AenvManifest::from_toml(&text) else {
-            continue;
-        };
-        if let Some(pv) = manifest.parameters.get(param) {
-            out.push((ns.as_str().to_string(), pv.clone()));
-        }
-    }
-    out
 }
 
 /// Run `aenv get <spec>`.
@@ -123,7 +95,7 @@ pub fn run<F: Filesystem>(
         .ok_or_else(|| AenvError::ParameterUndefined(format!("{leaf_name}.{param}")))?;
 
     // Build the inheritance chain (used by both JSON and text paths).
-    let inheritance = gather_inheritance_chain(fs, layout, &rr.chain, param);
+    let inheritance = parameters::gather_inheritance_chain(fs, layout, &rr.chain, param);
 
     if json {
         let report = aenv_core::json::GetReport::build(param.to_string(), rp, inheritance);

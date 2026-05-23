@@ -179,6 +179,8 @@ pub fn run<F: Filesystem>(fs: &F, project_root: &Path, aenv_home: &Path, json: b
         let mat = aenv_core::materialize::compute_material_set(fs, &registry, &adapters, &leaf)?;
         let hash = aenv_core::hash::hash_resolved_namespace(&mat);
         let report = aenv_core::json::StatusReport::build(
+            fs,
+            &registry,
             project_root.to_path_buf(),
             &state,
             &resolution,

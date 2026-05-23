@@ -1,6 +1,6 @@
 ---
 source: crates/aenv-core/tests/json_snapshots.rs
-assertion_line: 295
+assertion_line: 313
 expression: report
 ---
 {
@@ -14,7 +14,17 @@ expression: report
   "parameters": {
     "default_model": {
       "value": "claude-opus-4.7",
-      "source": "leaf"
+      "source_namespace": "leaf",
+      "inheritance_chain": [
+        {
+          "namespace": "base",
+          "value": "claude-sonnet-4.6"
+        },
+        {
+          "namespace": "leaf",
+          "value": "claude-opus-4.7"
+        }
+      ]
     }
   },
   "managed_files": [

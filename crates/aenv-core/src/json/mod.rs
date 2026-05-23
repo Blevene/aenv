@@ -23,5 +23,5 @@ pub use doctor::DoctorReportJson;
 pub use get::GetReport;
 pub use list::ListEntry;
 pub use skill::SkillEntry;
-pub use status::StatusReport;
+pub use status::{ParameterEntryJson, StatusReport};
 pub use which::WhichReport;
