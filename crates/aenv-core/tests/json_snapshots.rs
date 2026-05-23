@@ -167,7 +167,10 @@ fn structural_diff_shape_is_stable() {
         skills: SetDiff {
             added: vec!["beta::write-tests".into()],
             removed: vec!["alpha::quick-prototype".into()],
-            common: vec!["common-skill".into()],
+            // `common` is structurally always empty for skills: manifest_skill_qnames
+            // emits "<ns>::<name>" strings, so two different namespaces can never share
+            // an identical qualified name and the set intersection is always ∅.
+            common: vec![],
         },
         agents: SetDiff::default(),
         parameters: ValueDiff {
