@@ -31,7 +31,7 @@ fn claude_adapter() -> Adapter {
 
 fn setup_registry_with_namespace(fs: &MockFilesystem, ns: &str, files: &[(&str, &[u8])]) {
     let layout = layout();
-    create_namespace(fs, &layout, ns).unwrap();
+    create_namespace(fs, &layout, ns, &[]).unwrap();
     // Patch the manifest to reference claude-code so the adapter's files apply.
     let manifest = format!("name = \"{ns}\"\n\n[adapters.claude-code]\nfiles = [\"CLAUDE.md\"]\n");
     fs.write(&layout.manifest_path(ns), manifest.as_bytes())
@@ -110,7 +110,7 @@ fn errors_when_namespace_does_not_exist() {
 fn errors_when_manifest_names_unknown_adapter() {
     let fs = MockFilesystem::new();
     let layout = layout();
-    create_namespace(&fs, &layout, "experiments").unwrap();
+    create_namespace(&fs, &layout, "experiments", &[]).unwrap();
     // Manifest names an adapter not in the registry.
     let manifest = "name = \"experiments\"\n\n[adapters.cursor]\nfiles = [\".cursorrules\"]\n";
     fs.write(&layout.manifest_path("experiments"), manifest.as_bytes())

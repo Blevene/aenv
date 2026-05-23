@@ -24,6 +24,9 @@ enum Command {
     Create {
         /// Name of the namespace.
         name: String,
+        /// Parent namespace(s) to extend. Repeatable: --extends base --extends shared.
+        #[arg(long)]
+        extends: Vec<String>,
     },
     /// List every namespace in the registry.
     List {
@@ -199,7 +202,7 @@ fn main() -> ExitCode {
         let layout = aenv_core::home::RegistryLayout::new(paths::resolve_aenv_home()?);
         aenv_core::adapters_builtin::ensure_written(&fs, &layout.adapters_dir())?;
         match cli.command {
-            Command::Create { name } => cmd::create::run(&fs, &layout, &name),
+            Command::Create { name, extends } => cmd::create::run(&fs, &layout, &name, &extends),
             Command::List { json } => cmd::list::run(&fs, &layout, json),
             Command::Delete { name } => cmd::delete::run(&fs, &layout, &name),
             Command::Use { name, project } => {
@@ -286,7 +289,8 @@ fn main() -> ExitCode {
                 json,
             } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;
-                cmd::which::run(project_root, path, json)
+                let aenv_home = paths::resolve_aenv_home()?;
+                cmd::which::run(project_root, path, &aenv_home, json)
             }
             Command::Skill { action } => match action {
                 SkillAction::New { name, ns, adapter } => {

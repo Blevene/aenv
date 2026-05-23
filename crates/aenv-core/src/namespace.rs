@@ -13,14 +13,23 @@ use std::collections::BTreeMap;
 
 /// Create a new namespace by writing a default manifest. Errors if a
 /// manifest already exists for `name` (PRD R-5).
-pub fn create_namespace<F: Filesystem>(fs: &F, layout: &RegistryLayout, name: &str) -> Result<()> {
+///
+/// `extends` lists parent namespaces to inherit from. Pass `&[]` for a
+/// standalone namespace (the common case for `aenv create <name>` with no flag).
+pub fn create_namespace<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    name: &str,
+    extends: &[String],
+) -> Result<()> {
     let manifest_path = layout.manifest_path(name);
     if fs.exists(&manifest_path)? {
         return Err(AenvError::ManifestInvalid(format!(
             "namespace '{name}' already exists"
         )));
     }
-    let manifest = AenvManifest::default_for(name);
+    let mut manifest = AenvManifest::default_for(name);
+    manifest.extends = extends.to_vec();
     fs.write(&manifest_path, manifest.to_toml().as_bytes())?;
     Ok(())
 }

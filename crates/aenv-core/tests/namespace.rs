@@ -15,7 +15,7 @@ fn layout() -> RegistryLayout {
 fn create_writes_default_manifest() {
     let fs = MockFilesystem::new();
     let layout = layout();
-    create_namespace(&fs, &layout, "experiments").unwrap();
+    create_namespace(&fs, &layout, "experiments", &[]).unwrap();
 
     let manifest_bytes = fs.read(&layout.manifest_path("experiments")).unwrap();
     let m = AenvManifest::from_toml(&String::from_utf8(manifest_bytes).unwrap()).unwrap();
@@ -27,8 +27,8 @@ fn create_writes_default_manifest() {
 fn create_rejects_duplicate() {
     let fs = MockFilesystem::new();
     let layout = layout();
-    create_namespace(&fs, &layout, "experiments").unwrap();
-    let err = create_namespace(&fs, &layout, "experiments").expect_err("must reject");
+    create_namespace(&fs, &layout, "experiments", &[]).unwrap();
+    let err = create_namespace(&fs, &layout, "experiments", &[]).expect_err("must reject");
     assert!(matches!(err, AenvError::ManifestInvalid(_)));
 }
 
@@ -44,9 +44,9 @@ fn list_returns_empty_when_no_namespaces() {
 fn list_returns_namespace_names_sorted() {
     let fs = MockFilesystem::new();
     let layout = layout();
-    create_namespace(&fs, &layout, "experiments").unwrap();
-    create_namespace(&fs, &layout, "analyst").unwrap();
-    create_namespace(&fs, &layout, "detailed-execution").unwrap();
+    create_namespace(&fs, &layout, "experiments", &[]).unwrap();
+    create_namespace(&fs, &layout, "analyst", &[]).unwrap();
+    create_namespace(&fs, &layout, "detailed-execution", &[]).unwrap();
     let names = list_namespaces(&fs, &layout).unwrap();
     assert_eq!(
         names,
@@ -64,7 +64,7 @@ fn list_skips_entries_without_manifest() {
     // list_namespaces silently ignores it.
     let fs = MockFilesystem::new();
     let layout = layout();
-    create_namespace(&fs, &layout, "real").unwrap();
+    create_namespace(&fs, &layout, "real", &[]).unwrap();
     fs.create_dir_all(&layout.namespaces_dir().join("stray"))
         .unwrap();
     let names = list_namespaces(&fs, &layout).unwrap();
@@ -75,9 +75,41 @@ fn list_skips_entries_without_manifest() {
 fn delete_removes_namespace_directory() {
     let fs = MockFilesystem::new();
     let layout = layout();
-    create_namespace(&fs, &layout, "experiments").unwrap();
+    create_namespace(&fs, &layout, "experiments", &[]).unwrap();
     delete_namespace(&fs, &layout, "experiments").unwrap();
     assert!(!fs.exists(&layout.namespace_dir("experiments")).unwrap());
+}
+
+#[test]
+fn create_with_extends_writes_extends_list() {
+    let fs = MockFilesystem::new();
+    let layout = layout();
+    create_namespace(&fs, &layout, "base", &[]).unwrap();
+    create_namespace(&fs, &layout, "experiments", &["base".to_string()]).unwrap();
+
+    let manifest_bytes = fs.read(&layout.manifest_path("experiments")).unwrap();
+    let m = AenvManifest::from_toml(&String::from_utf8(manifest_bytes).unwrap()).unwrap();
+    assert_eq!(m.name, "experiments");
+    assert_eq!(m.extends, vec!["base".to_string()]);
+}
+
+#[test]
+fn create_with_multiple_extends_writes_all_parents() {
+    let fs = MockFilesystem::new();
+    let layout = layout();
+    create_namespace(&fs, &layout, "base", &[]).unwrap();
+    create_namespace(&fs, &layout, "shared", &[]).unwrap();
+    create_namespace(
+        &fs,
+        &layout,
+        "experiments",
+        &["base".to_string(), "shared".to_string()],
+    )
+    .unwrap();
+
+    let manifest_bytes = fs.read(&layout.manifest_path("experiments")).unwrap();
+    let m = AenvManifest::from_toml(&String::from_utf8(manifest_bytes).unwrap()).unwrap();
+    assert_eq!(m.extends, vec!["base".to_string(), "shared".to_string()]);
 }
 
 #[test]

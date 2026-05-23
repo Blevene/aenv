@@ -3,7 +3,7 @@
 use aenv_core::activate::activate_namespace;
 use aenv_core::adapter::{Adapter, AdapterRegistry};
 use aenv_core::deactivate::deactivate_namespace;
-use aenv_core::fs::{Filesystem, MockFilesystem};
+use aenv_core::fs::{Filesystem, MockFilesystem, RealFilesystem};
 use aenv_core::home::RegistryLayout;
 use aenv_core::identity::NamespaceId;
 use aenv_core::namespace::create_namespace;
@@ -30,7 +30,7 @@ fn registry_with_claude() -> AdapterRegistry {
 
 fn setup_namespace(fs: &MockFilesystem, ns: &str, body: &[u8]) {
     let layout = layout();
-    create_namespace(fs, &layout, ns).unwrap();
+    create_namespace(fs, &layout, ns, &[]).unwrap();
     fs.write(
         &layout.manifest_path(ns),
         format!("name = \"{ns}\"\n\n[adapters.claude-code]\nfiles = [\"CLAUDE.md\"]\n").as_bytes(),
@@ -150,4 +150,62 @@ fn deactivate_leaves_identical_file_in_place() {
 
     // Identical-strategy file is the user's; it stays.
     assert_eq!(fs.read(&project.join("CLAUDE.md")).unwrap(), body);
+}
+
+#[test]
+fn deactivate_removes_empty_state_directory() {
+    // After deactivation the .aenv-state/ directory should be removed if empty.
+    // This test uses RealFilesystem + tempdir because std::fs::remove_dir is called
+    // directly in deactivate_namespace (the Filesystem trait has no remove_dir).
+    let aenv_home_dir = tempfile::tempdir().unwrap();
+    let project_dir = tempfile::tempdir().unwrap();
+    let aenv_home = std::fs::canonicalize(aenv_home_dir.path()).unwrap();
+    let project = std::fs::canonicalize(project_dir.path()).unwrap();
+
+    let layout = RegistryLayout::new(aenv_home);
+    let fs = RealFilesystem;
+
+    // Build a real namespace with a CLAUDE.md artifact.
+    let ns_dir = layout.namespace_dir("base");
+    std::fs::create_dir_all(&ns_dir).unwrap();
+    std::fs::write(
+        layout.manifest_path("base"),
+        b"name = \"base\"\n\n[adapters.claude-code]\nfiles = [\"CLAUDE.md\"]\n",
+    )
+    .unwrap();
+    std::fs::write(ns_dir.join("CLAUDE.md"), b"content").unwrap();
+
+    let mut reg = AdapterRegistry::new();
+    reg.insert(Adapter {
+        name: "claude-code".to_string(),
+        files: vec!["CLAUDE.md".to_string()],
+        merge_strategies: Default::default(),
+        roles: Default::default(),
+        default_merge: Default::default(),
+        parameters: vec![],
+        skills_dir: None,
+        soft_limits: Default::default(),
+    });
+
+    activate_namespace(
+        &fs,
+        &layout,
+        &reg,
+        &project,
+        &NamespaceId::new("base").unwrap(),
+    )
+    .unwrap();
+
+    let state_dir = project.join(".aenv-state");
+    assert!(
+        state_dir.exists(),
+        ".aenv-state/ should exist after activate"
+    );
+
+    deactivate_namespace(&fs, &project).unwrap();
+
+    assert!(
+        !state_dir.exists(),
+        ".aenv-state/ should be removed after deactivate when empty"
+    );
 }

@@ -7,9 +7,14 @@ use aenv_core::namespace::create_namespace;
 use aenv_core::Result;
 
 /// Create a new namespace, installing built-in adapters on first run.
-pub fn run<F: Filesystem>(fs: &F, layout: &RegistryLayout, name: &str) -> Result<()> {
+pub fn run<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    name: &str,
+    extends: &[String],
+) -> Result<()> {
     adapters_builtin::install_builtins(fs, &layout.adapters_dir())?;
-    create_namespace(fs, layout, name)?;
+    create_namespace(fs, layout, name, extends)?;
     println!(
         "Created namespace '{}' at {}",
         name,
