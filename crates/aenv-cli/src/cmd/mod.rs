@@ -13,6 +13,7 @@ pub mod list;
 pub mod restore;
 pub mod set;
 pub mod skill;
+pub mod snapshot;
 pub mod status;
 pub mod unpin;
 pub mod use_;

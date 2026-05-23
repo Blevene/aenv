@@ -168,7 +168,7 @@ fn fork_name_copies_managed_files_from_project_and_writes_manifest() {
     adapters.insert(mcp);
 
     let reg = RegistryLayout::new(PathBuf::from("/aenv"));
-    create_namespace_from_project(&fs, &reg, &adapters, "new-env", Path::new("/p")).unwrap();
+    create_namespace_from_project(&fs, &reg, &adapters, "new-env", Path::new("/p"), &[]).unwrap();
 
     let manifest_bytes = fs.read(Path::new("/aenv/envs/new-env/aenv.toml")).unwrap();
     let m: aenv_core::manifest::AenvManifest =
@@ -204,7 +204,7 @@ fn fork_name_walks_glob_directories_and_copies_every_file() {
     adapters.insert(cc);
 
     let reg = RegistryLayout::new(PathBuf::from("/aenv"));
-    create_namespace_from_project(&fs, &reg, &adapters, "forked", Path::new("/p")).unwrap();
+    create_namespace_from_project(&fs, &reg, &adapters, "forked", Path::new("/p"), &[]).unwrap();
 
     assert_eq!(
         fs.read(Path::new("/aenv/envs/forked/.claude/skills/a/SKILL.md"))

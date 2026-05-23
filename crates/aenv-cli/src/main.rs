@@ -133,6 +133,22 @@ enum Command {
         #[arg(long)]
         project: Option<PathBuf>,
     },
+    /// Capture the current project's adapter-managed files into a new namespace.
+    ///
+    /// Walks each installed adapter's files = [...] patterns against the project
+    /// tree and copies every matching file into a fresh namespace directory.
+    /// The project pin is NOT updated. Refuses on duplicate name (exit 12) and
+    /// on a project with no adapter-managed files.
+    Snapshot {
+        /// Name for the new namespace.
+        name: String,
+        /// Project root override (defaults to ancestor walk from cwd).
+        #[arg(long)]
+        project: Option<PathBuf>,
+        /// Parent namespace(s) to extend. Repeatable: --extends base --extends shared.
+        #[arg(long)]
+        extends: Vec<String>,
+    },
     /// Remove the .aenv pin from a project. If a namespace is currently
     /// active, runs the deactivate flow first.
     Unpin {
@@ -371,6 +387,18 @@ fn main() -> ExitCode {
                     "aenv diff needs either zero or two namespace arguments".into(),
                 )),
             },
+            Command::Snapshot {
+                name,
+                project,
+                extends,
+            } => {
+                let project_root = paths::resolve_project_root(&fs, project)?;
+                let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
+                    &fs,
+                    &layout.adapters_dir(),
+                )?;
+                cmd::snapshot::run(&fs, &layout, &adapters, &project_root, &name, &extends)
+            }
             Command::Fork { target, project } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;
                 match target {

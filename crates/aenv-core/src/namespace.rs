@@ -97,12 +97,16 @@ pub fn delete_namespace<F: Filesystem>(fs: &F, layout: &RegistryLayout, name: &s
 ///
 /// The new manifest carries the *resolved literal paths* it captured, not
 /// the source glob pattern.
+///
+/// `extends` seeds the new namespace's parent chain. Pass `&[]` for a
+/// standalone namespace (the common case for `aenv fork <name>`).
 pub fn create_namespace_from_project<F: Filesystem>(
     fs: &F,
     registry: &RegistryLayout,
     adapters: &crate::adapter::AdapterRegistry,
     new_name: &str,
     project_root: &std::path::Path,
+    extends: &[String],
 ) -> Result<()> {
     let dest = registry.namespace_dir(new_name);
     if fs.exists(&dest)? {
@@ -150,7 +154,7 @@ pub fn create_namespace_from_project<F: Filesystem>(
     }
     let manifest = AenvManifest {
         name: new_name.to_string(),
-        extends: vec![],
+        extends: extends.to_vec(),
         adapters: manifest_adapters,
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),

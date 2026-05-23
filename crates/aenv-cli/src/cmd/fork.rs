@@ -49,6 +49,7 @@ pub fn run_name(
         &adapters,
         &new_name,
         &project_root,
+        &[],
     )?;
     aenv_core::project::write_pin(&aenv_core::fs::RealFilesystem, &project_root, &new_name)?;
     println!("Forked project into new namespace '{new_name}'");
