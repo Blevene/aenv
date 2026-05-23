@@ -5,6 +5,8 @@ use aenv_core::identity::{NamespaceId, QualifiedName, ShortName};
 use aenv_core::resolve::MaterializeStrategy;
 use aenv_core::state::{ActivationState, ManagedFile};
 
+static AENV_HOME: &str = "/home/test/.aenv";
+
 fn qn(ns: &str, short: &str) -> QualifiedName {
     let nsid = if ns == NamespaceId::RESERVED_MERGED {
         NamespaceId::merged_synthetic()
@@ -37,9 +39,12 @@ fn which_for_symlinked_file_with_shadow() {
         shadows: vec![qn("base", "CLAUDE.md")],
         skill_provenance: None,
     });
-    let out = format_which(&state, Path::new("CLAUDE.md")).unwrap();
+    let aenv_home = Path::new(AENV_HOME);
+    let out = format_which(&state, Path::new("CLAUDE.md"), aenv_home).unwrap();
     assert!(out.contains("Qualified name:  leaf::CLAUDE.md"));
     assert!(out.contains("Strategy:        symlink"));
+    assert!(out.contains("Source path:"));
+    assert!(out.contains("leaf/CLAUDE.md"));
     assert!(out.contains("Shadows:"));
     assert!(out.contains("base::CLAUDE.md"));
 }
@@ -54,9 +59,12 @@ fn which_for_merged_file_lists_contributors() {
         shadows: vec![],
         skill_provenance: None,
     });
-    let out = format_which(&state, Path::new(".mcp.json")).unwrap();
+    let aenv_home = Path::new(AENV_HOME);
+    let out = format_which(&state, Path::new(".mcp.json"), aenv_home).unwrap();
     assert!(out.contains("Qualified name:  (merged)"));
     assert!(out.contains("Strategy:        deep-merge (json)"));
+    // Merged strategy: no Source path line.
+    assert!(!out.contains("Source path:"));
     assert!(out.contains("Contributors:"));
     assert!(out.contains("base::.mcp.json"));
     assert!(out.contains("leaf::.mcp.json"));
@@ -74,6 +82,7 @@ fn which_for_unmanaged_path_reports_error() {
         policies: std::collections::BTreeMap::new(),
         warnings: Vec::new(),
     };
-    let err = format_which(&state, Path::new("unmanaged.txt")).unwrap_err();
+    let aenv_home = Path::new(AENV_HOME);
+    let err = format_which(&state, Path::new("unmanaged.txt"), aenv_home).unwrap_err();
     assert!(err.to_string().contains("not managed"));
 }
