@@ -22,9 +22,6 @@ pub fn run<F: Filesystem>(
     ns_arg: Option<&str>,
     json: bool,
 ) -> Result<()> {
-    if json {
-        todo!("aenv doctor --json lands in Task 11");
-    }
     // Determine the leaf namespace name.
     let leaf_name: String = match ns_arg {
         Some(name) => name.to_string(),
@@ -46,7 +43,16 @@ pub fn run<F: Filesystem>(
     let resolved = resolve_namespace(fs, layout, adapters, &leaf)?;
     let report = aenv_core::doctor::evaluate(fs, layout, adapters, &resolved);
 
-    print_report(&leaf_name, &report);
+    if json {
+        let report_json = aenv_core::json::DoctorReportJson::from_report(&leaf_name, &report);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&report_json)
+                .map_err(|e| AenvError::ManifestInvalid(format!("json: {e}")))?
+        );
+    } else {
+        print_report(&leaf_name, &report);
+    }
 
     if report.has_enforce_violations() {
         return Err(AenvError::PolicyViolation(report.summary_line()));

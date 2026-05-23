@@ -120,3 +120,24 @@ fn get_report_shape_is_stable() {
     };
     insta::assert_json_snapshot!(r);
 }
+
+#[test]
+fn doctor_report_shape_is_stable() {
+    use aenv_core::json::doctor::{DoctorReportJson, OutcomeJson};
+    let r = DoctorReportJson {
+        namespace: "leaf".into(),
+        chain: vec!["base".into(), "leaf".into()],
+        policies: Default::default(),
+        outcomes: vec![OutcomeJson {
+            key: "instructions_max_chars".into(),
+            status: "fail".into(),
+            target: Some("leaf::CLAUDE.md".into()),
+            msg: Some("CLAUDE.md is 5200 chars, limit 5000".into()),
+        }],
+        pass_count: 2,
+        warn_count: 0,
+        fail_count: 1,
+        skipped_count: 0,
+    };
+    insta::assert_json_snapshot!(r);
+}

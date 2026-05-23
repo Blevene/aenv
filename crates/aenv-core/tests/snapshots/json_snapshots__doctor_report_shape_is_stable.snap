@@ -1,0 +1,25 @@
+---
+source: crates/aenv-core/tests/json_snapshots.rs
+assertion_line: 142
+expression: r
+---
+{
+  "namespace": "leaf",
+  "chain": [
+    "base",
+    "leaf"
+  ],
+  "policies": {},
+  "outcomes": [
+    {
+      "key": "instructions_max_chars",
+      "status": "fail",
+      "target": "leaf::CLAUDE.md",
+      "msg": "CLAUDE.md is 5200 chars, limit 5000"
+    }
+  ],
+  "pass_count": 2,
+  "warn_count": 0,
+  "fail_count": 1,
+  "skipped_count": 0
+}
