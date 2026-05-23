@@ -54,7 +54,10 @@ pub fn run_add<F: Filesystem>(fs: &F, layout: &RegistryLayout, source: &Path) ->
     Ok(())
 }
 
-pub fn run_list<F: Filesystem>(fs: &F, layout: &RegistryLayout) -> Result<()> {
+pub fn run_list<F: Filesystem>(fs: &F, layout: &RegistryLayout, json: bool) -> Result<()> {
+    if json {
+        todo!("aenv adapter list --json lands in Task 9");
+    }
     let reg = AdapterRegistry::load_from_dir(fs, &layout.adapters_dir())?;
     if reg.is_empty() {
         println!(

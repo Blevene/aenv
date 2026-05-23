@@ -65,7 +65,10 @@ fn render_strategy(s: MaterializeStrategy) -> String {
 }
 
 /// Entry point for `aenv which <path>`.
-pub fn run(project_root: PathBuf, query: PathBuf) -> aenv_core::Result<()> {
+pub fn run(project_root: PathBuf, query: PathBuf, json: bool) -> aenv_core::Result<()> {
+    if json {
+        todo!("aenv which --json lands in Task 10");
+    }
     let state_path = project_root.join(".aenv-state/state.json");
     let body = match std::fs::read(&state_path) {
         Ok(b) => b,

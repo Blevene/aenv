@@ -149,7 +149,10 @@ fn describe(mf: &ManagedFile) -> String {
     }
 }
 
-pub fn run<F: Filesystem>(fs: &F, project_root: &Path, aenv_home: &Path) -> Result<()> {
+pub fn run<F: Filesystem>(fs: &F, project_root: &Path, aenv_home: &Path, json: bool) -> Result<()> {
+    if json {
+        todo!("aenv status --json lands in Task 8");
+    }
     let state_path = project_root.join(".aenv-state/state.json");
     if !fs.exists(&state_path)? {
         println!("No active namespace in {}", project_root.display());

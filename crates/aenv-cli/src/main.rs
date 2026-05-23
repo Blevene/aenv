@@ -26,7 +26,10 @@ enum Command {
         name: String,
     },
     /// List every namespace in the registry.
-    List,
+    List {
+        #[arg(long)]
+        json: bool,
+    },
     /// Delete a namespace from the registry.
     Delete {
         /// Name of the namespace.
@@ -61,6 +64,8 @@ enum Command {
     Status {
         #[arg(long)]
         project: Option<PathBuf>,
+        #[arg(long)]
+        json: bool,
     },
     /// Adapter operations.
     Adapter {
@@ -73,6 +78,8 @@ enum Command {
         path: PathBuf,
         #[arg(long)]
         project: Option<PathBuf>,
+        #[arg(long)]
+        json: bool,
     },
     /// Print the effective value of a parameter plus provenance.
     ///
@@ -81,6 +88,8 @@ enum Command {
     Get {
         /// Parameter spec: `<namespace>.<param>` or `.<param>`.
         spec: String,
+        #[arg(long)]
+        json: bool,
     },
     /// Set a parameter on a namespace.
     Set {
@@ -98,6 +107,8 @@ enum Command {
     Doctor {
         /// Namespace to evaluate (defaults to the active project's pinned namespace).
         namespace: Option<String>,
+        #[arg(long)]
+        json: bool,
     },
     /// Detach a file (or whole project) from namespace management.
     ///
@@ -125,7 +136,10 @@ enum AdapterAction {
         path: PathBuf,
     },
     /// List installed adapters.
-    List,
+    List {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -156,6 +170,8 @@ enum SkillAction {
     List {
         #[arg(long)]
         ns: Option<String>,
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -168,7 +184,7 @@ fn main() -> ExitCode {
         aenv_core::adapters_builtin::ensure_written(&fs, &layout.adapters_dir())?;
         match cli.command {
             Command::Create { name } => cmd::create::run(&fs, &layout, &name),
-            Command::List => cmd::list::run(&fs, &layout),
+            Command::List { json } => cmd::list::run(&fs, &layout, json),
             Command::Delete { name } => cmd::delete::run(&fs, &layout, &name),
             Command::Use { name, project } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;
@@ -186,26 +202,26 @@ fn main() -> ExitCode {
                 let project_root = paths::resolve_project_root(&fs, project)?;
                 cmd::restore::run(&fs, &project_root)
             }
-            Command::Status { project } => {
+            Command::Status { project, json } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;
                 let aenv_home = paths::resolve_aenv_home()?;
-                cmd::status::run(&fs, &project_root, &aenv_home)
+                cmd::status::run(&fs, &project_root, &aenv_home, json)
             }
             Command::Adapter { action } => match action {
                 AdapterAction::Add { path } => cmd::adapter::run_add(&fs, &layout, &path),
-                AdapterAction::List => cmd::adapter::run_list(&fs, &layout),
+                AdapterAction::List { json } => cmd::adapter::run_list(&fs, &layout, json),
             },
-            Command::Get { spec } => {
+            Command::Get { spec, json } => {
                 let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
                     &fs,
                     &layout.adapters_dir(),
                 )?;
                 // Defer project-root resolution so `aenv get ns.param` works
                 // outside a project directory (no .aenv pin needed).
-                cmd::get::run(&fs, &layout, &adapters, None, &spec)
+                cmd::get::run(&fs, &layout, &adapters, None, &spec, json)
             }
             Command::Set { spec, value } => cmd::set::run(&fs, &layout, &spec, &value),
-            Command::Doctor { namespace } => {
+            Command::Doctor { namespace, json } => {
                 let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
                     &fs,
                     &layout.adapters_dir(),
@@ -214,11 +230,22 @@ fn main() -> ExitCode {
                 let project_root = paths::resolve_project_root(&fs, None)
                     .ok()
                     .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
-                cmd::doctor::run(&fs, &layout, &adapters, &project_root, namespace.as_deref())
+                cmd::doctor::run(
+                    &fs,
+                    &layout,
+                    &adapters,
+                    &project_root,
+                    namespace.as_deref(),
+                    json,
+                )
             }
-            Command::Which { path, project } => {
+            Command::Which {
+                path,
+                project,
+                json,
+            } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;
-                cmd::which::run(project_root, path)
+                cmd::which::run(project_root, path, json)
             }
             Command::Skill { action } => match action {
                 SkillAction::New { name, ns, adapter } => {
@@ -255,7 +282,9 @@ fn main() -> ExitCode {
                         pin.as_deref(),
                     )
                 }
-                SkillAction::List { ns } => cmd::skill::list::run(&fs, &layout, ns.as_deref()),
+                SkillAction::List { ns, json } => {
+                    cmd::skill::list::run(&fs, &layout, ns.as_deref(), json)
+                }
             },
             Command::Fork { target, project } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;

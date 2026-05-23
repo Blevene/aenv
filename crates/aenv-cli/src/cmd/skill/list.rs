@@ -6,7 +6,15 @@ use aenv_core::home::RegistryLayout;
 use aenv_core::manifest::AenvManifest;
 use aenv_core::skills::SkillMode;
 
-pub fn run<F: Filesystem>(fs: &F, layout: &RegistryLayout, ns_filter: Option<&str>) -> Result<()> {
+pub fn run<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    ns_filter: Option<&str>,
+    json: bool,
+) -> Result<()> {
+    if json {
+        todo!("aenv skill list --json lands in Task 9");
+    }
     let envs_dir = layout.namespaces_dir();
     let namespaces: Vec<String> = if !fs.exists(&envs_dir)? {
         Vec::new()

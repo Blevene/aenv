@@ -20,7 +20,11 @@ pub fn run<F: Filesystem>(
     adapters: &AdapterRegistry,
     project_root: &Path,
     ns_arg: Option<&str>,
+    json: bool,
 ) -> Result<()> {
+    if json {
+        todo!("aenv doctor --json lands in Task 11");
+    }
     // Determine the leaf namespace name.
     let leaf_name: String = match ns_arg {
         Some(name) => name.to_string(),

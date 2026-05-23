@@ -54,7 +54,11 @@ pub fn run<F: Filesystem>(
     adapters: &AdapterRegistry,
     project_root_hint: Option<&Path>,
     spec: &str,
+    json: bool,
 ) -> Result<()> {
+    if json {
+        todo!("aenv get --json lands in Task 10");
+    }
     let (ns_opt, param) = parse_spec(spec)?;
 
     // Resolve the leaf namespace name.

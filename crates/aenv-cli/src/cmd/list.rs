@@ -5,7 +5,10 @@ use aenv_core::home::RegistryLayout;
 use aenv_core::namespace::list_namespaces;
 use aenv_core::Result;
 
-pub fn run<F: Filesystem>(fs: &F, layout: &RegistryLayout) -> Result<()> {
+pub fn run<F: Filesystem>(fs: &F, layout: &RegistryLayout, json: bool) -> Result<()> {
+    if json {
+        todo!("aenv list --json lands in Task 9");
+    }
     let names = list_namespaces(fs, layout)?;
     if names.is_empty() {
         println!("No namespaces in registry at {}", layout.root().display());
