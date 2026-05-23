@@ -16,11 +16,16 @@ use std::collections::BTreeMap;
 ///
 /// `extends` lists parent namespaces to inherit from. Pass `&[]` for a
 /// standalone namespace (the common case for `aenv create <name>` with no flag).
+///
+/// `adapter_names` seeds empty `[adapters.<name>]` blocks in the manifest.
+/// The caller is responsible for validating that these names are installed;
+/// this function trusts the slice (Option 1 / CLI-layer validation).
 pub fn create_namespace<F: Filesystem>(
     fs: &F,
     layout: &RegistryLayout,
     name: &str,
     extends: &[String],
+    adapter_names: &[String],
 ) -> Result<()> {
     let manifest_path = layout.manifest_path(name);
     if fs.exists(&manifest_path)? {
@@ -30,6 +35,12 @@ pub fn create_namespace<F: Filesystem>(
     }
     let mut manifest = AenvManifest::default_for(name);
     manifest.extends = extends.to_vec();
+    for adapter_name in adapter_names {
+        manifest.adapters.insert(
+            adapter_name.clone(),
+            crate::manifest::AdapterEntry::default(),
+        );
+    }
     fs.write(&manifest_path, manifest.to_toml().as_bytes())?;
     Ok(())
 }

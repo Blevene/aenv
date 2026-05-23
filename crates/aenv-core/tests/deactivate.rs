@@ -30,7 +30,7 @@ fn registry_with_claude() -> AdapterRegistry {
 
 fn setup_namespace(fs: &MockFilesystem, ns: &str, body: &[u8]) {
     let layout = layout();
-    create_namespace(fs, &layout, ns, &[]).unwrap();
+    create_namespace(fs, &layout, ns, &[], &[]).unwrap();
     fs.write(
         &layout.manifest_path(ns),
         format!("name = \"{ns}\"\n\n[adapters.claude-code]\nfiles = [\"CLAUDE.md\"]\n").as_bytes(),

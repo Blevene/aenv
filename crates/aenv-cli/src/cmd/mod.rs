@@ -14,5 +14,6 @@ pub mod restore;
 pub mod set;
 pub mod skill;
 pub mod status;
+pub mod unpin;
 pub mod use_;
 pub mod which;
