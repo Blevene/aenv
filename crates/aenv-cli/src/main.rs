@@ -108,6 +108,8 @@ enum Command {
         /// Namespace to evaluate (defaults to the active project's pinned namespace).
         namespace: Option<String>,
         #[arg(long)]
+        project: Option<PathBuf>,
+        #[arg(long)]
         json: bool,
     },
     /// Detach a file (or whole project) from namespace management.
@@ -232,15 +234,23 @@ fn main() -> ExitCode {
                 cmd::get::run(&fs, &layout, &adapters, None, &spec, json)
             }
             Command::Set { spec, value } => cmd::set::run(&fs, &layout, &spec, &value),
-            Command::Doctor { namespace, json } => {
+            Command::Doctor {
+                namespace,
+                project,
+                json,
+            } => {
                 let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
                     &fs,
                     &layout.adapters_dir(),
                 )?;
-                // Resolve project root best-effort; used only when ns_arg is None.
-                let project_root = paths::resolve_project_root(&fs, None)
-                    .ok()
-                    .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+                // Resolve project root only when needed (namespace arg absent).
+                // When an explicit namespace is given, project root is irrelevant;
+                // avoid failing with ProjectNotPinned for the explicit-ns form.
+                let project_root = if namespace.is_some() && project.is_none() {
+                    std::env::current_dir().map_err(aenv_core::AenvError::Io)?
+                } else {
+                    paths::resolve_project_root(&fs, project)?
+                };
                 cmd::doctor::run(
                     &fs,
                     &layout,
