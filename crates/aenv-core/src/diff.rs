@@ -12,9 +12,14 @@ use crate::error::Result;
 use crate::fs::{FileKind, Filesystem};
 use crate::home::RegistryLayout;
 use crate::identity::NamespaceId;
-use crate::json::diff::{DriftReport, DriftedFile};
+use crate::json::diff::{
+    DriftReport, DriftedFile, NamedValue, SetDiff, StructuralDiff, ValueChange, ValueDiff,
+};
+use crate::manifest::AenvManifest;
 use crate::materialize::compute_material_set;
-use crate::resolve::MaterializeStrategy;
+use crate::parameters::{ParameterValue, ResolvedParameter};
+use crate::policies::{PolicyValue, ResolvedPolicy};
+use crate::resolve::{resolve_namespace, MaterializeStrategy};
 use crate::state::ActivationState;
 
 /// Detect project drift. Returns an empty `DriftReport.drifted` if the
@@ -114,4 +119,199 @@ fn diff_summary(on_disk: &[u8], expected: &[u8]) -> String {
         on_disk_lines,
         exp_lines
     )
+}
+
+// ---- Task 13: structural diff ----
+
+/// Structural diff between two namespaces. Compares their resolved
+/// skills, parameters, policies, and instructions-section headers.
+pub fn structural<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    adapters: &AdapterRegistry,
+    a: &str,
+    b: &str,
+) -> Result<StructuralDiff> {
+    let a_id = NamespaceId::new(a)?;
+    let b_id = NamespaceId::new(b)?;
+    let a_res = resolve_namespace(fs, layout, adapters, &a_id)?;
+    let b_res = resolve_namespace(fs, layout, adapters, &b_id)?;
+
+    // Skill rosters: union of skills declared in each leaf's manifest,
+    // keyed by qualified short-name. Agents always empty today (no
+    // [[agents]] table in manifests yet).
+    let a_skills = manifest_skill_qnames(fs, layout, a)?;
+    let b_skills = manifest_skill_qnames(fs, layout, b)?;
+    let skills = set_diff(&a_skills, &b_skills);
+    let agents = SetDiff::default();
+
+    let parameters = value_diff_params(&a_res.parameters, &b_res.parameters);
+    let policies = value_diff_policies(&a_res.policies, &b_res.policies);
+
+    let a_sections = instruction_section_headers(fs, layout, adapters, &a_id)?;
+    let b_sections = instruction_section_headers(fs, layout, adapters, &b_id)?;
+    let instructions_sections = set_diff(&a_sections, &b_sections);
+
+    Ok(StructuralDiff {
+        a: a.to_string(),
+        b: b.to_string(),
+        skills,
+        agents,
+        parameters,
+        policies,
+        instructions_sections,
+    })
+}
+
+fn manifest_skill_qnames<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    ns: &str,
+) -> Result<Vec<String>> {
+    let bytes = fs.read(&layout.manifest_path(ns))?;
+    let text = String::from_utf8(bytes)
+        .map_err(|e| crate::AenvError::ManifestInvalid(format!("manifest utf-8: {e}")))?;
+    let m = AenvManifest::from_toml(&text)?;
+    Ok(m.skills
+        .iter()
+        .map(|s| format!("{ns}::{}", s.name))
+        .collect())
+}
+
+fn instruction_section_headers<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    adapters: &AdapterRegistry,
+    id: &NamespaceId,
+) -> Result<Vec<String>> {
+    let mat = compute_material_set(fs, layout, adapters, id)?;
+    let mut headers: Vec<String> = Vec::new();
+    for (path, content) in &mat.entries {
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        let is_instructions = name == "claude.md" || name.ends_with(".mdc");
+        if !is_instructions {
+            continue;
+        }
+        if let Ok(s) = std::str::from_utf8(content) {
+            for line in s.lines() {
+                if let Some(rest) = line.strip_prefix("## ") {
+                    headers.push(rest.trim().to_string());
+                }
+            }
+        }
+    }
+    headers.sort();
+    headers.dedup();
+    Ok(headers)
+}
+
+fn set_diff(a: &[String], b: &[String]) -> SetDiff {
+    let a_set: std::collections::BTreeSet<&str> = a.iter().map(String::as_str).collect();
+    let b_set: std::collections::BTreeSet<&str> = b.iter().map(String::as_str).collect();
+    SetDiff {
+        added: b_set.difference(&a_set).map(|s| (*s).to_string()).collect(),
+        removed: a_set.difference(&b_set).map(|s| (*s).to_string()).collect(),
+        common: a_set
+            .intersection(&b_set)
+            .map(|s| (*s).to_string())
+            .collect(),
+    }
+}
+
+fn value_diff_params(
+    a: &std::collections::BTreeMap<String, ResolvedParameter>,
+    b: &std::collections::BTreeMap<String, ResolvedParameter>,
+) -> ValueDiff {
+    let to_json = |v: &ParameterValue| -> serde_json::Value {
+        match v {
+            ParameterValue::String(s) => serde_json::Value::String(s.clone()),
+            ParameterValue::Integer(i) => serde_json::Value::Number((*i).into()),
+            ParameterValue::Boolean(b) => serde_json::Value::Bool(*b),
+            ParameterValue::ListString(xs) => serde_json::Value::Array(
+                xs.iter()
+                    .map(|s| serde_json::Value::String(s.clone()))
+                    .collect(),
+            ),
+        }
+    };
+    let mut added = Vec::new();
+    let mut removed = Vec::new();
+    let mut changed = Vec::new();
+    for (k, va) in a {
+        match b.get(k) {
+            None => removed.push(NamedValue {
+                name: k.clone(),
+                value: to_json(&va.value),
+            }),
+            Some(vb) if vb.value != va.value => changed.push(ValueChange {
+                name: k.clone(),
+                a: to_json(&va.value),
+                b: to_json(&vb.value),
+            }),
+            _ => {}
+        }
+    }
+    for (k, vb) in b {
+        if !a.contains_key(k) {
+            added.push(NamedValue {
+                name: k.clone(),
+                value: to_json(&vb.value),
+            });
+        }
+    }
+    ValueDiff {
+        added,
+        removed,
+        changed,
+    }
+}
+
+fn value_diff_policies(
+    a: &std::collections::BTreeMap<String, ResolvedPolicy>,
+    b: &std::collections::BTreeMap<String, ResolvedPolicy>,
+) -> ValueDiff {
+    let to_json = |v: &PolicyValue| -> serde_json::Value {
+        match v {
+            PolicyValue::Integer(i) => serde_json::Value::Number((*i).into()),
+            PolicyValue::Boolean(b) => serde_json::Value::Bool(*b),
+            PolicyValue::ListString(xs) => serde_json::Value::Array(
+                xs.iter()
+                    .map(|s| serde_json::Value::String(s.clone()))
+                    .collect(),
+            ),
+        }
+    };
+    let mut added = Vec::new();
+    let mut removed = Vec::new();
+    let mut changed = Vec::new();
+    for (k, va) in a {
+        match b.get(k) {
+            None => removed.push(NamedValue {
+                name: k.clone(),
+                value: to_json(&va.value),
+            }),
+            Some(vb) if vb.value != va.value => changed.push(ValueChange {
+                name: k.clone(),
+                a: to_json(&va.value),
+                b: to_json(&vb.value),
+            }),
+            _ => {}
+        }
+    }
+    for (k, vb) in b {
+        if !a.contains_key(k) {
+            added.push(NamedValue {
+                name: k.clone(),
+                value: to_json(&vb.value),
+            });
+        }
+    }
+    ValueDiff {
+        added,
+        removed,
+        changed,
+    }
 }
