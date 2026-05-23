@@ -1,11 +1,11 @@
 # Functional Spec: aenv
 
 **Companion to:** PRD v0.1
-**Version:** v0.4
+**Version:** v0.5
 **Status:** Draft
 **Last updated:** 2026-05-23
 
-_v0.4: alignment pass against shipped Phase 5 behavior (Tasks A + B + C). See git log for details._
+_v0.5: adds `aenv unpin` command and `--adapter` flag on `aenv create` (shipped at a5a21b2)._
 
 This document describes how `aenv` behaves from a user's perspective. It walks through three concrete harness configurations — *experiments*, *detailed execution*, and *analyst* — and shows how each is composed, activated, and used. Where the PRD says "the system shall," this spec says "the user types this and sees that."
 
@@ -299,23 +299,26 @@ $ aenv init-shell zsh >> ~/.zshrc
 $ source ~/.zshrc
 
 # Create the base env
-$ aenv create base
+$ aenv create base --adapter claude-code
 Created namespace 'base' at ~/.aenv/envs/base/
 $ aenv edit base
 # (opens ~/.aenv/envs/base/ in $EDITOR)
 
-# Create the three harnesses
-$ aenv create experiments --extends base
-$ aenv create detailed-execution --extends base
-$ aenv create analyst --extends base
+# Create the three harnesses — --adapter seeds the adapter block in the manifest
+# and validates the name against the installed adapter registry.
+$ aenv create experiments --extends base --adapter claude-code
+$ aenv create detailed-execution --extends base --adapter claude-code
+$ aenv create analyst --extends base --adapter claude-code
 
 $ aenv list
 NAME                EXTENDS    ADAPTERS
-base                -          claude, cursor
-experiments         base       claude, cursor, mcp
-detailed-execution  base       claude, cursor, mcp
-analyst             base       claude, cursor, mcp
+base                -          claude-code
+experiments         base       claude-code
+detailed-execution  base       claude-code
+analyst             base       claude-code
 ```
+
+Each created manifest starts with an empty `[adapters.claude-code] files = []` block, ready to be filled in. Unknown adapter names exit with code 11 (AdapterMissing) before any file is written.
 
 ### 5.2 Pinning a project
 
@@ -339,6 +342,18 @@ Backed up 1 file(s):
 ```
 
 The existing `CLAUDE.md` was backed up before the symlink was created. The user can `aenv restore` to get it back.
+
+#### Unpinning a project
+
+To fully disengage `aenv` from a project, use `aenv unpin`. If a namespace is currently active, the deactivate flow runs first (scrubbing managed files and `.aenv-state/`); then the `.aenv` pin file is removed. On a project with no pin, it's a no-op that exits 0.
+
+```bash
+$ aenv unpin
+Deactivated namespace in /home/user/code/payments-api
+Unpinned /home/user/code/payments-api (was 'detailed-execution').
+```
+
+`--project <path>` is accepted for scripted use without `cd`.
 
 ### 5.3 Switching harnesses on the same project
 
@@ -894,11 +909,12 @@ Note what's *not* there: no parsing of human output, no assumptions about the sh
 | Command | Purpose |
 |---|---|
 | `aenv init-shell <bash\|zsh\|fish>` | Print shell hook for sourcing in rc file |
-| `aenv create <name> [--extends <name>...]` | Create a new namespace |
+| `aenv create <name> [--extends <name>...] [--adapter <name>...]` | Create a new namespace; `--adapter` seeds an empty adapter block and validates against the installed adapter registry (exit 11 on unknown name) |
 | `aenv delete <name>` | Delete a namespace from the registry |
 | `aenv list [--json]` | List all namespaces (3-column: NAME / EXTENDS / ADAPTERS) |
 | `aenv edit <name>` | Open namespace directory in `$EDITOR` |
 | `aenv use <name> [--project <path>]` | Write the `.aenv` pin (metadata only; does not activate) |
+| `aenv unpin [--project <path>]` | Remove `.aenv` pin. Auto-deactivates if currently active. |
 | `aenv activate [<name>] [--project <path>]` | Materialize the pinned namespace (or a named one) into a project |
 | `aenv deactivate [--project <path>]` | Remove all materialized files, restore backups |
 | `aenv restore [--project <path>]` | Restore most recent backup set |
