@@ -64,5 +64,11 @@ pub fn deactivate_namespace<F: Filesystem>(fs: &F, project_root: &Path) -> Resul
     // Remove the state file last — its presence is the signal that there's
     // anything to deactivate.
     fs.remove_file(&state_path)?;
+
+    // Best-effort: if the state directory is now empty, remove it too.
+    // Ignore the error — a non-empty directory (user files, stale backup) is fine to leave.
+    let state_dir = project_root.join(".aenv-state");
+    let _ = std::fs::remove_dir(&state_dir);
+
     Ok(())
 }
