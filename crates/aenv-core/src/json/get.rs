@@ -1,5 +1,6 @@
 //! Schema for `aenv get --json`. Matches functional spec §7.1 example.
 
+use crate::parameters::{ParameterValue, ResolvedParameter};
 use serde::Serialize;
 
 /// JSON shape for `aenv get <param> --json`.
@@ -22,4 +23,41 @@ pub struct InheritanceEntry {
     pub namespace: String,
     /// Value declared by this namespace.
     pub value: serde_json::Value,
+}
+
+impl GetReport {
+    /// Build a `GetReport` for one parameter from its `ResolvedParameter`
+    /// (the effective value + source namespace) and the inheritance chain
+    /// (list of `(namespace_name, value_at_that_namespace)` in chain order).
+    pub fn build(
+        parameter: String,
+        rp: &ResolvedParameter,
+        inheritance: Vec<(String, ParameterValue)>,
+    ) -> Self {
+        GetReport {
+            parameter,
+            value: param_value_to_json(&rp.value),
+            source_namespace: rp.source.as_str().to_string(),
+            inheritance_chain: inheritance
+                .into_iter()
+                .map(|(ns, v)| InheritanceEntry {
+                    namespace: ns,
+                    value: param_value_to_json(&v),
+                })
+                .collect(),
+        }
+    }
+}
+
+fn param_value_to_json(v: &ParameterValue) -> serde_json::Value {
+    match v {
+        ParameterValue::String(s) => serde_json::Value::String(s.clone()),
+        ParameterValue::Integer(i) => serde_json::Value::Number((*i).into()),
+        ParameterValue::Boolean(b) => serde_json::Value::Bool(*b),
+        ParameterValue::ListString(xs) => serde_json::Value::Array(
+            xs.iter()
+                .map(|s| serde_json::Value::String(s.clone()))
+                .collect(),
+        ),
+    }
 }

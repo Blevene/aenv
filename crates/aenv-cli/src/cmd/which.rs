@@ -66,9 +66,6 @@ fn render_strategy(s: MaterializeStrategy) -> String {
 
 /// Entry point for `aenv which <path>`.
 pub fn run(project_root: PathBuf, query: PathBuf, json: bool) -> aenv_core::Result<()> {
-    if json {
-        todo!("aenv which --json lands in Task 10");
-    }
     let state_path = project_root.join(".aenv-state/state.json");
     let body = match std::fs::read(&state_path) {
         Ok(b) => b,
@@ -80,6 +77,27 @@ pub fn run(project_root: PathBuf, query: PathBuf, json: bool) -> aenv_core::Resu
     let text = String::from_utf8(body)
         .map_err(|e| aenv_core::AenvError::ManifestInvalid(format!("state.json: {e}")))?;
     let state = ActivationState::from_json(&text)?;
+
+    if json {
+        let mf = state
+            .managed_files
+            .iter()
+            .find(|m| m.path == query)
+            .ok_or_else(|| {
+                aenv_core::AenvError::ActivationConflict(format!(
+                    "path {} is not managed by the active namespace",
+                    query.display()
+                ))
+            })?;
+        let report = aenv_core::json::WhichReport::from_managed_file(mf);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&report)
+                .map_err(|e| aenv_core::AenvError::ManifestInvalid(format!("json: {e}")))?
+        );
+        return Ok(());
+    }
+
     let out = format_which(&state, &query).map_err(aenv_core::AenvError::ActivationConflict)?;
     print!("{out}");
     Ok(())

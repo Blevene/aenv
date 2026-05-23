@@ -83,3 +83,40 @@ fn skill_entry_shape_is_stable() {
     };
     insta::assert_json_snapshot!(e);
 }
+
+#[test]
+fn which_report_shape_is_stable() {
+    use aenv_core::json::WhichReport;
+    let r = WhichReport {
+        path: std::path::PathBuf::from(".claude/skills/write-tests/SKILL.md"),
+        qualified_name: "leaf::write-tests".into(),
+        short_name: "write-tests".into(),
+        provided_by_namespace: Some("leaf".into()),
+        strategy: "symlink".into(),
+        merge_kind: None,
+        contributors: vec![],
+        shadows: vec!["base::write-tests".into()],
+    };
+    insta::assert_json_snapshot!(r);
+}
+
+#[test]
+fn get_report_shape_is_stable() {
+    use aenv_core::json::get::{GetReport, InheritanceEntry};
+    let r = GetReport {
+        parameter: "default_model".into(),
+        value: serde_json::json!("claude-opus-4.7"),
+        source_namespace: "leaf".into(),
+        inheritance_chain: vec![
+            InheritanceEntry {
+                namespace: "base".into(),
+                value: serde_json::json!("claude-sonnet-4.6"),
+            },
+            InheritanceEntry {
+                namespace: "leaf".into(),
+                value: serde_json::json!("claude-opus-4.7"),
+            },
+        ],
+    };
+    insta::assert_json_snapshot!(r);
+}

@@ -6,7 +6,9 @@ use aenv_core::adapter::AdapterRegistry;
 use aenv_core::error::{AenvError, Result};
 use aenv_core::fs::Filesystem;
 use aenv_core::home::RegistryLayout;
+use aenv_core::identity::NamespaceId;
 use aenv_core::manifest::AenvManifest;
+use aenv_core::parameters::ParameterValue;
 use aenv_core::resolve::resolve_namespace;
 use aenv_core::state::ActivationState;
 use std::path::{Path, PathBuf};
@@ -43,6 +45,33 @@ fn parse_spec(spec: &str) -> Result<(Option<&str>, &str)> {
     }
 }
 
+/// Returns each namespace in the chain that declared `param`, in chain order
+/// (root → leaf), with the value it declared.
+fn gather_inheritance_chain<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    chain: &[NamespaceId],
+    param: &str,
+) -> Vec<(String, ParameterValue)> {
+    let mut out: Vec<(String, ParameterValue)> = Vec::new();
+    for ns in chain {
+        let manifest_path = layout.manifest_path(ns.as_str());
+        let Ok(bytes) = fs.read(&manifest_path) else {
+            continue;
+        };
+        let Ok(text) = String::from_utf8(bytes) else {
+            continue;
+        };
+        let Ok(manifest) = AenvManifest::from_toml(&text) else {
+            continue;
+        };
+        if let Some(pv) = manifest.parameters.get(param) {
+            out.push((ns.as_str().to_string(), pv.clone()));
+        }
+    }
+    out
+}
+
 /// Run `aenv get <spec>`.
 ///
 /// `project_root_hint` is only consulted when `spec` starts with `.` (active-project form).
@@ -56,9 +85,6 @@ pub fn run<F: Filesystem>(
     spec: &str,
     json: bool,
 ) -> Result<()> {
-    if json {
-        todo!("aenv get --json lands in Task 10");
-    }
     let (ns_opt, param) = parse_spec(spec)?;
 
     // Resolve the leaf namespace name.
@@ -96,36 +122,31 @@ pub fn run<F: Filesystem>(
         .get(param)
         .ok_or_else(|| AenvError::ParameterUndefined(format!("{leaf_name}.{param}")))?;
 
+    // Build the inheritance chain (used by both JSON and text paths).
+    let inheritance = gather_inheritance_chain(fs, layout, &rr.chain, param);
+
+    if json {
+        let report = aenv_core::json::GetReport::build(param.to_string(), rp, inheritance);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&report)
+                .map_err(|e| AenvError::ManifestInvalid(format!("json: {e}")))?
+        );
+        return Ok(());
+    }
+
     // Line 1: value.
     println!("{}", rp.value);
 
-    // Line 2: provenance.
+    // Line 2: provenance (text mode).
     let source_str = rp.source.as_str();
-    let chain = &rr.chain;
 
-    // Find the position of source in the chain.
-    let source_pos = chain.iter().position(|n| n.as_str() == source_str);
-
-    // Find the latest namespace BEFORE source that also declared this param,
-    // by re-reading each earlier manifest.
-    let prior_info: Option<(String, String)> = if let Some(spos) = source_pos {
-        let mut found: Option<(String, String)> = None;
-        for ns in &chain[..spos] {
-            let manifest_path = layout.manifest_path(ns.as_str());
-            if let Ok(bytes) = fs.read(&manifest_path) {
-                if let Ok(text) = String::from_utf8(bytes) {
-                    if let Ok(manifest) = AenvManifest::from_toml(&text) {
-                        if let Some(pv) = manifest.parameters.get(param) {
-                            found = Some((ns.as_str().to_string(), pv.to_string()));
-                        }
-                    }
-                }
-            }
-        }
-        found
-    } else {
-        None
-    };
+    // Find the latest namespace BEFORE source that also declared this param.
+    // Using the inheritance chain: the entry just before the source entry (if any).
+    let source_pos_in_chain = inheritance.iter().position(|(ns, _)| ns == source_str);
+    let prior_info: Option<(&str, &ParameterValue)> = source_pos_in_chain
+        .and_then(|spos| inheritance[..spos].last())
+        .map(|(ns, v)| (ns.as_str(), v));
 
     // Determine provenance message.
     let provenance = if source_str == leaf_name {
