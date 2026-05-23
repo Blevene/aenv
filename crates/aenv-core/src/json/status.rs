@@ -2,6 +2,8 @@
 
 use crate::parameters::ResolvedParameter;
 use crate::policies::ResolvedPolicy;
+use crate::resolve::{DeepMergeFormat, MaterializeStrategy, ResolutionResult};
+use crate::state::{ActivationState, ManagedFile};
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -85,4 +87,89 @@ pub struct BackedUpJson {
     pub path: PathBuf,
     /// Path where the backup was written.
     pub backup: PathBuf,
+}
+
+impl StatusReport {
+    /// Build a `StatusReport` from a project's `ActivationState` plus the
+    /// freshly-computed resolution and hash. `hash` is the
+    /// `sha256-v1:<hex>` string from `hash::hash_resolved_namespace`.
+    pub fn build(
+        project_root: PathBuf,
+        state: &ActivationState,
+        resolution: &ResolutionResult,
+        hash: String,
+    ) -> Self {
+        StatusReport {
+            project: project_root,
+            active_namespace: Some(state.active_namespace.clone()),
+            resolution_chain: resolution
+                .chain
+                .iter()
+                .map(|n| n.as_str().to_string())
+                .collect(),
+            resolved_hash: Some(hash),
+            resolved_hash_v2: None,
+            parameters: resolution.parameters.clone(),
+            policies: resolution.policies.clone(),
+            managed_files: state
+                .managed_files
+                .iter()
+                .map(ManagedFileJson::from)
+                .collect(),
+            backed_up: state
+                .backed_up
+                .iter()
+                .map(|b| BackedUpJson {
+                    path: b.original_path.clone(),
+                    backup: b.backup_path.clone(),
+                })
+                .collect(),
+            warnings: state.warnings.clone(),
+        }
+    }
+
+    /// Build a `StatusReport` for a project that has no active namespace.
+    pub fn unpinned(project_root: PathBuf) -> Self {
+        StatusReport {
+            project: project_root,
+            ..Default::default()
+        }
+    }
+}
+
+impl From<&ManagedFile> for ManagedFileJson {
+    fn from(mf: &ManagedFile) -> Self {
+        let (strategy_str, merge_kind) = match mf.strategy {
+            MaterializeStrategy::Symlink => ("symlink", None),
+            MaterializeStrategy::Identical => ("identical", None),
+            MaterializeStrategy::Copy => ("copy", None),
+            MaterializeStrategy::SectionMerge => ("section-merge", None),
+            MaterializeStrategy::DeepMerge(DeepMergeFormat::Json) => ("deep-merge", Some("json")),
+            MaterializeStrategy::DeepMerge(DeepMergeFormat::Yaml) => ("deep-merge", Some("yaml")),
+            MaterializeStrategy::DeepMerge(DeepMergeFormat::Toml) => ("deep-merge", Some("toml")),
+            MaterializeStrategy::Merged => ("merged", None),
+        };
+        let provided_by = if mf.qualified_name.namespace().as_str()
+            == crate::identity::NamespaceId::RESERVED_MERGED
+        {
+            None
+        } else {
+            Some(mf.qualified_name.namespace().as_str().to_string())
+        };
+        ManagedFileJson {
+            path: mf.path.clone(),
+            qualified_name: mf.qualified_name.to_string(),
+            short_name: mf.qualified_name.short().as_str().to_string(),
+            provided_by_namespace: provided_by,
+            strategy: strategy_str.to_string(),
+            merge_kind: merge_kind.map(str::to_string),
+            contributors: mf.contributors.iter().map(ToString::to_string).collect(),
+            shadows: mf.shadows.iter().map(ToString::to_string).collect(),
+            skill_provenance: mf.skill_provenance.as_ref().map(|p| SkillProvenanceJson {
+                source: p.source.clone(),
+                resolved_ref: p.resolved_ref.clone(),
+                resolved_hash: p.resolved_hash.clone(),
+            }),
+        }
+    }
 }

@@ -150,12 +150,18 @@ fn describe(mf: &ManagedFile) -> String {
 }
 
 pub fn run<F: Filesystem>(fs: &F, project_root: &Path, aenv_home: &Path, json: bool) -> Result<()> {
-    if json {
-        todo!("aenv status --json lands in Task 8");
-    }
     let state_path = project_root.join(".aenv-state/state.json");
     if !fs.exists(&state_path)? {
-        println!("No active namespace in {}", project_root.display());
+        if json {
+            let report = aenv_core::json::StatusReport::unpinned(project_root.to_path_buf());
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report)
+                    .map_err(|e| aenv_core::AenvError::ManifestInvalid(format!("json: {e}")))?
+            );
+        } else {
+            println!("No active namespace in {}", project_root.display());
+        }
         return Ok(());
     }
     let bytes = fs.read(&state_path)?;
@@ -163,12 +169,28 @@ pub fn run<F: Filesystem>(fs: &F, project_root: &Path, aenv_home: &Path, json: b
         .map_err(|e| aenv_core::AenvError::ManifestInvalid(format!("state.json: {e}")))?;
     let state = ActivationState::from_json(&text)?;
 
-    // Re-resolve the chain
     let registry = aenv_core::home::RegistryLayout::new(aenv_home.to_path_buf());
     let adapters =
         aenv_core::adapter::AdapterRegistry::load_from_dir(fs, &registry.adapters_dir())?;
     let leaf = NamespaceId::new(state.active_namespace.as_str())?;
     let resolution = aenv_core::resolve::resolve_namespace(fs, &registry, &adapters, &leaf)?;
+
+    if json {
+        let mat = aenv_core::materialize::compute_material_set(fs, &registry, &adapters, &leaf)?;
+        let hash = aenv_core::hash::hash_resolved_namespace(&mat);
+        let report = aenv_core::json::StatusReport::build(
+            project_root.to_path_buf(),
+            &state,
+            &resolution,
+            hash,
+        );
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&report)
+                .map_err(|e| aenv_core::AenvError::ManifestInvalid(format!("json: {e}")))?
+        );
+        return Ok(());
+    }
 
     print!("{}", format_status(&state, &resolution.chain));
     Ok(())

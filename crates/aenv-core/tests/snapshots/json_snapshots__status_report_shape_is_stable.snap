@@ -1,0 +1,23 @@
+---
+source: crates/aenv-core/tests/json_snapshots.rs
+assertion_line: 35
+expression: report
+---
+{
+  "project": "/proj",
+  "active_namespace": "solo",
+  "resolution_chain": [
+    "solo"
+  ],
+  "resolved_hash": "sha256-v1:0000000000000000000000000000000000000000000000000000000000000000",
+  "managed_files": [
+    {
+      "path": "CLAUDE.md",
+      "qualified_name": "solo::CLAUDE.md",
+      "short_name": "CLAUDE.md",
+      "provided_by_namespace": "solo",
+      "strategy": "symlink"
+    }
+  ],
+  "backed_up": []
+}
