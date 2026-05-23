@@ -5,7 +5,8 @@
 //! activation would write, without touching the project filesystem.
 //! Section-merged and deep-merged artifacts are produced by the same
 //! merge primitives activation uses; symlinked artifacts contribute the
-//! source file's raw bytes.
+//! source file's raw bytes. `Copy` and `Merged` strategies fail with
+//! `ActivationConflict`, mirroring the hard errors activation produces.
 //!
 //! This is the input to `hash::hash_resolved_namespace`.
 
@@ -73,13 +74,16 @@ fn materialize_one_in_memory<F: Filesystem>(
     strategy: MaterializeStrategy,
 ) -> Result<Vec<u8>> {
     match strategy {
-        MaterializeStrategy::Symlink
-        | MaterializeStrategy::Identical
-        | MaterializeStrategy::Copy
-        | MaterializeStrategy::Merged => {
+        MaterializeStrategy::Symlink | MaterializeStrategy::Identical => {
             let winner = candidates.last().expect("at least one candidate");
             fs.read(&winner.source_path).map_err(AenvError::from)
         }
+        MaterializeStrategy::Copy => Err(AenvError::ActivationConflict(
+            "Copy strategy is Phase 7 (Windows fallback); not supported in Phase 2".into(),
+        )),
+        MaterializeStrategy::Merged => Err(AenvError::ActivationConflict(
+            "Phase 1 'Merged' variant should not be produced by Phase 2".into(),
+        )),
         MaterializeStrategy::SectionMerge => {
             let bodies = read_all_as_strings(fs, candidates)?;
             let merged = crate::merge::section::merge_sections(&bodies);
