@@ -20,6 +20,7 @@ pub mod hash;
 pub mod home;
 pub mod identity;
 pub mod jcs;
+pub mod json;
 pub mod manifest;
 pub mod materialize;
 pub mod merge;
