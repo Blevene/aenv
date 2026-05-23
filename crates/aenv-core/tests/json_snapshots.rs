@@ -184,3 +184,18 @@ fn structural_diff_shape_is_stable() {
     };
     insta::assert_json_snapshot!(d);
 }
+
+#[test]
+fn skill_entry_omits_adapter_when_none() {
+    let e = aenv_core::json::SkillEntry {
+        namespace: "leaf".into(),
+        qualified_name: "leaf::stub".into(),
+        short_name: "stub".into(),
+        adapter: None,
+        mode: "authored".into(),
+        source: None,
+        pin: None,
+        required: false,
+    };
+    insta::assert_json_snapshot!(e);
+}

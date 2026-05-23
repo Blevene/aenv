@@ -1,0 +1,12 @@
+---
+source: crates/aenv-core/tests/json_snapshots.rs
+assertion_line: 200
+expression: e
+---
+{
+  "namespace": "leaf",
+  "qualified_name": "leaf::stub",
+  "short_name": "stub",
+  "mode": "authored",
+  "required": false
+}

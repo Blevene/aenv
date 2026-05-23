@@ -12,6 +12,7 @@ pub struct SkillEntry {
     /// Short name of the skill (without namespace prefix).
     pub short_name: String,
     /// Adapter this skill belongs to, if any.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub adapter: Option<String>,
     /// `authored` or `imported`.
     pub mode: String,
