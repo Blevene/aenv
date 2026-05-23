@@ -1,8 +1,11 @@
 # Functional Spec: aenv
 
 **Companion to:** PRD v0.1
+**Version:** v0.4
 **Status:** Draft
-**Last updated:** 2026-05-19
+**Last updated:** 2026-05-23
+
+_v0.4: alignment pass against shipped Phase 5 behavior (Tasks A + B + C). See git log for details._
 
 This document describes how `aenv` behaves from a user's perspective. It walks through three concrete harness configurations — *experiments*, *detailed execution*, and *analyst* — and shows how each is composed, activated, and used. Where the PRD says "the system shall," this spec says "the user types this and sees that."
 
@@ -316,19 +319,23 @@ analyst             base       claude, cursor, mcp
 
 ### 5.2 Pinning a project
 
+Pinning (`aenv use`) and activation (`aenv activate`) are two steps so the failure model is clean — pinning is metadata-only and always succeeds; activation can fail and rollback on enforce-policy violations or filesystem conflicts.
+
 ```bash
 $ cd ~/code/payments-api
 $ aenv use detailed-execution
-Pinned ~/code/payments-api to namespace 'detailed-execution'
-Activating...
-  + CLAUDE.md                                  (from detailed-execution)
-  + .claude/skills/write-tests/SKILL.md        (from detailed-execution)
-  + .claude/skills/match-conventions/SKILL.md  (from detailed-execution)
-  + .claude/agents/code-reviewer.md            (from detailed-execution)
-  + .cursorrules                                (from detailed-execution)
-  + .mcp.json                                   (merged from base + detailed-execution)
-Backed up 1 file to .aenv-state/backup/2026-05-19T14-22-03/
-  - CLAUDE.md (original preserved)
+Pinned /home/user/code/payments-api to namespace 'detailed-execution'
+
+$ aenv activate
+Activated 'detailed-execution' in /home/user/code/payments-api
+  + CLAUDE.md (SectionMerge)
+  + .claude/skills/write-tests/SKILL.md (Symlink)
+  + .claude/skills/match-conventions/SKILL.md (Symlink)
+  + .claude/agents/code-reviewer.md (Symlink)
+  + .cursorrules (Symlink)
+  + .mcp.json (DeepMerge)
+Backed up 1 file(s):
+  - CLAUDE.md -> .aenv-state/backup/2026-05-19T14-22-03/CLAUDE.md
 ```
 
 The existing `CLAUDE.md` was backed up before the symlink was created. The user can `aenv restore` to get it back.
@@ -349,14 +356,14 @@ The user finishes a careful implementation. Now they want to explore a refactor 
 
 ```bash
 $ aenv use experiments
-Deactivating 'detailed-execution'...
-  - removed 6 symlinks
-  - restored 0 backups (no underlying files were displaced)
-Activating 'experiments'...
-  + CLAUDE.md                                   (from experiments)
-  + .claude/skills/compare-approaches/SKILL.md  (from experiments)
-  + .cursorrules                                 (from experiments)
-  + .mcp.json                                    (merged from base + experiments)
+Pinned /home/user/code/payments-api to namespace 'experiments'
+
+$ aenv activate
+Activated 'experiments' in /home/user/code/payments-api
+  + CLAUDE.md (SectionMerge)
+  + .claude/skills/compare-approaches/SKILL.md (Symlink)
+  + .cursorrules (Symlink)
+  + .mcp.json (DeepMerge)
 
 $ # Open Claude Code — it now reads the experiments CLAUDE.md
 ```
@@ -387,8 +394,9 @@ A user opens a project and wonders why a particular skill is there.
 $ aenv which .claude/skills/match-conventions/SKILL.md
 Qualified name:  detailed-execution::match-conventions
 Materialized at: ./.claude/skills/match-conventions/SKILL.md
+Strategy:        symlink
 Source path:     ~/.aenv/envs/detailed-execution/.claude/skills/match-conventions/SKILL.md
-Shadows:         (nothing — no parent namespace defines this skill)
+Shadows:         (nothing — no parent namespace defines this artifact)
 ```
 
 When two namespaces in the resolution chain define a skill with the same short name, `aenv which` shows the shadow chain explicitly. Suppose `base` also defined a `write-tests` skill:
@@ -397,19 +405,20 @@ When two namespaces in the resolution chain define a skill with the same short n
 $ aenv which .claude/skills/write-tests/SKILL.md
 Qualified name:  detailed-execution::write-tests
 Materialized at: ./.claude/skills/write-tests/SKILL.md
+Strategy:        symlink
 Source path:     ~/.aenv/envs/detailed-execution/.claude/skills/write-tests/SKILL.md
 Shadows:         base::write-tests
-                 (at ~/.aenv/envs/base/.claude/skills/write-tests/SKILL.md)
 ```
 
 The user can immediately see which version is active and where to look if they want to compare against the parent. Deep-merged files report all contributing namespaces:
 
 ```bash
 $ aenv which .mcp.json
-Qualified name:  (merged from base + detailed-execution)
-Materialized at: ./.mcp.json (regular file, regenerated on activation)
+Qualified name:  (merged)::.mcp.json
+Materialized at: ./.mcp.json
 Strategy:        deep-merge (json)
-Contributors:    base::.mcp.json, detailed-execution::.mcp.json
+Contributors:    base::.mcp.json
+                 detailed-execution::.mcp.json
 ```
 
 Querying parameters works the same way:
@@ -514,7 +523,10 @@ Resolving imported skills...
   - check-before-submit @ ~/team-skills/check-before-submit — not found locally
     warning: imported skill 'check-before-submit' could not be resolved; activation will skip it
 Installed: base, detailed-execution
-Activating detailed-execution...
+
+$ aenv activate
+Activated 'detailed-execution' in /home/user/code/payments-api
+  ...
 ```
 
 ### 5.9 Authoring a new skill
@@ -522,7 +534,7 @@ Activating detailed-execution...
 The user wants to add a project-specific skill — say, one that knows how to handle their codebase's custom migration framework. They want it in `detailed-execution` so it applies whenever they're doing careful work.
 
 ```bash
-$ aenv skill new run-migration --env detailed-execution --adapter claude-code
+$ aenv skill new run-migration --ns detailed-execution --adapter claude-code
 Created authored skill 'run-migration' in namespace 'detailed-execution':
   - ~/.aenv/envs/detailed-execution/.claude/skills/run-migration/SKILL.md
   - registered in ~/.aenv/envs/detailed-execution/aenv.toml
@@ -539,7 +551,7 @@ The user wants `match-conventions` — a skill someone else maintains in a share
 
 ```bash
 $ aenv skill import git+https://github.com/acme/aenv-skills.git#match-conventions \
-    --env detailed-execution \
+    --ns detailed-execution \
     --adapter claude-code \
     --pin v1.2.0
 Resolving git+https://github.com/acme/aenv-skills.git#match-conventions @ v1.2.0...
@@ -550,24 +562,28 @@ Imported skill 'match-conventions' into namespace 'detailed-execution':
 
 # Or, from a local path, unpinned (floats to head):
 $ aenv skill import ~/team-skills/check-before-submit \
-    --env detailed-execution \
+    --ns detailed-execution \
     --adapter claude-code
 Imported skill 'check-before-submit' into namespace 'detailed-execution':
   - source: ~/team-skills/check-before-submit
-  - no pin (will resolve on each activation)
+  - no pin (resolves on each activation)
 ```
 
 At activation time, imported skills are fetched (cached for git sources) and materialized at the project's adapter-appropriate skill path. The activation state records exactly which ref was resolved:
 
 ```bash
-$ aenv status --json | jq '.managed_files[] | select(.role=="skills")'
+$ aenv status --json | jq '.managed_files[] | select(.skill_provenance != null)'
 {
   "path": ".claude/skills/match-conventions/SKILL.md",
-  "provided_by": "detailed-execution",
-  "mode": "imported",
-  "source": "git+https://github.com/acme/aenv-skills.git#match-conventions",
-  "resolved_ref": "v1.2.0",
-  "resolved_hash": "sha256:7e2a..."
+  "qualified_name": "detailed-execution::match-conventions",
+  "short_name": "match-conventions",
+  "provided_by_namespace": "detailed-execution",
+  "strategy": "symlink",
+  "skill_provenance": {
+    "source": "git+https://github.com/acme/aenv-skills.git#match-conventions",
+    "resolved_ref": "v1.2.0",
+    "resolved_hash": "sha256:7e2a..."
+  }
 }
 ```
 
@@ -653,15 +669,15 @@ This is the workflow `aenv` makes possible that ad-hoc config editing makes pain
 
 ```bash
 $ cd ~/code/payments-api
-$ aenv use experiments
+$ aenv use experiments && aenv activate
 $ # Run task: "Refactor the retry logic in payment_processor.py"
 $ # Save the agent's output, the diff, the conversation, to ./runs/experiments-001/
 
-$ aenv use detailed-execution
+$ aenv use detailed-execution && aenv activate
 $ # Same prompt, same starting commit.
 $ # Save to ./runs/detailed-execution-001/
 
-$ aenv use analyst
+$ aenv use analyst && aenv activate
 $ # Same prompt — though analyst will likely refuse to modify code, which is itself a data point.
 $ # Save to ./runs/analyst-001/
 
@@ -727,16 +743,15 @@ $ aenv status --json
       "short_name": "write-tests",
       "provided_by_namespace": "detailed-execution",
       "strategy": "symlink",
-      "source": "/home/user/.aenv/envs/detailed-execution/.claude/skills/write-tests/SKILL.md",
       "shadows": ["base::write-tests"]
     },
     {
       "path": ".mcp.json",
-      "qualified_name": "(merged)",
+      "qualified_name": "(merged)::.mcp.json",
       "short_name": ".mcp.json",
       "provided_by_namespace": null,
       "strategy": "deep-merge",
-      "merge_kind": "json-deep",
+      "merge_kind": "json",
       "contributors": ["base::.mcp.json", "detailed-execution::.mcp.json"]
     }
   ],
@@ -748,6 +763,8 @@ $ aenv status --json
   ]
 }
 ```
+
+Note: symlink-strategy entries do not carry a `source` field in `status --json`. The on-disk source path is available via `aenv which <path>` (text) if needed; it was intentionally deferred from `status --json` to avoid state-schema churn.
 
 ```bash
 $ aenv list --json
@@ -799,13 +816,14 @@ This works identically whether or not the shell hook is installed, and whether o
 
 ### 7.3 Resolved-namespace content hash
 
-The `resolved_hash` is a stable identifier for the fully-resolved namespace — the union of all files after `extends` resolution, canonicalized and hashed. The full algorithm is specified in PRD §5.15; the user-facing properties are:
+The `resolved_hash` is a stable identifier for the fully-resolved namespace — the union of all files after `extends` resolution, plus the resolved parameter map, canonicalized and hashed. The full algorithm is specified in PRD §5.17 (R-84); the user-facing properties are:
 
 - Two users on different machines computing the hash from the same registry commit see the same value, byte for byte.
-- The hash changes if and only if the resolved content changes. Reordering manifest entries, reformatting `aenv.toml`, or renaming sibling namespaces has no effect.
+- The hash changes if and only if the resolved content or resolved parameter values change. Reordering manifest entries, reformatting `aenv.toml`, or renaming sibling namespaces has no effect.
 - For deep-merged files, the hash incorporates the merged contents (canonical JSON), not the source fragments. Adding a `base` and an overlay that together produce the same merged result as a single namespace produces the same hash.
+- The resolved parameter map is folded into the hash at the synthetic path `.aenv/parameters.json` (RFC 8785 canonical JSON of the effective parameter map; only `value` is hashed, not `source_namespace` provenance). This means changing a parameter value in any namespace in the resolution chain changes the hash, even if no materialized file changes.
 - The hash is namespaced by algorithm version. Today it's emitted as `sha256-v1:<hex>`. If the canonicalization ever changes, both versions will be emitted during a deprecation window so consumers can migrate.
-- The hash covers materialized content only. Parameters, policies, and shadow chains are *not* part of the hash — they're metadata about the resolution, not the resolved output. If two namespaces with different parameters produce identical materialized files, their hashes will be equal. Downstream tools that care about parameter values should record them separately (see §7.1 JSON output).
+- Policies, shadow chains, manifest formatting, timestamps, and filesystem permissions are *not* part of the hash.
 
 This is the affordance that lets a downstream evaluation tool record "this run used harness `detailed-execution` at hash `sha256-v1:c4f3a8...`" and later verify reproducibility — or detect that the harness has since changed.
 
@@ -878,32 +896,29 @@ Note what's *not* there: no parsing of human output, no assumptions about the sh
 | `aenv init-shell <bash\|zsh\|fish>` | Print shell hook for sourcing in rc file |
 | `aenv create <name> [--extends <name>...]` | Create a new namespace |
 | `aenv delete <name>` | Delete a namespace from the registry |
-| `aenv list [--json]` | List all namespaces |
+| `aenv list [--json]` | List all namespaces (3-column: NAME / EXTENDS / ADAPTERS) |
 | `aenv edit <name>` | Open namespace directory in `$EDITOR` |
-| `aenv use <name>` | Set the current project's `.aenv` pin |
-| `aenv activate [<name>] [--project <path>]` | Activate the pinned namespace, or a named namespace against a specific project |
+| `aenv use <name> [--project <path>]` | Write the `.aenv` pin (metadata only; does not activate) |
+| `aenv activate [<name>] [--project <path>]` | Materialize the pinned namespace (or a named one) into a project |
 | `aenv deactivate [--project <path>]` | Remove all materialized files, restore backups |
+| `aenv restore [--project <path>]` | Restore most recent backup set |
 | `aenv status [--project <path>] [--json]` | Show active namespace, resolution chain, managed files, parameters, policies, resolved hash |
 | `aenv diff [--json]` | Show drift between project files and namespace source |
 | `aenv diff <namespace-a> <namespace-b> [--json]` | Structural diff between two namespaces |
-| `aenv which <path> [--json]` | Show qualified name of the namespace that provided a given file, plus any shadowed predecessors |
-| `aenv get <namespace>.<param> [--json]` | Print a parameter's resolved value and inheritance chain. `.` for active namespace |
-| `aenv doctor [<namespace>] [--json]` | Validate a namespace (or all namespaces) against its policies |
-| `aenv fork [<path>]` | Detach the project (or a single file) from namespace management |
+| `aenv which <path> [--project <path>] [--json]` | Show qualified name and provenance of the namespace that provided a given file |
+| `aenv get <namespace>.<param> [--project <path>] [--json]` | Print a parameter's resolved value and inheritance chain; use `.<param>` for active namespace |
+| `aenv set <namespace>.<param> <value>` | Set a parameter on a namespace |
+| `aenv doctor [<namespace>] [--project <path>] [--json]` | Validate a namespace (or all) against its policies |
+| `aenv fork [<path>] [--project <path>]` | Detach the project (or a single file) from namespace management |
 | `aenv promote <path>` | Push project-local edits back into the namespace |
-| `aenv restore` | Restore most recent backup set |
 | `aenv install` | Fetch namespaces named in `.aenv` from configured remotes |
 | `aenv sync` | Push/pull registry against configured remotes |
 | `aenv remote add <name> <url>` | Configure a remote |
 | `aenv adapter add <path>` | Install a new adapter plugin |
 | `aenv adapter list [--json]` | List installed adapters |
-| `aenv skill new <name> --namespace <ns>` | Scaffold a new authored skill in a namespace |
-| `aenv skill import <source> --namespace <ns> [--pin]` | Add an imported skill entry to a namespace's manifest |
-| `aenv skill list [--namespace <ns>] [--json]` | List skills in a namespace (or all) with authored/imported mode | List installed adapters |
-
-| `aenv skill import <source> --env <env> --adapter <a> [--pin <ref>]` | Add an imported skill (git, path, or registry source) |
-| `aenv skill list [--env <name>] [--json]` | List skills across envs with mode, source, and pin |
-| `aenv doctor [--env <name>] [--json]` | Validate envs: size limits, skill reachability, manifest sanity |
+| `aenv skill new <name> --ns <ns> [--adapter <a>]` | Scaffold a new authored skill in a namespace |
+| `aenv skill import <source> --ns <ns> [--adapter <a>] [--pin <ref>]` | Add an imported skill (git, path, or registry source) to a namespace's manifest |
+| `aenv skill list [--ns <ns>] [--json]` | List skills across all namespaces (or one) with mode, source, and pin |
 
 The `--project <path>` flag is accepted by every command that operates on a project, not only those shown above. Read-oriented commands accept `--json` per §7.1, and use qualified names (`namespace::short_name`) for all artifacts in machine output.
 
@@ -923,7 +938,7 @@ A few situations that don't fit cleanly into the EARS requirements but matter in
 
 **Hidden activation drift.** If a user edits a symlinked file, they're editing the namespace. This is by design (it's how `aenv promote`-style workflows feel natural), but it's a footgun. The first activation in a new shell prints a one-line reminder: `Managed files are symlinks to the namespace. Edits will affect all projects using this namespace.`
 
-**Hash stability.** The resolved hash is computed over file contents and relative paths after `extends` resolution, in lexicographic order. It explicitly does not include the manifest itself (so reformatting `aenv.toml` doesn't perturb it) and does not include timestamps or filesystem metadata. Adapter-driven merging is performed before hashing, so a deep-merged `.mcp.json` contributes its merged contents, not its source fragments.
+**Hash stability.** The resolved hash is computed over file contents and relative paths after `extends` resolution, plus the resolved parameter map (folded in as a synthetic `.aenv/parameters.json` entry using RFC 8785 canonical JSON of effective values only). All entries are sorted lexicographically before hashing. The hash explicitly does not include the manifest itself (so reformatting `aenv.toml` doesn't perturb it), timestamps, filesystem metadata, policies, or shadow-chain provenance. Adapter-driven merging is performed before hashing, so a deep-merged `.mcp.json` contributes its merged contents, not its source fragments. Either content drift or parameter-value drift changes the hash.
 
 **Section-merge for instructions files.** By default, instructions files like `CLAUDE.md` are merged across the `extends` chain by Markdown section. A `base/CLAUDE.md` providing a `## Build & Test` section and a `detailed-execution/CLAUDE.md` providing a `## Disposition` section produce a combined file with both. If two namespaces in the chain provide the same section, content is appended in chain order. To force replacement rather than append, the later namespace marks the section with `<!-- aenv:replace -->` immediately under the heading. This is the right default because dispositional content lives best at the leaf namespace while structural content (build commands, conventions imports) lives best at `base`.
 
