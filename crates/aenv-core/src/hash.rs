@@ -10,7 +10,7 @@ use crate::jcs::canonicalize;
 use crate::materialize::MaterialSet;
 use crate::parameters::{ParameterValue, ResolvedParameter};
 
-const ALGORITHM_VERSION_V1: u8 = 0x01;
+pub(crate) const ALGORITHM_VERSION_V1: u8 = 0x01;
 /// User-facing prefix advertised on every emitted hash string.
 pub const HASH_PREFIX_V1: &str = "sha256-v1:";
 /// Synthetic path used to fold the resolved parameter map into the hash.
@@ -50,6 +50,9 @@ fn canonicalize_parameters(
 ) -> String {
     let mut map = serde_json::Map::with_capacity(params.len());
     for (k, rp) in params {
+        // Intentionally omit rp.source — the hash captures effective values
+        // only, not which namespace in the override chain supplied them.
+        // See engineering §7.5 (hash-neutrality invariant).
         map.insert(k.clone(), parameter_value_to_json(&rp.value));
     }
     canonicalize(&serde_json::Value::Object(map))
@@ -69,6 +72,11 @@ fn parameter_value_to_json(v: &ParameterValue) -> serde_json::Value {
 }
 
 fn path_to_bytes(p: &std::path::Path) -> Vec<u8> {
+    // Normalize Windows path separators to forward slashes so a hash
+    // computed on Windows matches one computed on Unix. Backslash is a
+    // legal filename character on Unix but is unsupported in aenv
+    // namespace directories — using it would produce a hash collision
+    // with the equivalent forward-slash path.
     let s = p.to_string_lossy();
     s.replace('\\', "/").into_bytes()
 }
