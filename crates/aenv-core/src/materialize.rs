@@ -1,0 +1,125 @@
+//! Pure material-set computation — the read-only counterpart to
+//! `activate_namespace`.
+//!
+//! Returns the same `(project_relative_path, content_bytes)` pairs that
+//! activation would write, without touching the project filesystem.
+//! Section-merged and deep-merged artifacts are produced by the same
+//! merge primitives activation uses; symlinked artifacts contribute the
+//! source file's raw bytes.
+//!
+//! This is the input to `hash::hash_resolved_namespace`.
+
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+
+use crate::adapter::AdapterRegistry;
+use crate::error::Result;
+use crate::fs::Filesystem;
+use crate::home::RegistryLayout;
+use crate::identity::NamespaceId;
+use crate::parameters::ResolvedParameter;
+use crate::resolve::{resolve_namespace, Candidate, DeepMergeFormat, MaterializeStrategy};
+use crate::strategy::decide_strategy;
+use crate::AenvError;
+
+/// Output of `compute_material_set`. Entries are sorted by path.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MaterialSet {
+    /// Sorted (project-relative path, post-merge bytes) pairs.
+    pub entries: Vec<(PathBuf, Vec<u8>)>,
+    /// Resolved parameter map. Carried alongside so the hash function can
+    /// append it as the synthetic `.aenv/parameters.json` entry.
+    pub parameters: BTreeMap<String, ResolvedParameter>,
+}
+
+/// Compute the material set for `leaf` without writing anything.
+pub fn compute_material_set<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    adapters: &AdapterRegistry,
+    leaf: &NamespaceId,
+) -> Result<MaterialSet> {
+    let resolution = resolve_namespace(fs, layout, adapters, leaf)?;
+
+    let mut by_path: BTreeMap<PathBuf, Vec<Candidate>> = BTreeMap::new();
+    for c in resolution.candidates {
+        by_path.entry(c.path.clone()).or_default().push(c);
+    }
+
+    let mut entries: Vec<(PathBuf, Vec<u8>)> = Vec::with_capacity(by_path.len());
+    for (path, candidates) in by_path {
+        let strategy = decide_strategy(&candidates, adapters)?;
+        let bytes = materialize_one_in_memory(fs, &candidates, strategy)?;
+        entries.push((path, bytes));
+    }
+
+    // Byte-wise lex sort on UTF-8 path (defensive — BTreeMap iteration
+    // is already sorted, but the hash contract requires this exact order).
+    entries.sort_by(|a, b| {
+        a.0.as_os_str()
+            .as_encoded_bytes()
+            .cmp(b.0.as_os_str().as_encoded_bytes())
+    });
+
+    Ok(MaterialSet {
+        entries,
+        parameters: resolution.parameters,
+    })
+}
+
+fn materialize_one_in_memory<F: Filesystem>(
+    fs: &F,
+    candidates: &[Candidate],
+    strategy: MaterializeStrategy,
+) -> Result<Vec<u8>> {
+    match strategy {
+        MaterializeStrategy::Symlink
+        | MaterializeStrategy::Identical
+        | MaterializeStrategy::Copy
+        | MaterializeStrategy::Merged => {
+            let winner = candidates.last().expect("at least one candidate");
+            fs.read(&winner.source_path).map_err(AenvError::from)
+        }
+        MaterializeStrategy::SectionMerge => {
+            let bodies = read_all_as_strings(fs, candidates)?;
+            let merged = crate::merge::section::merge_sections(&bodies);
+            Ok(merged.into_bytes())
+        }
+        MaterializeStrategy::DeepMerge(format) => {
+            let bodies = read_all_as_bytes(fs, candidates)?;
+            match format {
+                DeepMergeFormat::Json => {
+                    crate::merge::deep_json::merge_json(&bodies).map_err(AenvError::from)
+                }
+                DeepMergeFormat::Yaml => {
+                    crate::merge::deep_yaml::merge_yaml(&bodies).map_err(AenvError::from)
+                }
+                DeepMergeFormat::Toml => {
+                    crate::merge::deep_toml::merge_toml(&bodies).map_err(AenvError::from)
+                }
+            }
+        }
+    }
+}
+
+fn read_all_as_bytes<F: Filesystem>(fs: &F, candidates: &[Candidate]) -> Result<Vec<Vec<u8>>> {
+    candidates
+        .iter()
+        .map(|c| fs.read(&c.source_path).map_err(AenvError::from))
+        .collect()
+}
+
+fn read_all_as_strings<F: Filesystem>(fs: &F, candidates: &[Candidate]) -> Result<Vec<String>> {
+    candidates
+        .iter()
+        .map(|c| {
+            let bytes = fs.read(&c.source_path).map_err(AenvError::from)?;
+            String::from_utf8(bytes).map_err(|e| {
+                AenvError::ActivationConflict(format!(
+                    "UTF-8 decode {}: {e}",
+                    c.source_path.display()
+                ))
+            })
+        })
+        .collect()
+}

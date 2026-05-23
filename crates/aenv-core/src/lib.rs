@@ -21,6 +21,7 @@ pub mod home;
 pub mod identity;
 pub mod jcs;
 pub mod manifest;
+pub mod materialize;
 pub mod merge;
 pub mod namespace;
 pub mod parameters;
