@@ -88,6 +88,9 @@ enum Command {
     Get {
         /// Parameter spec: `<namespace>.<param>` or `.<param>`.
         spec: String,
+        /// Project root override for the `.<param>` form (ancestor walk from cwd otherwise).
+        #[arg(long)]
+        project: Option<PathBuf>,
         #[arg(long)]
         json: bool,
     },
@@ -224,14 +227,31 @@ fn main() -> ExitCode {
                 AdapterAction::Add { path } => cmd::adapter::run_add(&fs, &layout, &path),
                 AdapterAction::List { json } => cmd::adapter::run_list(&fs, &layout, json),
             },
-            Command::Get { spec, json } => {
+            Command::Get {
+                spec,
+                project,
+                json,
+            } => {
                 let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
                     &fs,
                     &layout.adapters_dir(),
                 )?;
-                // Defer project-root resolution so `aenv get ns.param` works
-                // outside a project directory (no .aenv pin needed).
-                cmd::get::run(&fs, &layout, &adapters, None, &spec, json)
+                // For the explicit `ns.param` form project root is irrelevant;
+                // for `.<param>` it's needed — resolve it only when --project
+                // was supplied (otherwise cmd::get::run walks cwd itself).
+                let project_root_hint = project
+                    .map(|p| -> aenv_core::Result<std::path::PathBuf> {
+                        paths::resolve_project_root(&fs, Some(p))
+                    })
+                    .transpose()?;
+                cmd::get::run(
+                    &fs,
+                    &layout,
+                    &adapters,
+                    project_root_hint.as_deref(),
+                    &spec,
+                    json,
+                )
             }
             Command::Set { spec, value } => cmd::set::run(&fs, &layout, &spec, &value),
             Command::Doctor {
