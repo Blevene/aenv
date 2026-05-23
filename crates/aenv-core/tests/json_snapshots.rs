@@ -3,6 +3,9 @@
 //! Snapshots live under `tests/snapshots/`. Approve schema changes with
 //! `cargo insta accept --all` and review the diff in code review.
 
+use aenv_core::json::adapter::{AdapterEntryJson, AdapterParameterJson};
+use aenv_core::json::list::ListEntry;
+use aenv_core::json::skill::SkillEntry;
 use aenv_core::json::status::{ManagedFileJson, StatusReport};
 use std::path::PathBuf;
 
@@ -33,4 +36,50 @@ fn status_report_shape_is_stable() {
         warnings: vec![],
     };
     insta::assert_json_snapshot!(report);
+}
+
+#[test]
+fn list_entry_shape_is_stable() {
+    let e = ListEntry {
+        name: "leaf".into(),
+        extends: vec!["base".into()],
+        adapters: vec!["claude-code".into()],
+        parameters_declared: vec!["default_model".into()],
+        policies_declared: vec!["skill_requires_description".into()],
+        resolved_hash: Some("sha256-v1:abc".into()),
+        resolved_hash_v2: None,
+        error: None,
+    };
+    insta::assert_json_snapshot!(e);
+}
+
+#[test]
+fn adapter_entry_shape_is_stable() {
+    let e = AdapterEntryJson {
+        name: "claude-code".into(),
+        files: vec!["CLAUDE.md".into(), ".claude/skills/**/*".into()],
+        skills_dir: Some(".claude/skills".into()),
+        parameters: vec![AdapterParameterJson {
+            name: "default_model".into(),
+            type_: "string".into(),
+            projects_to: None,
+        }],
+        soft_limits: [("instructions".to_string(), 5000)].into_iter().collect(),
+    };
+    insta::assert_json_snapshot!(e);
+}
+
+#[test]
+fn skill_entry_shape_is_stable() {
+    let e = SkillEntry {
+        namespace: "leaf".into(),
+        qualified_name: "leaf::write-tests".into(),
+        short_name: "write-tests".into(),
+        adapter: Some("claude-code".into()),
+        mode: "imported".into(),
+        source: Some("git+https://example.com/skills.git#write-tests".into()),
+        pin: Some("v1.2.0".into()),
+        required: true,
+    };
+    insta::assert_json_snapshot!(e);
 }

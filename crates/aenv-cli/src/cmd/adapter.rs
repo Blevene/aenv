@@ -55,10 +55,21 @@ pub fn run_add<F: Filesystem>(fs: &F, layout: &RegistryLayout, source: &Path) ->
 }
 
 pub fn run_list<F: Filesystem>(fs: &F, layout: &RegistryLayout, json: bool) -> Result<()> {
-    if json {
-        todo!("aenv adapter list --json lands in Task 9");
-    }
     let reg = AdapterRegistry::load_from_dir(fs, &layout.adapters_dir())?;
+
+    if json {
+        let entries: Vec<aenv_core::json::AdapterEntryJson> = reg
+            .iter()
+            .map(|(_, a)| aenv_core::json::AdapterEntryJson::from_adapter(a))
+            .collect();
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&entries)
+                .map_err(|e| AenvError::ManifestInvalid(format!("json: {e}")))?
+        );
+        return Ok(());
+    }
+
     if reg.is_empty() {
         println!(
             "No adapters installed at {}",

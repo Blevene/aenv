@@ -1,0 +1,22 @@
+---
+source: crates/aenv-core/tests/json_snapshots.rs
+assertion_line: 69
+expression: e
+---
+{
+  "name": "claude-code",
+  "files": [
+    "CLAUDE.md",
+    ".claude/skills/**/*"
+  ],
+  "skills_dir": ".claude/skills",
+  "parameters": [
+    {
+      "name": "default_model",
+      "type": "string"
+    }
+  ],
+  "soft_limits": {
+    "instructions": 5000
+  }
+}

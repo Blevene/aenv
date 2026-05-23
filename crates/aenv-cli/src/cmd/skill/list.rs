@@ -12,9 +12,6 @@ pub fn run<F: Filesystem>(
     ns_filter: Option<&str>,
     json: bool,
 ) -> Result<()> {
-    if json {
-        todo!("aenv skill list --json lands in Task 9");
-    }
     let envs_dir = layout.namespaces_dir();
     let namespaces: Vec<String> = if !fs.exists(&envs_dir)? {
         Vec::new()
@@ -28,6 +25,31 @@ pub fn run<F: Filesystem>(
         names.sort();
         names
     };
+
+    if json {
+        let mut entries: Vec<aenv_core::json::SkillEntry> = Vec::new();
+        for ns in &namespaces {
+            let manifest_path = layout.manifest_path(ns);
+            let Ok(bytes) = fs.read(&manifest_path) else {
+                continue;
+            };
+            let Ok(text) = String::from_utf8(bytes) else {
+                continue;
+            };
+            let Ok(manifest) = AenvManifest::from_toml(&text) else {
+                continue;
+            };
+            for s in &manifest.skills {
+                entries.push(aenv_core::json::SkillEntry::from_decl(ns, s));
+            }
+        }
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&entries)
+                .map_err(|e| aenv_core::AenvError::ManifestInvalid(format!("json: {e}")))?
+        );
+        return Ok(());
+    }
 
     println!(
         "{:<20}  {:<30}  {:<10}  {:<60}  PIN",
