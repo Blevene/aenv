@@ -126,3 +126,52 @@ fn adapter_entry_fields_are_publicly_constructible() {
     };
     assert_eq!(entry.files.len(), 1);
 }
+
+#[test]
+fn merge_bare_string_form_parses() {
+    let toml = r#"
+name = "leaf"
+[adapters.mcp]
+files = [".mcp.json"]
+merge = "deep"
+"#;
+    let m = AenvManifest::from_toml(toml).unwrap();
+    let mcp = m.adapters.get("mcp").unwrap();
+    let merge = mcp.merge.as_ref().expect("merge expanded");
+    assert_eq!(merge.get(".mcp.json"), Some(&"deep".to_string()));
+}
+
+#[test]
+fn merge_per_file_map_form_still_parses() {
+    let toml = r#"
+name = "leaf"
+[adapters.mcp]
+files = [".mcp.json", ".aider/config.json"]
+merge = { ".mcp.json" = "deep", ".aider/config.json" = "section" }
+"#;
+    let m = AenvManifest::from_toml(toml).unwrap();
+    let mcp = m.adapters.get("mcp").unwrap();
+    let merge = mcp.merge.as_ref().expect("merge");
+    assert_eq!(merge.get(".mcp.json"), Some(&"deep".to_string()));
+    assert_eq!(
+        merge.get(".aider/config.json"),
+        Some(&"section".to_string())
+    );
+}
+
+#[test]
+fn merge_bare_string_expands_to_every_file() {
+    let toml = r#"
+name = "leaf"
+[adapters.mcp]
+files = ["a.json", "b.json", "c.json"]
+merge = "deep"
+"#;
+    let m = AenvManifest::from_toml(toml).unwrap();
+    let mcp = m.adapters.get("mcp").unwrap();
+    let merge = mcp.merge.as_ref().unwrap();
+    assert_eq!(merge.len(), 3);
+    for f in &["a.json", "b.json", "c.json"] {
+        assert_eq!(merge.get(*f), Some(&"deep".to_string()), "missing key {f}");
+    }
+}

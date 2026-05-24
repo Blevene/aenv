@@ -1096,7 +1096,7 @@ The project and the scratch registry are gone.
 These are places where the spec describes something that doesn't quite work
 today, discovered during the end-to-end run of this walkthrough.
 
-### 1. `merge = "deep"` under `[adapters.mcp]`
+### 1. `merge = "deep"` under `[adapters.mcp]` *(fixed in Phase 5.5 Track 1)*
 
 The functional spec §4.3 and §4.4 show:
 
@@ -1106,16 +1106,14 @@ files = [".mcp.json"]
 merge = "deep"
 ```
 
-The current binary expects `merge` to be a map keyed by file path, not a bare
-string:
+**This gap is resolved.** The manifest parser now accepts both the bare-string
+form (`merge = "deep"`) and the per-file map form
+(`merge = { ".mcp.json" = "deep" }`). The bare string is expanded at parse
+time to apply the named strategy to every file in the adapter's `files` list,
+so the public `AdapterEntry.merge` field stays `Option<BTreeMap<String,
+String>>` and downstream resolver code is unchanged.
 
-```toml
-[adapters.mcp]
-files = [".mcp.json"]
-merge = { ".mcp.json" = "deep" }
-```
-
-Using `merge = "deep"` produces `exit 12` with:
+Prior to the fix, using `merge = "deep"` produced `exit 12`:
 
 ```
 TOML parse error at line 9, column 9
@@ -1125,11 +1123,9 @@ TOML parse error at line 9, column 9
 invalid type: string "deep", expected a map
 ```
 
-This walkthrough omits the `merge` key entirely; `.mcp.json` materializes as a
-symlink instead of a deep merge. Downstream: if a project has its own
-`.mcp.json` and the namespace has one, the last activation wins (symlink
-overwrites). The spec's deep-merge behavior (combining MCP servers from
-multiple namespaces) requires the map form or a future binary update.
+This walkthrough was written before the fix and omits the `merge` key; an
+updated walkthrough run would show `.mcp.json` materializing as a deep-merged
+file rather than a symlink.
 
 ### 2. `[[agents]]` declarations not in the manifest schema
 

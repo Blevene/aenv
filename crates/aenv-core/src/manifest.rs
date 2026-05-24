@@ -58,6 +58,27 @@ impl AenvManifest {
     /// structural parse; then `[parameters]` entries are validated via
     /// `ParameterValue::from_toml_value`.
     pub fn from_toml(input: &str) -> Result<Self> {
+        // `merge` on an adapter block accepts either a bare string
+        // (`merge = "deep"`) or a per-file map (`merge = { "f.json" = "deep" }`).
+        // The bare form means "apply this strategy to every file in `files`."
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum MergeRaw {
+            /// `merge = "deep"` — uniform strategy for all files.
+            Uniform(String),
+            /// `merge = { ".mcp.json" = "deep" }` — per-file strategies.
+            PerFile(BTreeMap<String, String>),
+        }
+
+        /// Raw adapter entry used only during parsing; accepts both merge forms.
+        #[derive(Deserialize)]
+        struct RawAdapterEntry {
+            #[serde(default)]
+            files: Vec<String>,
+            #[serde(default)]
+            merge: Option<MergeRaw>,
+        }
+
         // Stage 1: structural parse into a raw shape that holds parameters as
         // `toml::Value` so we can validate per-entry.
         #[derive(Deserialize)]
@@ -66,7 +87,7 @@ impl AenvManifest {
             #[serde(default)]
             extends: Vec<String>,
             #[serde(default)]
-            adapters: BTreeMap<String, AdapterEntry>,
+            adapters: BTreeMap<String, RawAdapterEntry>,
             #[serde(default)]
             parameters: BTreeMap<String, toml::Value>,
             #[serde(default)]
@@ -77,7 +98,27 @@ impl AenvManifest {
         let raw: Raw =
             toml::from_str(input).map_err(|e| AenvError::ManifestInvalid(format!("{e}")))?;
 
-        // Stage 2: validate each parameter entry.
+        // Stage 2: expand adapter merge fields — bare strings become per-file maps.
+        let adapters: BTreeMap<String, AdapterEntry> = raw
+            .adapters
+            .into_iter()
+            .map(|(name, raw_entry)| {
+                let RawAdapterEntry {
+                    files,
+                    merge: merge_raw,
+                } = raw_entry;
+                let merge = merge_raw.map(|m| match m {
+                    MergeRaw::PerFile(map) => map,
+                    MergeRaw::Uniform(strategy) => files
+                        .iter()
+                        .map(|f| (f.clone(), strategy.clone()))
+                        .collect(),
+                });
+                (name, AdapterEntry { files, merge })
+            })
+            .collect();
+
+        // Stage 3: validate each parameter entry.
         let mut parameters: BTreeMap<String, ParameterValue> = BTreeMap::new();
         for (k, v) in &raw.parameters {
             let pv = ParameterValue::from_toml_value(v).map_err(|e| match e {
@@ -89,16 +130,16 @@ impl AenvManifest {
             parameters.insert(k.clone(), pv);
         }
 
-        // Stage 3: validate each policy entry.
+        // Stage 4: validate each policy entry.
         let policies = policy_table_from_toml(&raw.policies)?;
 
-        // Stage 4: validate skills (duplicates, mode/source coherence).
+        // Stage 5: validate skills (duplicates, mode/source coherence).
         validate_skills(&raw.skills)?;
 
         Ok(AenvManifest {
             name: raw.name,
             extends: raw.extends,
-            adapters: raw.adapters,
+            adapters,
             parameters,
             policies,
             skills: raw.skills,
