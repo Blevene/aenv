@@ -276,3 +276,81 @@ files = ["foo"]
     .unwrap_err();
     assert!(matches!(err, ResolutionError::AdapterMissing(_)));
 }
+
+#[test]
+fn resolve_rejects_absolute_candidate_path() {
+    // A manifest declaring an absolute path in files = [...] must be rejected
+    // with ManifestInvalid. An absolute path would make the hash
+    // machine-specific and silently different across environments.
+    let fs = MockFilesystem::new();
+    write_manifest(
+        &fs,
+        "escape",
+        r#"
+name = "escape"
+[adapters.claude-code]
+files = ["/etc/passwd"]
+"#,
+    );
+    // Write the file at the absolute source path so gather_candidates doesn't
+    // skip it on the existence check — we want the validator to fire, not the
+    // skip-if-missing short-circuit.
+    fs.write(Path::new("/etc/passwd"), b"root:x:0:0\n").unwrap();
+
+    let err = resolve_namespace(
+        &fs,
+        &registry(),
+        &registry_with_cc(),
+        &NamespaceId::new("escape").unwrap(),
+    )
+    .unwrap_err();
+    match &err {
+        ResolutionError::ManifestInvalid { reason, .. } => {
+            assert!(
+                reason.contains("absolute"),
+                "expected 'absolute' in error reason, got: {reason}"
+            );
+        }
+        other => panic!("expected ManifestInvalid, got {other:?}"),
+    }
+}
+
+#[test]
+fn resolve_rejects_dot_dot_in_candidate_path() {
+    // A manifest declaring a path with '..' traversal must be rejected with
+    // ManifestInvalid. '..' in a hash input is a security and determinism risk.
+    let fs = MockFilesystem::new();
+    write_manifest(
+        &fs,
+        "traversal",
+        r#"
+name = "traversal"
+[adapters.claude-code]
+files = ["../escape.md"]
+"#,
+    );
+    // The source path gather_candidates computes is ns_root.join("../escape.md")
+    // = /aenv/envs/traversal/../escape.md. MockFilesystem stores files by exact
+    // path string without normalizing, so we must write to the same un-normalized
+    // path that exists() will look up — otherwise the candidate is silently skipped
+    // and the validator never fires.
+    fs.write(Path::new("/aenv/envs/traversal/../escape.md"), b"secret\n")
+        .unwrap();
+
+    let err = resolve_namespace(
+        &fs,
+        &registry(),
+        &registry_with_cc(),
+        &NamespaceId::new("traversal").unwrap(),
+    )
+    .unwrap_err();
+    match &err {
+        ResolutionError::ManifestInvalid { reason, .. } => {
+            assert!(
+                reason.contains(".."),
+                "expected '..' in error reason, got: {reason}"
+            );
+        }
+        other => panic!("expected ManifestInvalid, got {other:?}"),
+    }
+}

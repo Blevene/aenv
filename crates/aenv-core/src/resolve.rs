@@ -249,6 +249,7 @@ pub fn resolve_namespace<F: Filesystem>(
             reason: e.to_string(),
         }
     })?;
+    validate_candidate_paths(&candidates)?;
     Ok(ResolutionResult {
         chain,
         candidates,
@@ -256,6 +257,46 @@ pub fn resolve_namespace<F: Filesystem>(
         policies,
         warnings,
     })
+}
+
+/// Validate that every candidate path is project-relative, contains no `..`
+/// traversal, and uses no backslashes. Returns `ManifestInvalid` (exit 12)
+/// with a specific reason so manifest authors see the failure in release builds
+/// rather than getting a silently wrong hash.
+fn validate_candidate_paths(candidates: &[Candidate]) -> Result<(), ResolutionError> {
+    for c in candidates {
+        let p = &c.path;
+        if p.is_absolute() {
+            return Err(ResolutionError::ManifestInvalid {
+                namespace: c.namespace.clone(),
+                reason: format!(
+                    "candidate path is absolute: {} (must be project-relative)",
+                    p.display()
+                ),
+            });
+        }
+        let s = p.to_string_lossy();
+        if s.contains('\\') {
+            return Err(ResolutionError::ManifestInvalid {
+                namespace: c.namespace.clone(),
+                reason: format!(
+                    "candidate path contains backslashes: {} \
+                     (use forward slashes for cross-platform hash stability)",
+                    p.display()
+                ),
+            });
+        }
+        if s.split('/').any(|seg| seg == "..") {
+            return Err(ResolutionError::ManifestInvalid {
+                namespace: c.namespace.clone(),
+                reason: format!(
+                    "candidate path contains '..' traversal: {} (security)",
+                    p.display()
+                ),
+            });
+        }
+    }
+    Ok(())
 }
 
 fn walk<F: Filesystem>(
