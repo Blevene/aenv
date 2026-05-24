@@ -157,10 +157,14 @@ pub fn structural<F: Filesystem>(
     let instructions_sections = set_diff(&a_headings, &b_headings);
 
     // Build per-section body deltas for sections common to both.
-    let a_map: std::collections::BTreeMap<&str, &str> =
-        a_section_map.iter().map(|(h, body)| (h.as_str(), body.as_str())).collect();
-    let b_map: std::collections::BTreeMap<&str, &str> =
-        b_section_map.iter().map(|(h, body)| (h.as_str(), body.as_str())).collect();
+    let a_map: std::collections::BTreeMap<&str, &str> = a_section_map
+        .iter()
+        .map(|(h, body)| (h.as_str(), body.as_str()))
+        .collect();
+    let b_map: std::collections::BTreeMap<&str, &str> = b_section_map
+        .iter()
+        .map(|(h, body)| (h.as_str(), body.as_str()))
+        .collect();
     let mut instructions_section_diffs: Vec<SectionDelta> = Vec::new();
     for heading in &instructions_sections.common {
         let a_body = a_map.get(heading.as_str()).copied().unwrap_or("");
@@ -224,8 +228,7 @@ fn instruction_section_bodies<F: Filesystem>(
     let mat = compute_material_set(fs, layout, adapters, id)?;
     // Use a BTreeMap so that duplicate headings are deduplicated (last write
     // wins) and the result is already in sorted order.
-    let mut map: std::collections::BTreeMap<String, String> =
-        std::collections::BTreeMap::new();
+    let mut map: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
     for (path, content) in mat.entries() {
         let name = path
             .file_name()

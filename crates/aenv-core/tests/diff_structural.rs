@@ -88,3 +88,113 @@ default_model = "claude-opus-4.7"
         serde_json::json!("claude-opus-4.7")
     );
 }
+
+#[test]
+fn structural_diff_reports_section_body_differs() {
+    let (_tmp, layout, adapters) = setup();
+    // Both namespaces have a ## Disposition section but with different bodies.
+    write_file(
+        &layout.manifest_path("alpha"),
+        "name = \"alpha\"\n\
+         [adapters.claude-code]\n\
+         files = [\"CLAUDE.md\"]\n",
+    );
+    write_file(
+        &layout.namespace_dir("alpha").join("CLAUDE.md"),
+        "## Disposition\nAlpha emphasizes breadth.\n",
+    );
+    write_file(
+        &layout.manifest_path("beta"),
+        "name = \"beta\"\n\
+         [adapters.claude-code]\n\
+         files = [\"CLAUDE.md\"]\n",
+    );
+    write_file(
+        &layout.namespace_dir("beta").join("CLAUDE.md"),
+        "## Disposition\nBeta emphasizes care and detailed execution.\n",
+    );
+
+    let fs = aenv_core::fs::RealFilesystem;
+    let diff = structural(&fs, &layout, &adapters, "alpha", "beta").unwrap();
+
+    assert_eq!(diff.instructions_sections.common, vec!["Disposition"]);
+    assert_eq!(diff.instructions_section_diffs.len(), 1);
+    let delta = &diff.instructions_section_diffs[0];
+    assert_eq!(delta.heading, "Disposition");
+    assert_eq!(delta.status, "differs");
+    assert!(
+        delta.summary.is_some(),
+        "summary should be present when bodies differ"
+    );
+}
+
+#[test]
+fn structural_diff_reports_section_body_identical() {
+    let (_tmp, layout, adapters) = setup();
+    // Both namespaces have an identical ## Project Facts section.
+    write_file(
+        &layout.manifest_path("alpha"),
+        "name = \"alpha\"\n\
+         [adapters.claude-code]\n\
+         files = [\"CLAUDE.md\"]\n",
+    );
+    write_file(
+        &layout.namespace_dir("alpha").join("CLAUDE.md"),
+        "## Project Facts\nShared project facts.\n",
+    );
+    write_file(
+        &layout.manifest_path("beta"),
+        "name = \"beta\"\n\
+         [adapters.claude-code]\n\
+         files = [\"CLAUDE.md\"]\n",
+    );
+    write_file(
+        &layout.namespace_dir("beta").join("CLAUDE.md"),
+        "## Project Facts\nShared project facts.\n",
+    );
+
+    let fs = aenv_core::fs::RealFilesystem;
+    let diff = structural(&fs, &layout, &adapters, "alpha", "beta").unwrap();
+
+    assert_eq!(diff.instructions_sections.common, vec!["Project Facts"]);
+    assert_eq!(diff.instructions_section_diffs.len(), 1);
+    let delta = &diff.instructions_section_diffs[0];
+    assert_eq!(delta.heading, "Project Facts");
+    assert_eq!(delta.status, "identical");
+    assert!(
+        delta.summary.is_none(),
+        "summary should be None when bodies are identical"
+    );
+}
+
+#[test]
+fn structural_diff_no_common_sections_means_empty_deltas() {
+    let (_tmp, layout, adapters) = setup();
+    // No overlap in section headings.
+    write_file(
+        &layout.manifest_path("alpha"),
+        "name = \"alpha\"\n\
+         [adapters.claude-code]\n\
+         files = [\"CLAUDE.md\"]\n",
+    );
+    write_file(
+        &layout.namespace_dir("alpha").join("CLAUDE.md"),
+        "## Only In Alpha\nSome content.\n",
+    );
+    write_file(
+        &layout.manifest_path("beta"),
+        "name = \"beta\"\n\
+         [adapters.claude-code]\n\
+         files = [\"CLAUDE.md\"]\n",
+    );
+    write_file(
+        &layout.namespace_dir("beta").join("CLAUDE.md"),
+        "## Only In Beta\nOther content.\n",
+    );
+
+    let fs = aenv_core::fs::RealFilesystem;
+    let diff = structural(&fs, &layout, &adapters, "alpha", "beta").unwrap();
+
+    assert!(diff.instructions_sections.common.is_empty());
+    assert!(diff.instructions_section_diffs.is_empty());
+}

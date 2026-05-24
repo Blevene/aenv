@@ -110,6 +110,24 @@ pub fn run_structural<F: Filesystem>(
         for s in &diff.instructions_sections.removed {
             println!("  - ## {s}");
         }
+        println!();
+    }
+    // Show the section-body block only when at least one common section differs;
+    // suppress if all are identical or there are no common sections at all.
+    let has_diff = diff
+        .instructions_section_diffs
+        .iter()
+        .any(|d| d.status != "identical");
+    if has_diff {
+        println!("Instructions section bodies (common to both):");
+        for sd in &diff.instructions_section_diffs {
+            if sd.status == "identical" {
+                println!("  ## {} (identical)", sd.heading);
+            } else {
+                let summary = sd.summary.as_deref().unwrap_or("differs");
+                println!("  ## {} (differs — {summary})", sd.heading);
+            }
+        }
     }
     Ok(())
 }

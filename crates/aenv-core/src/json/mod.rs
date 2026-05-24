@@ -18,7 +18,7 @@ pub mod status;
 pub mod which;
 
 pub use adapter::AdapterEntryJson;
-pub use diff::{DriftReport, StructuralDiff};
+pub use diff::{DriftReport, SectionDelta, StructuralDiff};
 pub use doctor::DoctorReportJson;
 pub use get::GetReport;
 pub use list::ListEntry;

@@ -268,7 +268,16 @@ fn structural_diff_shape_is_stable() {
             }],
         },
         policies: ValueDiff::default(),
-        instructions_sections: SetDiff::default(),
+        instructions_sections: SetDiff {
+            added: vec![],
+            removed: vec![],
+            common: vec!["Project Facts".into()],
+        },
+        instructions_section_diffs: vec![SectionDelta {
+            heading: "Project Facts".into(),
+            status: "differs".into(),
+            summary: Some("alpha: 142 chars; beta: 198 chars".into()),
+        }],
     };
     insta::assert_json_snapshot!(d);
 }

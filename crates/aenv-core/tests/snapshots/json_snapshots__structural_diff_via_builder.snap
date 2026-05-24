@@ -1,6 +1,5 @@
 ---
 source: crates/aenv-core/tests/json_snapshots.rs
-assertion_line: 429
 expression: diff
 ---
 {
@@ -40,5 +39,11 @@ expression: diff
     "common": [
       "Project Facts"
     ]
-  }
+  },
+  "instructions_section_diffs": [
+    {
+      "heading": "Project Facts",
+      "status": "identical"
+    }
+  ]
 }

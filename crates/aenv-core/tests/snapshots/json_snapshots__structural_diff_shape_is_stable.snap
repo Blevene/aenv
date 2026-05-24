@@ -1,6 +1,5 @@
 ---
 source: crates/aenv-core/tests/json_snapshots.rs
-assertion_line: 188
 expression: d
 ---
 {
@@ -39,6 +38,15 @@ expression: d
   "instructions_sections": {
     "added": [],
     "removed": [],
-    "common": []
-  }
+    "common": [
+      "Project Facts"
+    ]
+  },
+  "instructions_section_diffs": [
+    {
+      "heading": "Project Facts",
+      "status": "differs",
+      "summary": "alpha: 142 chars; beta: 198 chars"
+    }
+  ]
 }

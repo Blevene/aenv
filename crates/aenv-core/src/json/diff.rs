@@ -44,8 +44,22 @@ pub struct StructuralDiff {
     pub parameters: ValueDiff,
     /// Policy value differences.
     pub policies: ValueDiff,
-    /// Instruction-section set differences.
+    /// Instruction-section set differences (headings only: added / removed / common).
     pub instructions_sections: SetDiff,
+    /// Per-section body status for sections present in both namespaces.
+    pub instructions_section_diffs: Vec<SectionDelta>,
+}
+
+/// Body-level comparison for a single instructions section common to both namespaces.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct SectionDelta {
+    /// Section heading text (without the leading `## `).
+    pub heading: String,
+    /// `"identical"` or `"differs"`.
+    pub status: String,
+    /// Short summary of the difference (e.g. char counts). `None` when identical.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
 }
 
 /// Set-level diff between two namespaces (added / removed / common).
