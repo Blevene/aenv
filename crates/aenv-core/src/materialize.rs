@@ -62,7 +62,10 @@ impl MaterialSet {
                 path.display()
             );
         }
-        Self { entries, parameters }
+        Self {
+            entries,
+            parameters,
+        }
     }
 
     /// Read-only view of the (path, content) pairs, in lex order.
