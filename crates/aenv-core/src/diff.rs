@@ -13,7 +13,8 @@ use crate::fs::{FileKind, Filesystem};
 use crate::home::RegistryLayout;
 use crate::identity::NamespaceId;
 use crate::json::diff::{
-    DriftReport, DriftedFile, NamedValue, SetDiff, StructuralDiff, ValueChange, ValueDiff,
+    DriftReport, DriftedFile, NamedValue, SectionDelta, SetDiff, StructuralDiff, ValueChange,
+    ValueDiff,
 };
 use crate::manifest::AenvManifest;
 use crate::materialize::compute_material_set;
@@ -49,7 +50,7 @@ pub fn project_drift<F: Filesystem>(
 
     // Build a lookup map: project-relative path → expected bytes.
     let mut expected: std::collections::BTreeMap<&std::path::Path, &[u8]> = mat
-        .entries
+        .entries()
         .iter()
         .map(|(p, c)| (p.as_path(), c.as_slice()))
         .collect();
@@ -148,9 +149,40 @@ pub fn structural<F: Filesystem>(
     let parameters = value_diff_params(&a_res.parameters, &b_res.parameters);
     let policies = value_diff_policies(&a_res.policies, &b_res.policies);
 
-    let a_sections = instruction_section_headers(fs, layout, adapters, &a_id)?;
-    let b_sections = instruction_section_headers(fs, layout, adapters, &b_id)?;
-    let instructions_sections = set_diff(&a_sections, &b_sections);
+    let a_section_map = instruction_section_bodies(fs, layout, adapters, &a_id)?;
+    let b_section_map = instruction_section_bodies(fs, layout, adapters, &b_id)?;
+
+    let a_headings: Vec<String> = a_section_map.iter().map(|(h, _)| h.clone()).collect();
+    let b_headings: Vec<String> = b_section_map.iter().map(|(h, _)| h.clone()).collect();
+    let instructions_sections = set_diff(&a_headings, &b_headings);
+
+    // Build per-section body deltas for sections common to both.
+    let a_map: std::collections::BTreeMap<&str, &str> =
+        a_section_map.iter().map(|(h, body)| (h.as_str(), body.as_str())).collect();
+    let b_map: std::collections::BTreeMap<&str, &str> =
+        b_section_map.iter().map(|(h, body)| (h.as_str(), body.as_str())).collect();
+    let mut instructions_section_diffs: Vec<SectionDelta> = Vec::new();
+    for heading in &instructions_sections.common {
+        let a_body = a_map.get(heading.as_str()).copied().unwrap_or("");
+        let b_body = b_map.get(heading.as_str()).copied().unwrap_or("");
+        if a_body == b_body {
+            instructions_section_diffs.push(SectionDelta {
+                heading: heading.clone(),
+                status: "identical".to_string(),
+                summary: None,
+            });
+        } else {
+            instructions_section_diffs.push(SectionDelta {
+                heading: heading.clone(),
+                status: "differs".to_string(),
+                summary: Some(format!(
+                    "{a}: {} chars; {b}: {} chars",
+                    a_body.len(),
+                    b_body.len()
+                )),
+            });
+        }
+    }
 
     Ok(StructuralDiff {
         a: a.to_string(),
@@ -160,6 +192,7 @@ pub fn structural<F: Filesystem>(
         parameters,
         policies,
         instructions_sections,
+        instructions_section_diffs,
     })
 }
 
@@ -178,15 +211,22 @@ fn manifest_skill_qnames<F: Filesystem>(
         .collect())
 }
 
-fn instruction_section_headers<F: Filesystem>(
+/// Parse instruction files and return a sorted, deduplicated list of
+/// `(heading, body)` pairs. The body is the text between this `## ` heading
+/// and the next one (or EOF), with leading/trailing whitespace trimmed.
+/// When the same heading appears more than once, the last occurrence wins.
+fn instruction_section_bodies<F: Filesystem>(
     fs: &F,
     layout: &RegistryLayout,
     adapters: &AdapterRegistry,
     id: &NamespaceId,
-) -> Result<Vec<String>> {
+) -> Result<Vec<(String, String)>> {
     let mat = compute_material_set(fs, layout, adapters, id)?;
-    let mut headers: Vec<String> = Vec::new();
-    for (path, content) in &mat.entries {
+    // Use a BTreeMap so that duplicate headings are deduplicated (last write
+    // wins) and the result is already in sorted order.
+    let mut map: std::collections::BTreeMap<String, String> =
+        std::collections::BTreeMap::new();
+    for (path, content) in mat.entries() {
         let name = path
             .file_name()
             .map(|n| n.to_string_lossy().to_lowercase())
@@ -195,17 +235,30 @@ fn instruction_section_headers<F: Filesystem>(
         if !is_instructions {
             continue;
         }
-        if let Ok(s) = std::str::from_utf8(content) {
-            for line in s.lines() {
-                if let Some(rest) = line.strip_prefix("## ") {
-                    headers.push(rest.trim().to_string());
+        let Ok(s) = std::str::from_utf8(content) else {
+            continue;
+        };
+        // Walk lines, collecting bodies per heading.
+        let mut current_heading: Option<String> = None;
+        let mut current_body: Vec<&str> = Vec::new();
+        for line in s.lines() {
+            if let Some(rest) = line.strip_prefix("## ") {
+                // Flush the previous section.
+                if let Some(h) = current_heading.take() {
+                    map.insert(h, current_body.join("\n").trim().to_string());
                 }
+                current_heading = Some(rest.trim().to_string());
+                current_body = Vec::new();
+            } else if current_heading.is_some() {
+                current_body.push(line);
             }
         }
+        // Flush last section.
+        if let Some(h) = current_heading {
+            map.insert(h, current_body.join("\n").trim().to_string());
+        }
     }
-    headers.sort();
-    headers.dedup();
-    Ok(headers)
+    Ok(map.into_iter().collect())
 }
 
 fn set_diff(a: &[String], b: &[String]) -> SetDiff {

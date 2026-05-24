@@ -19,8 +19,8 @@ const SYNTHETIC_PARAMETERS_PATH: &str = ".aenv/parameters.json";
 /// Compute the resolved-namespace hash per PRD §5.17 R-84.
 pub fn hash_resolved_namespace(mat: &MaterialSet) -> String {
     let params_bytes = canonicalize_parameters(&mat.parameters);
-    let mut all: Vec<(Vec<u8>, &[u8])> = Vec::with_capacity(mat.entries.len() + 1);
-    for (path, content) in &mat.entries {
+    let mut all: Vec<(Vec<u8>, &[u8])> = Vec::with_capacity(mat.entries().len() + 1);
+    for (path, content) in mat.entries() {
         all.push((path_to_bytes(path), content.as_slice()));
     }
     all.push((

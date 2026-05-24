@@ -11,10 +11,7 @@ fn prefix_is_sha256_v1() {
 
 #[test]
 fn emitted_strings_carry_v1_prefix() {
-    let mat = MaterialSet {
-        entries: vec![],
-        parameters: BTreeMap::new(),
-    };
+    let mat = MaterialSet::new(vec![], BTreeMap::new());
     let h = hash_resolved_namespace(&mat);
     assert!(
         h.starts_with("sha256-v1:"),

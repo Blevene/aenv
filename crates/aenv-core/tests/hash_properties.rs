@@ -17,10 +17,7 @@ fn material_set_strategy() -> impl Strategy<Value = MaterialSet> {
     vec(entry_strategy(), 0..8).prop_map(|mut entries| {
         entries.sort_by(|a, b| a.0.cmp(&b.0));
         entries.dedup_by(|a, b| a.0 == b.0);
-        MaterialSet {
-            entries,
-            parameters: BTreeMap::new(),
-        }
+        MaterialSet::new(entries, BTreeMap::new())
     })
 }
 
@@ -30,12 +27,9 @@ proptest! {
     /// Order independence: reversing entries does not change the hash.
     #[test]
     fn hash_is_order_independent(mat in material_set_strategy()) {
-        let mut shuffled = mat.entries.clone();
+        let mut shuffled = mat.entries().to_vec();
         shuffled.reverse();
-        let shuffled_mat = MaterialSet {
-            entries: shuffled,
-            parameters: mat.parameters.clone(),
-        };
+        let shuffled_mat = MaterialSet::new(shuffled, mat.parameters.clone());
         prop_assert_eq!(
             hash_resolved_namespace(&mat),
             hash_resolved_namespace(&shuffled_mat)
@@ -45,43 +39,45 @@ proptest! {
     /// Avalanche: a single-byte content flip changes the hash.
     #[test]
     fn hash_changes_on_single_byte_content_flip(
-        mat in material_set_strategy().prop_filter("non-empty", |m| !m.entries.is_empty())
+        mat in material_set_strategy().prop_filter("non-empty", |m| !m.entries().is_empty())
     ) {
         let original = hash_resolved_namespace(&mat);
-        let mut flipped = mat.clone();
-        if flipped.entries[0].1.is_empty() {
-            flipped.entries[0].1.push(0);
+        let mut flipped_entries = mat.entries().to_vec();
+        if flipped_entries[0].1.is_empty() {
+            flipped_entries[0].1.push(0);
         } else {
-            flipped.entries[0].1[0] ^= 0x01;
+            flipped_entries[0].1[0] ^= 0x01;
         }
+        let flipped = MaterialSet::new(flipped_entries, mat.parameters.clone());
         prop_assert_ne!(original, hash_resolved_namespace(&flipped));
     }
 
     /// Any path rename changes the hash.
     #[test]
     fn hash_changes_on_path_rename(
-        mat in material_set_strategy().prop_filter("non-empty", |m| !m.entries.is_empty())
+        mat in material_set_strategy().prop_filter("non-empty", |m| !m.entries().is_empty())
     ) {
         let original = hash_resolved_namespace(&mat);
-        let mut renamed = mat.clone();
-        renamed.entries[0].0 = PathBuf::from(format!(
+        let mut renamed_entries = mat.entries().to_vec();
+        renamed_entries[0].0 = PathBuf::from(format!(
             "renamed_{}",
-            renamed.entries[0].0.display()
+            renamed_entries[0].0.display()
         ));
+        let renamed = MaterialSet::new(renamed_entries, mat.parameters.clone());
         prop_assert_ne!(original, hash_resolved_namespace(&renamed));
     }
 
     /// Case sensitivity in paths.
     #[test]
     fn hash_is_path_case_sensitive(content in vec(any::<u8>(), 0..32)) {
-        let lower = MaterialSet {
-            entries: vec![(PathBuf::from("foo.md"), content.clone())],
-            parameters: BTreeMap::new(),
-        };
-        let upper = MaterialSet {
-            entries: vec![(PathBuf::from("FOO.md"), content)],
-            parameters: BTreeMap::new(),
-        };
+        let lower = MaterialSet::new(
+            vec![(PathBuf::from("foo.md"), content.clone())],
+            BTreeMap::new(),
+        );
+        let upper = MaterialSet::new(
+            vec![(PathBuf::from("FOO.md"), content)],
+            BTreeMap::new(),
+        );
         prop_assert_ne!(hash_resolved_namespace(&lower), hash_resolved_namespace(&upper));
     }
 
@@ -92,10 +88,7 @@ proptest! {
         let mut sorted = entries;
         sorted.sort_by(|a, b| a.0.cmp(&b.0));
         sorted.dedup_by(|a, b| a.0 == b.0);
-        let no_params = MaterialSet {
-            entries: sorted.clone(),
-            parameters: BTreeMap::new(),
-        };
+        let no_params = MaterialSet::new(sorted.clone(), BTreeMap::new());
         let mut params = BTreeMap::new();
         params.insert(
             "default_model".to_string(),
@@ -104,10 +97,7 @@ proptest! {
                 source: aenv_core::identity::NamespaceId::new("leaf").unwrap(),
             },
         );
-        let with_params = MaterialSet {
-            entries: sorted,
-            parameters: params,
-        };
+        let with_params = MaterialSet::new(sorted, params);
         prop_assert_ne!(
             hash_resolved_namespace(&no_params),
             hash_resolved_namespace(&with_params)
@@ -133,8 +123,8 @@ proptest! {
                 source: aenv_core::identity::NamespaceId::new("b").unwrap(),
             },
         );
-        let a = MaterialSet { entries: vec![], parameters: params_a };
-        let b = MaterialSet { entries: vec![], parameters: params_b };
+        let a = MaterialSet::new(vec![], params_a);
+        let b = MaterialSet::new(vec![], params_b);
         prop_assert_eq!(hash_resolved_namespace(&a), hash_resolved_namespace(&b));
     }
 }

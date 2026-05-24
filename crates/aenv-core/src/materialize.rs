@@ -27,10 +27,48 @@ use crate::AenvError;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MaterialSet {
     /// Sorted (project-relative path, post-merge bytes) pairs.
-    pub entries: Vec<(PathBuf, Vec<u8>)>,
+    ///
+    /// Invariant: every path is relative and uses forward slashes only
+    /// (cross-platform hash stability). Use [`MaterialSet::new`] to construct;
+    /// use [`MaterialSet::entries`] to read. Direct mutation is intentionally
+    /// prevented by the `pub(crate)` visibility.
+    pub(crate) entries: Vec<(PathBuf, Vec<u8>)>,
     /// Resolved parameter map. Carried alongside so the hash function can
     /// append it as the synthetic `.aenv/parameters.json` entry.
     pub parameters: BTreeMap<String, ResolvedParameter>,
+}
+
+impl MaterialSet {
+    /// Construct a `MaterialSet`, asserting that every path is relative and
+    /// uses forward slashes (cross-platform hash stability invariant).
+    ///
+    /// The `debug_assert!`s fire only in debug builds; the cost vanishes in
+    /// release while the contract remains documented and tested by the
+    /// cross-machine fixture.
+    pub fn new(
+        entries: Vec<(PathBuf, Vec<u8>)>,
+        parameters: BTreeMap<String, ResolvedParameter>,
+    ) -> Self {
+        for (path, _) in &entries {
+            debug_assert!(
+                path.is_relative(),
+                "MaterialSet path must be relative: {}",
+                path.display()
+            );
+            debug_assert!(
+                !path.to_string_lossy().contains('\\'),
+                "MaterialSet path must not contain backslashes: {} \
+                 (use forward slashes for cross-platform hash stability)",
+                path.display()
+            );
+        }
+        Self { entries, parameters }
+    }
+
+    /// Read-only view of the (path, content) pairs, in lex order.
+    pub fn entries(&self) -> &[(PathBuf, Vec<u8>)] {
+        &self.entries
+    }
 }
 
 /// Compute the material set for `leaf` without writing anything.
@@ -62,10 +100,7 @@ pub fn compute_material_set<F: Filesystem>(
             .cmp(b.0.as_os_str().as_encoded_bytes())
     });
 
-    Ok(MaterialSet {
-        entries,
-        parameters: resolution.parameters,
-    })
+    Ok(MaterialSet::new(entries, resolution.parameters))
 }
 
 fn materialize_one_in_memory<F: Filesystem>(

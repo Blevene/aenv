@@ -40,9 +40,9 @@ fn single_symlink_candidate_contributes_source_bytes() {
     let leaf = NamespaceId::new("solo").unwrap();
     let mat = compute_material_set(&fs, &layout, &adapters, &leaf).unwrap();
 
-    assert_eq!(mat.entries.len(), 1);
-    assert_eq!(mat.entries[0].0, PathBuf::from("CLAUDE.md"));
-    assert_eq!(mat.entries[0].1, b"# Hello\nProject facts.\n".to_vec());
+    assert_eq!(mat.entries().len(), 1);
+    assert_eq!(mat.entries()[0].0, PathBuf::from("CLAUDE.md"));
+    assert_eq!(mat.entries()[0].1, b"# Hello\nProject facts.\n".to_vec());
 }
 
 #[test]
@@ -65,8 +65,8 @@ fn section_merge_combines_two_namespaces() {
     let leaf_id = NamespaceId::new("leaf").unwrap();
     let mat = compute_material_set(&fs, &layout, &adapters, &leaf_id).unwrap();
 
-    assert_eq!(mat.entries.len(), 1);
-    let body = std::str::from_utf8(&mat.entries[0].1).unwrap();
+    assert_eq!(mat.entries().len(), 1);
+    let body = std::str::from_utf8(&mat.entries()[0].1).unwrap();
     // Section merge concatenates by `##` header, base first.
     assert!(body.contains("## Facts"));
     assert!(body.contains("## Disposition"));
@@ -101,7 +101,7 @@ fn deep_merge_json_uses_default_serializer_bytes() {
     let leaf_id = NamespaceId::new("leaf").unwrap();
     let mat = compute_material_set(&fs, &layout, &adapters, &leaf_id).unwrap();
 
-    let body = std::str::from_utf8(&mat.entries[0].1).unwrap();
+    let body = std::str::from_utf8(&mat.entries()[0].1).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(body).unwrap();
     assert!(parsed["servers"]["a"].is_object());
     assert!(parsed["servers"]["b"].is_object());
@@ -123,7 +123,7 @@ fn entries_are_sorted_by_path() {
     let leaf = NamespaceId::new("multi").unwrap();
     let mat = compute_material_set(&fs, &layout, &adapters, &leaf).unwrap();
 
-    let paths: Vec<&std::path::Path> = mat.entries.iter().map(|(p, _)| p.as_path()).collect();
+    let paths: Vec<&std::path::Path> = mat.entries().iter().map(|(p, _)| p.as_path()).collect();
     let sorted: Vec<&std::path::Path> = {
         let mut s = paths.clone();
         s.sort();

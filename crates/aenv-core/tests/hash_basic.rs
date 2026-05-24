@@ -16,10 +16,7 @@ fn write_file(path: &std::path::Path, contents: &str) {
 
 #[test]
 fn empty_material_set_hashes_to_constant() {
-    let mat = MaterialSet {
-        entries: vec![],
-        parameters: BTreeMap::new(),
-    };
+    let mat = MaterialSet::new(vec![], BTreeMap::new());
     let h = hash_resolved_namespace(&mat);
     assert!(h.starts_with(HASH_PREFIX_V1));
     let hex = h.strip_prefix(HASH_PREFIX_V1).unwrap();
@@ -31,10 +28,10 @@ fn empty_material_set_hashes_to_constant() {
 
 #[test]
 fn single_entry_material_set_is_deterministic() {
-    let mat = MaterialSet {
-        entries: vec![(PathBuf::from("CLAUDE.md"), b"hello\n".to_vec())],
-        parameters: BTreeMap::new(),
-    };
+    let mat = MaterialSet::new(
+        vec![(PathBuf::from("CLAUDE.md"), b"hello\n".to_vec())],
+        BTreeMap::new(),
+    );
     let h1 = hash_resolved_namespace(&mat);
     let h2 = hash_resolved_namespace(&mat);
     assert_eq!(h1, h2);
@@ -42,27 +39,27 @@ fn single_entry_material_set_is_deterministic() {
 
 #[test]
 fn hash_differs_on_content_change() {
-    let a = MaterialSet {
-        entries: vec![(PathBuf::from("CLAUDE.md"), b"hello\n".to_vec())],
-        parameters: BTreeMap::new(),
-    };
-    let b = MaterialSet {
-        entries: vec![(PathBuf::from("CLAUDE.md"), b"hello!\n".to_vec())],
-        parameters: BTreeMap::new(),
-    };
+    let a = MaterialSet::new(
+        vec![(PathBuf::from("CLAUDE.md"), b"hello\n".to_vec())],
+        BTreeMap::new(),
+    );
+    let b = MaterialSet::new(
+        vec![(PathBuf::from("CLAUDE.md"), b"hello!\n".to_vec())],
+        BTreeMap::new(),
+    );
     assert_ne!(hash_resolved_namespace(&a), hash_resolved_namespace(&b));
 }
 
 #[test]
 fn hash_differs_on_path_change() {
-    let a = MaterialSet {
-        entries: vec![(PathBuf::from("a.md"), b"x".to_vec())],
-        parameters: BTreeMap::new(),
-    };
-    let b = MaterialSet {
-        entries: vec![(PathBuf::from("b.md"), b"x".to_vec())],
-        parameters: BTreeMap::new(),
-    };
+    let a = MaterialSet::new(
+        vec![(PathBuf::from("a.md"), b"x".to_vec())],
+        BTreeMap::new(),
+    );
+    let b = MaterialSet::new(
+        vec![(PathBuf::from("b.md"), b"x".to_vec())],
+        BTreeMap::new(),
+    );
     assert_ne!(hash_resolved_namespace(&a), hash_resolved_namespace(&b));
 }
 
