@@ -70,7 +70,7 @@ Activated 'karpathy' in /home/you/code/my-project
   + CLAUDE.md (Symlink)
 ```
 
-`CLAUDE.md` is now a symlink to `~/.aenv/envs/karpathy/CLAUDE.md`. Any pre-existing `CLAUDE.md` got backed up to `.aenv-state/backups/`; see the [README §What happens to your existing files](../../README.md#what-happens-to-your-existing-files) for the safety guarantee.
+`CLAUDE.md` is now a symlink to `~/.aenv/envs/karpathy/CLAUDE.md`. Any pre-existing `CLAUDE.md` got moved into `.aenv-state/backup/<timestamp>/CLAUDE.md` and the move was recorded in `state.json`; see the [README §What happens to your existing files](../../README.md#what-happens-to-your-existing-files) for the safety guarantee.
 
 ## Step 5: Confirm
 

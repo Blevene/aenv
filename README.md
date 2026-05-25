@@ -16,14 +16,16 @@ After `phase-3-complete`, `aenv` can:
 - **Read and write parameters from the CLI.** `aenv get <ns>.<param>` or `aenv get .<param>` (active project) shows the effective value with provenance; `aenv set <ns>.<param> <value>` rewrites the named namespace's manifest, inferring the value type.
 - **Fork to a private copy.** `aenv fork` detaches a whole project from its namespace (replacing symlinks with copies); `aenv fork <file>` detaches just one file; `aenv fork <name>` creates a new namespace populated from the current project state.
 - **Manage skills.** `aenv skill new <name> --ns <ns>` scaffolds an authored skill whose files live in the namespace tree; `aenv skill import <source> --ns <ns>` pulls one in from a local path or git URL, with `--pin <ref>` for reproducibility and `--path <subdir>` for monorepo skill collections (k-dense-ai's `scientific-agent-skills`, etc.).
+- **Snapshot an existing project.** `aenv snapshot <name>` walks the project against every installed adapter's `files = [...]` and copies the matches into a new namespace at `~/.aenv/envs/<name>/` — useful for capturing a hand-shaped `.claude/` tree as something portable.
+- **Diff resolved namespaces.** `aenv diff` compares a project's materialized files against the namespace declaration (drift detection); `aenv diff <ns_a> <ns_b>` shows the structural delta between two namespaces. Both ship `--json` for downstream tooling.
+- **Scriptability.** Every read-oriented command — `list`, `status`, `which`, `get`, `doctor`, `skill list`, `adapter list`, `diff` — accepts `--json` and emits a stable schema. Each namespace also carries a resolved-namespace hash you can read off `aenv status` / `aenv list --json` to compare configurations across machines.
 
-Ships with built-in adapters for **Claude Code, Cursor, Aider, Cline, Continue, Windsurf, Codex, and a generic MCP adapter** — all embedded in the binary, written to `~/.aenv/adapters/` on first run, and overridable by user edit. Also ships with two starter namespaces (`karpathy`, `cherny`) written to `~/.aenv/envs/` on first run so you have something to switch between out of the box.
+Ships with built-in adapters for **Claude Code, Cursor, Aider, Cline, Continue, Windsurf, Codex, and a generic MCP adapter** — all embedded in the binary, written to `~/.aenv/adapters/` on first run, and overridable by user edit. `aenv adapter list` shows what's installed; `aenv adapter add <path>` registers a new one. Also ships with two starter namespaces (`karpathy`, `cherny`) written to `~/.aenv/envs/` on first run so you have something to switch between out of the box.
 
 ## What's still in flight
 
-The roadmap (see [`tasks/todo.md`](./tasks/todo.md)) has three phases left:
+The roadmap (see [`tasks/todo.md`](./tasks/todo.md)) has two phases left:
 
-- **Phase 5** — Resolved-namespace hash + `--json` on every read-oriented command + `aenv diff`. Designed for downstream eval tools.
 - **Phase 6** — Shell integration (`cd`-based auto-activation), git remotes, `aenv install`, `aenv sync`, `aenv promote`.
 - **Phase 7** — Windows symlink fallback, cross-platform CI, v0.1.0 release.
 
@@ -142,14 +144,24 @@ The starter namespaces are regular namespaces — edit `~/.aenv/envs/karpathy/CL
 
 When activation finds a file it's about to manage:
 
-1. The existing file is **renamed to `.aenv-state/backups/<file>.<timestamp>`** and the rename is recorded in `.aenv-state/state.json`.
+1. The existing file is **moved into `.aenv-state/backup/<timestamp>/<original-relative-path>`** (`<timestamp>` is a per-activation nanoseconds-since-epoch directory; each activation writes its own backup set). The move is recorded in `.aenv-state/state.json`.
 2. The namespace's version takes its place — symlinked by default, copied or merged where the strategy demands.
 3. On `aenv deactivate` (and on `aenv unpin`, which auto-deactivates), the backup is `mv`-ed back into place — byte-for-byte identical to what was there before. Files aenv *created* (paths that didn't exist pre-activation) are simply removed; no backup to restore.
 
 Two practical consequences:
 
-- **Editing through the symlink edits the namespace, not your original.** While a namespace is active, opening `CLAUDE.md` in your editor follows the symlink into `~/.aenv/envs/<ns>/CLAUDE.md`. The original sits in `.aenv-state/backups/` until deactivate. If you want to keep edits that diverged from the namespace, capture them with `aenv fork <new-name>` before deactivating.
+- **Editing through the symlink edits the namespace, not your original.** While a namespace is active, opening `CLAUDE.md` in your editor follows the symlink into `~/.aenv/envs/<ns>/CLAUDE.md`. The original sits in `.aenv-state/backup/<timestamp>/` until deactivate. If you want to keep edits that diverged from the namespace, capture them with `aenv fork <new-name>` before deactivating.
 - **`.aenv-state/` is the safety net.** Don't delete it by hand while a namespace is active — `aenv` can't restore what it can't see. The directory disappears on its own after a clean deactivate.
+
+### Escape hatch: `aenv restore`
+
+If `aenv deactivate` didn't run cleanly (process killed, user deleted `state.json` by hand, force-deactivated by a script), the backup set on disk is orphaned but recoverable. `aenv restore` reads the *most recent* backup directory under `.aenv-state/backup/` and copies every file back to its original project path — overwriting anything currently there.
+
+```bash
+aenv restore        # restores .aenv-state/backup/<latest-timestamp>/* → project root
+```
+
+Restore uses *copy* semantics (vs deactivate's *move*), so the backup set is left intact — re-runnable if something goes sideways. It also works after `aenv deactivate` only if you have a stale older backup set still on disk; a clean deactivate consumes the corresponding backup, so the typical post-deactivate state is "nothing to restore."
 
 ## Creating your own namespace
 

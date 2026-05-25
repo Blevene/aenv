@@ -78,7 +78,7 @@ ls -la ~/code/the-shaped-project/.aenv 2>&1
 # → No such file or directory
 ```
 
-That means: you can keep working in the source project the way you always have, and the snapshot is a reusable copy living entirely under `~/.aenv/envs/my-existing-style/`. If you later want to activate the snapshot in the source project itself, `aenv use my-existing-style && aenv activate` from there — but `aenv activate` will detect the existing files and back them up to `.aenv-state/backups/` before symlinking (see [README §What happens to your existing files](../../README.md#what-happens-to-your-existing-files)).
+That means: you can keep working in the source project the way you always have, and the snapshot is a reusable copy living entirely under `~/.aenv/envs/my-existing-style/`. If you later want to activate the snapshot in the source project itself, `aenv use my-existing-style && aenv activate` from there — but `aenv activate` will detect the existing files and back them up to `.aenv-state/backup/<timestamp>/` before symlinking (see [README §What happens to your existing files](../../README.md#what-happens-to-your-existing-files)).
 
 ## Step 4: Reuse the captured namespace elsewhere
 

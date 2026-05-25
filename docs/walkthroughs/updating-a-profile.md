@@ -201,7 +201,7 @@ cd ~/code/some-project
 aenv deactivate && aenv activate
 ```
 
-If the project had its own `.mcp.json` *before* aenv first activated, that original file is in `.aenv-state/backups/` and gets restored on `aenv deactivate` — but only as long as the namespace was still managing the path at the time. To be safe: deactivate first, then remove the file from the manifest. See [README §What happens to your existing files](../../README.md#what-happens-to-your-existing-files).
+If the project had its own `.mcp.json` *before* aenv first activated, that original file is in `.aenv-state/backup/<timestamp>/` and gets restored on `aenv deactivate` — but only as long as the namespace was still managing the path at the time. To be safe: deactivate first, then remove the file from the manifest. See [README §What happens to your existing files](../../README.md#what-happens-to-your-existing-files).
 
 ---
 
