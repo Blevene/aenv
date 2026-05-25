@@ -1,0 +1,4 @@
+name = "karpathy"
+
+[adapters.claude-code]
+files = ["CLAUDE.md"]

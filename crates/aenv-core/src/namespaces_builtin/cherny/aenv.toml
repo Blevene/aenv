@@ -1,0 +1,4 @@
+name = "cherny"
+
+[adapters.claude-code]
+files = ["CLAUDE.md"]

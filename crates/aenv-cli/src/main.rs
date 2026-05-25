@@ -227,6 +227,7 @@ fn main() -> ExitCode {
     let result = (|| -> aenv_core::Result<()> {
         let layout = aenv_core::home::RegistryLayout::new(paths::resolve_aenv_home()?);
         aenv_core::adapters_builtin::ensure_written(&fs, &layout.adapters_dir())?;
+        aenv_core::namespaces_builtin::ensure_written(&fs, &layout)?;
         match cli.command {
             Command::Create {
                 name,

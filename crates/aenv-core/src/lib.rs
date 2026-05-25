@@ -26,6 +26,7 @@ pub mod manifest;
 pub mod materialize;
 pub mod merge;
 pub mod namespace;
+pub mod namespaces_builtin;
 pub mod parameters;
 pub mod policies;
 pub mod project;
