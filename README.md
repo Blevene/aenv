@@ -110,6 +110,8 @@ aenv doctor base    # check policy compliance
 
 Functional spec §2 sketches three example harnesses (`experiments`, `detailed-execution`, `analyst`) that illustrate the intended composition style.
 
+For a step-by-step setup-to-first-swap walkthrough, see [`docs/walkthroughs/setup-and-first-swap.md`](./docs/walkthroughs/setup-and-first-swap.md).
+
 ## Try the built-in namespaces
 
 `aenv` ships with two starter namespaces — `karpathy` (surgical, "minimum code to solve the problem") and `cherny` (plan-first, subagent-heavy) — both wired up against the `claude-code` adapter and materialized to `~/.aenv/envs/` automatically on first run. Use them to see the activate / switch / restore loop without authoring anything yourself.
@@ -155,6 +157,8 @@ Three common starting points, in roughly increasing order of "I have something i
 
 ### 1. Start from scratch
 
+Full step-by-step in [`docs/walkthroughs/build-your-own.md`](./docs/walkthroughs/build-your-own.md). The short version:
+
 ```bash
 aenv create my-style --adapter claude-code
 $EDITOR ~/.aenv/envs/my-style/CLAUDE.md   # blank file, ready to write
@@ -177,7 +181,7 @@ Use this when an existing namespace is *most* of what you want and you just need
 
 ### 3. Capture an existing project
 
-If you've already shaped a project's `.claude/` tree and `CLAUDE.md` by hand and want to reuse that setup elsewhere, snapshot it:
+Full step-by-step in [`docs/walkthroughs/snapshot-an-existing-project.md`](./docs/walkthroughs/snapshot-an-existing-project.md). The short version:
 
 ```bash
 cd ~/code/the-shaped-project
@@ -252,6 +256,8 @@ When `my-style` is activated in a project, `my-checker/SKILL.md` materializes at
 
 ### Imported skills — `aenv skill import`
 
+Full step-by-step in [`docs/walkthroughs/install-a-skill-from-github.md`](./docs/walkthroughs/install-a-skill-from-github.md). The reference:
+
 Files live somewhere external — a local path or a git URL — and are fetched at activation time, cached under `~/.aenv/cache/skills/<source-hash>/<ref>/`. Use this when you're pulling in someone else's skill.
 
 ```bash
@@ -298,6 +304,7 @@ aenv skill list --json         # machine-readable
 - **[`tasks/2026-05-22-phase-3-parameters-policies.md`](./tasks/2026-05-22-phase-3-parameters-policies.md)** — Most recent implementation plan (20 tasks, bite-sized, with code and tests inline). Earlier phase plans live alongside it.
 - **[`RELEASING.md`](./RELEASING.md)** — Maintainer guide for cutting a release: tag-triggered GH Actions matrix, version bump, dry-run, rollback.
 - **[`INSTALL_FROM_BINARY.md`](./INSTALL_FROM_BINARY.md)** — End-user guide for installing pre-built Linux / macOS binaries from a GitHub Release (alternative to the build-from-source path in the [Installation section](#installation)).
+- **[`docs/walkthroughs/`](./docs/walkthroughs/)** — Step-by-step recipes for common journeys: [setup + first swap](./docs/walkthroughs/setup-and-first-swap.md), [build your own namespace](./docs/walkthroughs/build-your-own.md), [install a skill from GitHub](./docs/walkthroughs/install-a-skill-from-github.md), [snapshot an existing project](./docs/walkthroughs/snapshot-an-existing-project.md).
 
 ## Building & testing
 
