@@ -3,6 +3,7 @@
 pub mod activate;
 pub mod activate_if_needed;
 pub mod adapter;
+pub mod cache;
 pub mod create;
 pub mod deactivate;
 pub mod delete;

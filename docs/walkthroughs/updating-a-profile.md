@@ -27,8 +27,8 @@ There are two kinds of change you can make to a namespace:
 
 |                                | Add                                 | Update                                                       | Remove                                      |
 |--------------------------------|-------------------------------------|--------------------------------------------------------------|---------------------------------------------|
-| **Skill — authored**           | `aenv skill new <name> --ns <ns>`   | Edit `~/.aenv/envs/<ns>/.claude/skills/<name>/SKILL.md`     | Manifest edit + `rm -rf` (no CLI command yet) |
-| **Skill — imported (git)**     | `aenv skill import git+… --pin <ref>` | Bump `ref =` in manifest, re-activate                      | Manifest edit (cache stays; cheap)          |
+| **Skill — authored**           | `aenv skill new <name> --ns <ns>`   | Edit `~/.aenv/envs/<ns>/.claude/skills/<name>/SKILL.md`     | `aenv skill remove <name> --ns <ns>`        |
+| **Skill — imported (git)**     | `aenv skill import git+… --pin <ref>` | Bump `ref =` in manifest, re-activate                      | `aenv skill remove <name> --ns <ns>` (cache stays; `aenv cache prune` reclaims) |
 | **Instructions (CLAUDE.md etc.)** | Edit manifest `files`, create file | Edit the file in the namespace dir (or via the project symlink) | Edit manifest `files`, `rm` the file        |
 
 Each row in detail below.
@@ -96,7 +96,7 @@ cd ~/code/some-project
 aenv deactivate && aenv activate
 ```
 
-aenv fetches the new ref into a fresh cache directory (the old one stays — cheap, but `aenv cache prune` is a planned future command). The project's symlinks update to point at the new cache.
+aenv fetches the new ref into a fresh cache directory; the old one stays around until you run `aenv cache prune` (which walks every namespace's `[[skills]]` entries and deletes any cache dir nothing references). The project's symlinks update to point at the new cache on the next activate.
 
 ### Changing source URL or `path`
 
@@ -106,34 +106,18 @@ Same flow as bumping the ref — manifest edit, then re-activate. Note that chan
 
 ## Removing a skill
 
-There's no `aenv skill remove` CLI command yet — removal is a manual two-step:
+```bash
+aenv skill remove commit-discipline --ns my-profile
+```
 
-### Authored skill
+For an authored skill this deletes the manifest's `[[skills]]` block AND the on-disk directory at `~/.aenv/envs/my-profile/.claude/skills/commit-discipline/`. For an imported skill it removes only the manifest block — the `~/.aenv/cache/skills/<hash>/<ref>/` clone is left in place so it can serve other namespaces using the same source+ref. Run `aenv cache prune` to reclaim any cache dirs that aren't referenced anywhere.
+
+Either way, re-activate in every project where `my-profile` is in use to drop the now-stale symlink:
 
 ```bash
-# 1. Delete the [[skills]] block from the manifest
-$EDITOR ~/.aenv/envs/my-profile/aenv.toml
-
-# 2. Delete the skill's files from the namespace
-rm -rf ~/.aenv/envs/my-profile/.claude/skills/commit-discipline/
-
-# 3. Re-activate in every project where my-profile is active
 cd ~/code/some-project
 aenv deactivate && aenv activate
 ```
-
-### Imported skill
-
-```bash
-# 1. Delete the [[skills]] block from the manifest
-$EDITOR ~/.aenv/envs/my-profile/aenv.toml
-
-# 2. Re-activate to drop the project symlinks
-cd ~/code/some-project
-aenv deactivate && aenv activate
-```
-
-The cache directory under `~/.aenv/cache/skills/<hash>/<ref>/` is left in place — it's cheap and `aenv` may need it again if you re-add the skill.
 
 ---
 
@@ -230,8 +214,6 @@ aenv status                          # confirms scanpy materialized with resolve
 
 ## What's still in flight
 
-- `aenv skill remove <name> --ns <ns>` — currently a manual manifest edit; CLI command planned.
-- `aenv cache prune` — clean cache directories for refs no longer referenced by any manifest.
 - `aenv install` / `aenv sync` (Phase 6) — pull namespace updates from a git remote so multi-machine sync is automated.
 
 ## What to read next

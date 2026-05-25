@@ -160,6 +160,11 @@ enum Command {
         #[command(subcommand)]
         action: SkillAction,
     },
+    /// Cache operations (currently: prune unreferenced skill clones).
+    Cache {
+        #[command(subcommand)]
+        action: CacheAction,
+    },
     /// Print a shell hook script for sourcing in your rc file. The hook
     /// auto-activates the right namespace as you `cd` between projects.
     ///
@@ -242,6 +247,26 @@ enum SkillAction {
         #[arg(long)]
         json: bool,
     },
+    /// Remove a skill from a namespace.
+    ///
+    /// Deletes the [[skills]] entry from the manifest. For authored
+    /// skills, also removes the on-disk skill directory. For imported
+    /// skills, the `~/.aenv/cache/skills/` clone is left in place — run
+    /// `aenv cache prune` to reclaim space.
+    Remove {
+        /// Skill name to remove.
+        name: String,
+        /// Target namespace.
+        #[arg(long)]
+        ns: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum CacheAction {
+    /// Walk every namespace's [[skills]] entries, collect the
+    /// (source-hash, ref) cache directories in use, delete the rest.
+    Prune,
 }
 
 fn main() -> ExitCode {
@@ -397,6 +422,12 @@ fn main() -> ExitCode {
                 SkillAction::List { ns, json } => {
                     cmd::skill::list::run(&fs, &layout, ns.as_deref(), json)
                 }
+                SkillAction::Remove { name, ns } => {
+                    cmd::skill::remove::run(&fs, &layout, &ns, &name)
+                }
+            },
+            Command::Cache { action } => match action {
+                CacheAction::Prune => cmd::cache::run_prune(&fs, &layout),
             },
             Command::InitShell { shell } => cmd::init_shell::run(&shell),
             Command::ActivateIfNeeded { last_active } => {

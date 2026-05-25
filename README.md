@@ -15,7 +15,7 @@ After `phase-3-complete`, `aenv` can:
 - **Run a doctor check.** `aenv doctor [<ns>]` evaluates four built-in policy evaluators (`instructions_max_chars`, `skill_requires_description`, `mcp_requires_command_or_url`, `forbid_paths`) against the resolved namespace and prints per-policy outcomes. Enforced violations also block `aenv activate` with exit 17 — *before* any file is touched.
 - **Read and write parameters from the CLI.** `aenv get <ns>.<param>` or `aenv get .<param>` (active project) shows the effective value with provenance; `aenv set <ns>.<param> <value>` rewrites the named namespace's manifest, inferring the value type.
 - **Fork to a private copy.** `aenv fork` detaches a whole project from its namespace (replacing symlinks with copies); `aenv fork <file>` detaches just one file; `aenv fork <name>` creates a new namespace populated from the current project state.
-- **Manage skills.** `aenv skill new <name> --ns <ns>` scaffolds an authored skill whose files live in the namespace tree; `aenv skill import <source> --ns <ns>` pulls one in from a local path or git URL, with `--pin <ref>` for reproducibility and `--path <subdir>` for monorepo skill collections (k-dense-ai's `scientific-agent-skills`, etc.).
+- **Manage skills.** `aenv skill new <name> --ns <ns>` scaffolds an authored skill whose files live in the namespace tree; `aenv skill import <source> --ns <ns>` pulls one in from a local path or git URL, with `--pin <ref>` for reproducibility and `--path <subdir>` for monorepo skill collections (k-dense-ai's `scientific-agent-skills`, etc.). `aenv skill remove <name> --ns <ns>` undoes either flavor; `aenv cache prune` reclaims `~/.aenv/cache/skills/` dirs nothing references.
 - **Snapshot an existing project.** `aenv snapshot <name>` walks the project against every installed adapter's `files = [...]` and copies the matches into a new namespace at `~/.aenv/envs/<name>/` — useful for capturing a hand-shaped `.claude/` tree as something portable.
 - **Diff resolved namespaces.** `aenv diff` compares a project's materialized files against the namespace declaration (drift detection); `aenv diff <ns_a> <ns_b>` shows the structural delta between two namespaces. Both ship `--json` for downstream tooling.
 - **Scriptability.** Every read-oriented command — `list`, `status`, `which`, `get`, `doctor`, `skill list`, `adapter list`, `diff` — accepts `--json` and emits a stable schema. Each namespace also carries a resolved-namespace hash you can read off `aenv status` / `aenv list --json` to compare configurations across machines.
@@ -262,9 +262,15 @@ $EDITOR ~/.aenv/envs/<profile>/CLAUDE.md           # live via symlink; no re-act
 # Bump a pinned skill's ref
 $EDITOR ~/.aenv/envs/<profile>/aenv.toml           # change ref = "<new>"
 
-# Remove a skill or file (no CLI command yet — manual two-step)
-$EDITOR ~/.aenv/envs/<profile>/aenv.toml           # delete the [[skills]] block / files[] entry
-rm -rf ~/.aenv/envs/<profile>/.claude/skills/<name>/   # for authored skills only
+# Remove a skill
+aenv skill remove <name> --ns <profile>            # manifest + on-disk dir for authored
+
+# Remove a file (no CLI command yet — manual two-step)
+$EDITOR ~/.aenv/envs/<profile>/aenv.toml           # delete the files[] entry
+rm ~/.aenv/envs/<profile>/<path>
+
+# Reclaim cache space (orphaned imported-skill clones)
+aenv cache prune
 ```
 
 **The gotcha**: any change that adds or removes a managed path (new skill, new file, removed skill, bumped pin) requires `aenv deactivate && aenv activate` in every project where the namespace is currently active. Edits to existing files are live via the symlink and need no re-activate.
