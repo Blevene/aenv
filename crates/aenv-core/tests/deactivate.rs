@@ -209,3 +209,85 @@ fn deactivate_removes_empty_state_directory() {
         ".aenv-state/ should be removed after deactivate when empty"
     );
 }
+
+#[test]
+fn deactivate_prunes_empty_parent_directories() {
+    // Regression: a namespace whose managed files sit several levels deep
+    // (e.g. `.claude/skills/<skill>/references/<file>`) used to leave empty
+    // parent dirs behind after deactivate. Pruning is best-effort, so user
+    // files at the same level are preserved.
+    let aenv_home_dir = tempfile::tempdir().unwrap();
+    let project_dir = tempfile::tempdir().unwrap();
+    let aenv_home = std::fs::canonicalize(aenv_home_dir.path()).unwrap();
+    let project = std::fs::canonicalize(project_dir.path()).unwrap();
+
+    let layout = RegistryLayout::new(aenv_home);
+    let fs = RealFilesystem;
+
+    // Namespace declares the claude-code adapter and a deeply-nested file
+    // (mirroring the layout an imported skill materializes into).
+    let ns_dir = layout.namespace_dir("deep");
+    std::fs::create_dir_all(&ns_dir).unwrap();
+    std::fs::write(
+        layout.manifest_path("deep"),
+        b"name = \"deep\"\n\n[adapters.claude-code]\nfiles = [\".claude/skills/scanpy/references/api.md\"]\n",
+    )
+    .unwrap();
+    let src_dir = ns_dir.join(".claude/skills/scanpy/references");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::write(src_dir.join("api.md"), b"scanpy api").unwrap();
+
+    let mut reg = AdapterRegistry::new();
+    reg.insert(Adapter {
+        name: "claude-code".to_string(),
+        files: vec![".claude/skills/scanpy/references/api.md".to_string()],
+        merge_strategies: Default::default(),
+        roles: Default::default(),
+        default_merge: Default::default(),
+        parameters: vec![],
+        skills_dir: None,
+        soft_limits: Default::default(),
+    });
+
+    // A USER file sitting next to the managed tree must survive deactivate.
+    let user_file = project.join(".claude/notes.md");
+    std::fs::create_dir_all(user_file.parent().unwrap()).unwrap();
+    std::fs::write(&user_file, b"my notes").unwrap();
+
+    activate_namespace(
+        &fs,
+        &layout,
+        &reg,
+        &project,
+        &NamespaceId::new("deep").unwrap(),
+    )
+    .unwrap();
+    assert!(project
+        .join(".claude/skills/scanpy/references/api.md")
+        .exists());
+
+    deactivate_namespace(&fs, &project).unwrap();
+
+    // The empty intermediate dirs that ONLY held managed files should be pruned.
+    assert!(
+        !project.join(".claude/skills/scanpy/references").exists(),
+        ".claude/skills/scanpy/references/ should be pruned"
+    );
+    assert!(
+        !project.join(".claude/skills/scanpy").exists(),
+        ".claude/skills/scanpy/ should be pruned"
+    );
+    assert!(
+        !project.join(".claude/skills").exists(),
+        ".claude/skills/ should be pruned"
+    );
+    // BUT .claude/ contained a user file (notes.md), so it must stay.
+    assert!(
+        project.join(".claude").exists(),
+        ".claude/ must survive — it still holds notes.md"
+    );
+    assert!(
+        user_file.exists(),
+        "user file .claude/notes.md must be untouched"
+    );
+}

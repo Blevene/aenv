@@ -61,6 +61,13 @@ pub fn deactivate_namespace<F: Filesystem>(fs: &F, project_root: &Path) -> Resul
         fs.rename(&backup_path, &original)?;
     }
 
+    // Best-effort: prune empty parent dirs left behind by removed files
+    // (e.g. `.claude/skills/<skill>/references/` after a skill's symlinks
+    // go away). `std::fs::remove_dir` is a no-op on non-empty directories,
+    // so adjacent user files are never touched. Done BEFORE state removal
+    // so an interrupted run leaves the state pointer intact for retry.
+    prune_empty_parents(project_root, &state.managed_files);
+
     // Remove the state file last — its presence is the signal that there's
     // anything to deactivate.
     fs.remove_file(&state_path)?;
@@ -71,4 +78,33 @@ pub fn deactivate_namespace<F: Filesystem>(fs: &F, project_root: &Path) -> Resul
     let _ = std::fs::remove_dir(&state_dir);
 
     Ok(())
+}
+
+/// Remove every empty parent directory of every removed managed file, up to
+/// but not including `project_root`. Best-effort: a non-empty directory
+/// (because the user has their own files there, or another managed file
+/// from the same skill still occupies the path) is left alone — that's
+/// exactly what `std::fs::remove_dir` does already.
+///
+/// Deepest-first ordering matters: pruning `<skill>/references/` after
+/// `<skill>/references/api.md` is removed unblocks pruning `<skill>/` next.
+fn prune_empty_parents(project_root: &Path, files: &[crate::state::ManagedFile]) {
+    use std::collections::BTreeSet;
+    let mut parents: BTreeSet<std::path::PathBuf> = BTreeSet::new();
+    for file in files {
+        let full = project_root.join(&file.path);
+        let mut cur = full.parent();
+        while let Some(dir) = cur {
+            if dir == project_root || !dir.starts_with(project_root) {
+                break;
+            }
+            parents.insert(dir.to_path_buf());
+            cur = dir.parent();
+        }
+    }
+    let mut sorted: Vec<_> = parents.into_iter().collect();
+    sorted.sort_by_key(|p| std::cmp::Reverse(p.components().count()));
+    for dir in sorted {
+        let _ = std::fs::remove_dir(&dir);
+    }
 }
