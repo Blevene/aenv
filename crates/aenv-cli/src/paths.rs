@@ -42,3 +42,29 @@ pub fn resolve_project_root<F: Filesystem>(fs: &F, explicit: Option<PathBuf>) ->
     let cwd = std::env::current_dir().map_err(AenvError::Io)?;
     find_project_root(fs, &cwd)
 }
+
+/// Resolve the project root for commands that CREATE a pin (`aenv use`).
+/// Walks ancestors first — if an existing pin is found in an ancestor, the
+/// command should overwrite that pin (the user is somewhere inside an
+/// existing project tree). When no pin exists anywhere, fall back to cwd:
+/// the user is establishing a new project here.
+pub fn resolve_project_root_for_pin<F: Filesystem>(
+    fs: &F,
+    explicit: Option<PathBuf>,
+) -> Result<PathBuf> {
+    if let Some(p) = explicit {
+        if !p.is_absolute() {
+            return Err(AenvError::ManifestInvalid(format!(
+                "--project must be absolute, got '{}'",
+                p.display()
+            )));
+        }
+        return Ok(p);
+    }
+    let cwd = std::env::current_dir().map_err(AenvError::Io)?;
+    match find_project_root(fs, &cwd) {
+        Ok(root) => Ok(root),
+        Err(AenvError::ProjectNotPinned) => Ok(cwd),
+        Err(other) => Err(other),
+    }
+}

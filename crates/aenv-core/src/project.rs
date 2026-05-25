@@ -48,11 +48,20 @@ pub fn read_pin<F: Filesystem>(fs: &F, project_root: &Path) -> Result<String> {
 /// Walk up from `start` looking for a `.aenv` pin file. Returns the path
 /// containing the nearest-ancestor pin file. Errors `ProjectNotPinned` if
 /// no ancestor (or `start` itself) contains one.
+///
+/// A directory named `.aenv` is NOT a pin — the registry root lives at
+/// `$HOME/.aenv` by default, and the walk must step over it instead of
+/// treating it as a project root.
 pub fn find_project_root<F: Filesystem>(fs: &F, start: &Path) -> Result<PathBuf> {
     let mut current: Option<&Path> = Some(start);
     while let Some(dir) = current {
-        if fs.exists(&dir.join(PIN_FILENAME))? {
-            return Ok(dir.to_path_buf());
+        let candidate = dir.join(PIN_FILENAME);
+        if fs.exists(&candidate)? {
+            let kind = fs.metadata(&candidate)?.kind;
+            if !matches!(kind, crate::fs::FileKind::Directory) {
+                return Ok(dir.to_path_buf());
+            }
+            // Directory at this path is the registry, not a pin. Keep walking.
         }
         current = dir.parent();
     }

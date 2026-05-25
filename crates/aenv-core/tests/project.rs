@@ -95,3 +95,22 @@ fn find_project_root_prefers_nearest_pin_ancestor() {
     let root = find_project_root(&fs, &inner).unwrap();
     assert_eq!(root, inner);
 }
+
+#[test]
+fn find_project_root_skips_dot_aenv_directory() {
+    // Regression: the default AENV_HOME is `$HOME/.aenv`, which is a
+    // directory. If the project-root walk treats it as a pin, every
+    // command run anywhere under $HOME silently resolves to $HOME — and
+    // `aenv use` then tries to overwrite the registry dir with a file
+    // (EISDIR). The walk must only match regular files.
+    let fs = MockFilesystem::new();
+    let home = PathBuf::from("/home/user");
+    // Simulate AENV_HOME at $HOME/.aenv — a directory holding the registry.
+    fs.create_dir_all(&home.join(".aenv/envs")).unwrap();
+    let project = home.join("code/charybdis");
+    fs.create_dir_all(&project).unwrap();
+    // The walk from charybdis must NOT return /home/user just because
+    // $HOME/.aenv exists as a directory.
+    let err = find_project_root(&fs, &project).expect_err("must error");
+    assert!(matches!(err, AenvError::ProjectNotPinned));
+}

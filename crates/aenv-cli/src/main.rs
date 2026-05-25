@@ -248,7 +248,7 @@ fn main() -> ExitCode {
             Command::List { json } => cmd::list::run(&fs, &layout, json),
             Command::Delete { name } => cmd::delete::run(&fs, &layout, &name),
             Command::Use { name, project } => {
-                let project_root = paths::resolve_project_root(&fs, project)?;
+                let project_root = paths::resolve_project_root_for_pin(&fs, project)?;
                 cmd::use_::run(&fs, &layout, &project_root, &name)
             }
             Command::Activate { name, project } => {
