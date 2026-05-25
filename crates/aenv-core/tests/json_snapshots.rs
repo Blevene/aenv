@@ -371,6 +371,7 @@ fn skill_entry_via_builder() {
         adapter: Some("claude-code".into()),
         source: Some("git+https://example.com/skills.git#write-tests".into()),
         ref_: Some("v1.2.0".into()),
+        path: None,
         required: true,
     };
     let entry = SkillEntry::from_decl("leaf", &decl);

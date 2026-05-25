@@ -39,6 +39,13 @@ pub struct SkillDecl {
     /// ref in `state.json`.
     #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
     pub ref_: Option<String>,
+    /// Optional sub-path *within* the resolved source. Lets one git or local
+    /// source supply many skills (monorepo layouts like
+    /// `scientific-skills/<name>/SKILL.md`). Forbidden on authored skills,
+    /// where the path is fixed by the namespace tree. Must be a relative
+    /// path without `..` segments; validated in `manifest.rs`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
     /// When `true`, an unreachable import fails activation (R-22). Default
     /// `false` means: report the failure, omit this skill, continue.
     #[serde(default)]
@@ -81,11 +88,20 @@ pub fn resolve_imported_skill<F: Filesystem>(
     })?;
     let kind = SourceKind::parse(source_str)?;
     match kind {
-        SourceKind::Local(path) => crate::skills::local::resolve_local(fs, &path, &decl.name),
+        SourceKind::Local(path) => {
+            crate::skills::local::resolve_local(fs, &path, &decl.name, decl.path.as_deref())
+        }
         SourceKind::Git { url, ref_spec } => {
             // Use the decl's ref if provided; else use the URL fragment ref.
             let chosen = decl.ref_.as_deref().or(ref_spec.as_deref());
-            crate::skills::git_source::resolve_git(fs, layout, &url, chosen, &decl.name)
+            crate::skills::git_source::resolve_git(
+                fs,
+                layout,
+                &url,
+                chosen,
+                &decl.name,
+                decl.path.as_deref(),
+            )
         }
         SourceKind::Registry(name) => {
             crate::skills::registry::resolve_registry(&name, decl.ref_.as_deref())

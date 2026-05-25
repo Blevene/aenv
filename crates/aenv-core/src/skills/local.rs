@@ -22,11 +22,15 @@ pub struct ResolvedSkill {
     pub resolved_hash: String,
 }
 
-/// Validate that `<source_dir>/SKILL.md` exists and hash its bytes.
+/// Validate that `<source_dir>/<sub_path?>/SKILL.md` exists and hash its
+/// bytes. When `sub_path` is set, the returned `source_path` points at the
+/// sub-directory so the materialization walk doesn't pull in unrelated
+/// siblings from a monorepo layout.
 pub fn resolve_local<F: Filesystem>(
     fs: &F,
     source_dir: &Path,
     _skill_name: &str,
+    sub_path: Option<&str>,
 ) -> Result<ResolvedSkill> {
     if !fs.exists(source_dir)? {
         return Err(AenvError::ManifestInvalid(format!(
@@ -34,16 +38,28 @@ pub fn resolve_local<F: Filesystem>(
             source_dir.display()
         )));
     }
-    let skill_md = source_dir.join("SKILL.md");
+    let effective_dir = match sub_path {
+        Some(rel) => source_dir.join(rel),
+        None => source_dir.to_path_buf(),
+    };
+    if let Some(rel) = sub_path {
+        if !fs.exists(&effective_dir)? {
+            return Err(AenvError::ManifestInvalid(format!(
+                "local skill source {} has no '{rel}' sub-directory",
+                source_dir.display()
+            )));
+        }
+    }
+    let skill_md = effective_dir.join("SKILL.md");
     if !fs.exists(&skill_md)? {
         return Err(AenvError::ManifestInvalid(format!(
             "local skill source {} has no SKILL.md",
-            source_dir.display()
+            effective_dir.display()
         )));
     }
     let bytes = fs.read(&skill_md)?;
     Ok(ResolvedSkill {
-        source_path: source_dir.to_path_buf(),
+        source_path: effective_dir,
         resolved_ref: None,
         resolved_hash: format!("sha256:{}", sha256_hex(&bytes)),
     })

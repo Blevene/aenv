@@ -69,7 +69,7 @@ fn resolves_git_source_to_cache_directory() {
     let url = format!("file://{}", bare.path().display());
 
     let fs = RealFilesystem;
-    let result = resolve_git(&fs, &layout, &url, Some("master"), "dummy-skill").unwrap();
+    let result = resolve_git(&fs, &layout, &url, Some("master"), "dummy-skill", None).unwrap();
     assert!(result.source_path.exists());
     assert!(result.source_path.join("dummy-skill/SKILL.md").exists());
     assert_eq!(result.resolved_ref.as_deref().map(str::len), Some(40));
@@ -88,8 +88,8 @@ fn second_resolution_uses_cache() {
     let url = format!("file://{}", bare.path().display());
     let fs = RealFilesystem;
 
-    let r1 = resolve_git(&fs, &layout, &url, Some("master"), "dummy-skill").unwrap();
-    let r2 = resolve_git(&fs, &layout, &url, Some("master"), "dummy-skill").unwrap();
+    let r1 = resolve_git(&fs, &layout, &url, Some("master"), "dummy-skill", None).unwrap();
+    let r2 = resolve_git(&fs, &layout, &url, Some("master"), "dummy-skill", None).unwrap();
     assert_eq!(r1.source_path, r2.source_path);
     assert_eq!(r1.resolved_ref, r2.resolved_ref);
 }
@@ -103,6 +103,14 @@ fn unreachable_url_returns_remote_unreachable() {
     let aenv_home = tempdir().unwrap();
     let layout = RegistryLayout::new(aenv_home.path().to_path_buf());
     let fs = RealFilesystem;
-    let err = resolve_git(&fs, &layout, "file:///definitely/not/a/repo", None, "x").unwrap_err();
+    let err = resolve_git(
+        &fs,
+        &layout,
+        "file:///definitely/not/a/repo",
+        None,
+        "x",
+        None,
+    )
+    .unwrap_err();
     assert_eq!(err.exit_code(), 14);
 }

@@ -21,6 +21,7 @@ fn resolves_when_local_source_exists() {
         adapter: Some("claude-code".into()),
         source: Some("/local/skill".into()),
         ref_: None,
+        path: None,
         required: false,
     };
     let result = resolve_imported_skill(&fs, &layout(), &decl).unwrap();
@@ -36,6 +37,7 @@ fn required_unreachable_propagates_error() {
         adapter: Some("claude-code".into()),
         source: Some("/does/not/exist".into()),
         ref_: None,
+        path: None,
         required: true,
     };
     let outcome = apply_required_rule(&fs, &layout(), &decl);
@@ -52,6 +54,7 @@ fn unrequired_unreachable_returns_skipped_marker() {
         adapter: Some("claude-code".into()),
         source: Some("/does/not/exist".into()),
         ref_: None,
+        path: None,
         required: false,
     };
     let outcome = apply_required_rule(&fs, &layout(), &decl).unwrap();
@@ -67,6 +70,7 @@ fn authored_decls_panic_or_error() {
         adapter: None,
         source: None,
         ref_: None,
+        path: None,
         required: false,
     };
     let err = apply_required_rule(&fs, &layout(), &decl).unwrap_err();

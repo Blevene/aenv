@@ -210,6 +210,11 @@ enum SkillAction {
         adapter: Option<String>,
         #[arg(long)]
         pin: Option<String>,
+        /// Optional sub-path inside the source. Pick one skill out of a
+        /// monorepo whose layout is `<path>/<name>/SKILL.md` (e.g.
+        /// `--path scientific-skills/scanpy`).
+        #[arg(long)]
+        path: Option<String>,
     },
     /// List every skill in every namespace (or one if --ns).
     List {
@@ -353,6 +358,7 @@ fn main() -> ExitCode {
                     ns,
                     adapter,
                     pin,
+                    path,
                 } => {
                     let adapters_reg = aenv_core::adapter::AdapterRegistry::load_from_dir(
                         &fs,
@@ -366,6 +372,7 @@ fn main() -> ExitCode {
                         &source,
                         adapter.as_deref(),
                         pin.as_deref(),
+                        path.as_deref(),
                     )
                 }
                 SkillAction::List { ns, json } => {

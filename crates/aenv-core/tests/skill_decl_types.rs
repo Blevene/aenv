@@ -8,6 +8,7 @@ fn authored_decl_shape() {
         adapter: Some("claude-code".into()),
         source: None,
         ref_: None,
+        path: None,
         required: false,
     };
     assert_eq!(s.name, "write-tests");
@@ -24,6 +25,7 @@ fn imported_decl_shape() {
         adapter: Some("claude-code".into()),
         source: Some("git+https://github.com/acme/aenv-skills.git#match-conventions".into()),
         ref_: Some("v1.2.0".into()),
+        path: None,
         required: true,
     };
     assert!(matches!(s.mode, SkillMode::Imported));
@@ -54,6 +56,7 @@ fn skill_decl_round_trips_via_toml() {
         adapter: Some("claude-code".into()),
         source: Some("/local/path".into()),
         ref_: None,
+        path: None,
         required: false,
     };
     let rendered = toml::to_string(&s).unwrap();

@@ -7,6 +7,9 @@ use aenv_core::home::RegistryLayout;
 use aenv_core::manifest::AenvManifest;
 use aenv_core::skills::{apply_required_rule, SkillDecl, SkillMode};
 
+// The 8th argument is `path_arg` (Phase 4 sub-path support). Wrapping these
+// in a struct would obscure the call site without simplifying the logic.
+#[allow(clippy::too_many_arguments)]
 pub fn run<F: Filesystem>(
     fs: &F,
     layout: &RegistryLayout,
@@ -15,6 +18,7 @@ pub fn run<F: Filesystem>(
     source: &str,
     adapter_arg: Option<&str>,
     pin: Option<&str>,
+    path_arg: Option<&str>,
 ) -> Result<()> {
     let manifest_path = layout.manifest_path(namespace);
     if !fs.exists(&manifest_path)? {
@@ -38,12 +42,19 @@ pub fn run<F: Filesystem>(
         }
     };
 
-    // Derive a skill name from the source: last path component (for local) or
-    // the URL fragment (for git#ref) or registry name.
-    let skill_name = derive_skill_name(source).ok_or_else(|| {
+    // Derive a skill name. With --path, the path's basename takes precedence
+    // (`scientific-skills/scanpy` → `scanpy`) because the source URL alone
+    // can't pick which skill out of a monorepo we want. Without --path, fall
+    // back to the source-derived name (fragment, repo basename, etc.).
+    let skill_name = match path_arg {
+        Some(p) => skill_name_from_path(p),
+        None => None,
+    }
+    .or_else(|| derive_skill_name(source))
+    .ok_or_else(|| {
         AenvError::ManifestInvalid(format!(
             "could not derive a skill name from source '{source}'; \
-             pick a different source or edit the manifest manually"
+             pick a different source, pass --path, or edit the manifest manually"
         ))
     })?;
 
@@ -59,6 +70,7 @@ pub fn run<F: Filesystem>(
         adapter: Some(adapter_name),
         source: Some(source.to_string()),
         ref_: pin.map(String::from),
+        path: path_arg.map(String::from),
         required: false,
     };
 
@@ -71,10 +83,14 @@ pub fn run<F: Filesystem>(
 
     let _ = adapters; // declarations don't need adapter lookup yet
     let pinned_ref = decl.ref_.clone();
+    let pinned_path = decl.path.clone();
     manifest.skills.push(decl);
     fs.write(&manifest_path, manifest.to_toml().as_bytes())?;
     println!("Imported skill '{skill_name}' into namespace '{namespace}':");
     println!("  - source: {source}");
+    if let Some(p) = pinned_path {
+        println!("  - path: {p}");
+    }
     if let Some(r) = pinned_ref {
         println!("  - pinned ref: {r}");
     } else {
@@ -82,6 +98,15 @@ pub fn run<F: Filesystem>(
     }
     println!("  - registered in {}", manifest_path.display());
     Ok(())
+}
+
+/// `scientific-skills/scanpy` → `scanpy`; bare `scanpy` → `scanpy`.
+/// Returns `None` for empty paths or those ending in a separator.
+fn skill_name_from_path(path: &str) -> Option<String> {
+    std::path::Path::new(path)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .map(std::string::ToString::to_string)
 }
 
 /// Resolve an imported skill once to verify reachability and capture the

@@ -72,6 +72,7 @@ pub fn run<F: Filesystem>(
         adapter: Some(adapter_name),
         source: None,
         ref_: None,
+        path: None,
         required: false,
     });
     fs.write(&manifest_path, manifest.to_toml().as_bytes())?;

@@ -182,6 +182,13 @@ fn validate_skills(skills: &[crate::skills::SkillDecl]) -> crate::error::Result<
                         s.name
                     )));
                 }
+                if s.path.is_some() {
+                    return Err(crate::error::AenvError::ManifestInvalid(format!(
+                        "skill '{}' is authored but declares a path; \
+                         path applies to imported skills only",
+                        s.name
+                    )));
+                }
             }
             crate::skills::SkillMode::Imported => {
                 if s.source.is_none() {
@@ -190,6 +197,40 @@ fn validate_skills(skills: &[crate::skills::SkillDecl]) -> crate::error::Result<
                         s.name
                     )));
                 }
+                if let Some(path) = s.path.as_deref() {
+                    validate_skill_path(&s.name, path)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Reject path traversal and absolute paths in `[[skills]].path`. The path
+/// is rooted at the resolved source (cache dir for git, source dir for
+/// local); escaping it would either pull in unrelated files or, worse, read
+/// outside the registry.
+fn validate_skill_path(skill_name: &str, path: &str) -> crate::error::Result<()> {
+    use std::path::Component;
+    if path.is_empty() {
+        return Err(crate::error::AenvError::ManifestInvalid(format!(
+            "skill '{skill_name}' has empty path; omit the field or set a sub-directory"
+        )));
+    }
+    let parsed = std::path::Path::new(path);
+    if parsed.is_absolute() {
+        return Err(crate::error::AenvError::ManifestInvalid(format!(
+            "skill '{skill_name}' path '{path}' must be relative"
+        )));
+    }
+    for component in parsed.components() {
+        match component {
+            Component::Normal(_) => {}
+            _ => {
+                return Err(crate::error::AenvError::ManifestInvalid(format!(
+                    "skill '{skill_name}' path '{path}' may not contain '..' or other \
+                     non-normal components"
+                )));
             }
         }
     }
