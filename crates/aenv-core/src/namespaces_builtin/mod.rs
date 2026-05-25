@@ -14,6 +14,8 @@ const KARPATHY_AENV_TOML: &str = include_str!("karpathy/aenv.toml");
 const KARPATHY_CLAUDE_MD: &str = include_str!("karpathy/CLAUDE.md");
 const CHERNY_AENV_TOML: &str = include_str!("cherny/aenv.toml");
 const CHERNY_CLAUDE_MD: &str = include_str!("cherny/CLAUDE.md");
+const BLANK_AENV_TOML: &str = include_str!("blank/aenv.toml");
+const BLANK_CLAUDE_MD: &str = include_str!("blank/CLAUDE.md");
 
 const KARPATHY_FILES: &[(&str, &str)] = &[
     ("aenv.toml", KARPATHY_AENV_TOML),
@@ -25,10 +27,18 @@ const CHERNY_FILES: &[(&str, &str)] = &[
     ("CLAUDE.md", CHERNY_CLAUDE_MD),
 ];
 
+const BLANK_FILES: &[(&str, &str)] = &[
+    ("aenv.toml", BLANK_AENV_TOML),
+    ("CLAUDE.md", BLANK_CLAUDE_MD),
+];
+
 /// Every built-in namespace as a (name, files) pair, where `files` is a
 /// list of (relative-path, contents) tuples written under `envs/<name>/`.
-pub const ALL: &[(&str, &[(&str, &str)])] =
-    &[("karpathy", KARPATHY_FILES), ("cherny", CHERNY_FILES)];
+pub const ALL: &[(&str, &[(&str, &str)])] = &[
+    ("karpathy", KARPATHY_FILES),
+    ("cherny", CHERNY_FILES),
+    ("blank", BLANK_FILES),
+];
 
 /// Write every built-in namespace under `layout.namespaces_dir()` if not
 /// already present. A file is skipped if it already exists on disk — even

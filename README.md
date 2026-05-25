@@ -16,7 +16,7 @@ After `phase-3-complete`, `aenv` can:
 - **Read and write parameters from the CLI.** `aenv get <ns>.<param>` or `aenv get .<param>` (active project) shows the effective value with provenance; `aenv set <ns>.<param> <value>` rewrites the named namespace's manifest, inferring the value type.
 - **Fork to a private copy.** `aenv fork` detaches a whole project from its namespace (replacing symlinks with copies); `aenv fork <file>` detaches just one file; `aenv fork <name>` creates a new namespace populated from the current project state.
 
-Ships with built-in adapters for **Claude Code, Cursor, Aider, Cline, Continue, Windsurf, Codex, and a generic MCP adapter** — all embedded in the binary, written to `~/.aenv/adapters/` on first run, and overridable by user edit. Also ships with two starter namespaces (`karpathy`, `cherny`) written to `~/.aenv/envs/` on first run so you have something to switch between out of the box.
+Ships with built-in adapters for **Claude Code, Cursor, Aider, Cline, Continue, Windsurf, Codex, and a generic MCP adapter** — all embedded in the binary, written to `~/.aenv/adapters/` on first run, and overridable by user edit. Also ships with three starter namespaces (`karpathy`, `cherny`, `blank`) written to `~/.aenv/envs/` on first run so you have something to switch between out of the box.
 
 ## What's still in flight
 
@@ -112,7 +112,7 @@ Functional spec §2 sketches three example harnesses (`experiments`, `detailed-e
 
 ## Try the built-in namespaces
 
-`aenv` ships with two starter namespaces — `karpathy` (surgical, "minimum code to solve the problem") and `cherny` (plan-first, subagent-heavy) — both wired up against the `claude-code` adapter and materialized to `~/.aenv/envs/` automatically on first run. Use them to see the activate / switch / restore loop without authoring anything yourself.
+`aenv` ships with three starter namespaces — `karpathy` (surgical, "minimum code to solve the problem"), `cherny` (plan-first, subagent-heavy), and `blank` (placeholder scaffold designed for editing) — all wired up against the `claude-code` adapter and materialized to `~/.aenv/envs/` automatically on first run. Use them to see the activate / switch / restore loop without authoring anything yourself.
 
 ```bash
 aenv list                 # karpathy and cherny show up out of the box
@@ -132,7 +132,74 @@ aenv deactivate           # back to the original project state
 aenv unpin                # also drop the .aenv pin file
 ```
 
-The two starter namespaces are regular namespaces — edit `~/.aenv/envs/karpathy/CLAUDE.md` to tailor it, or copy one as the starting point for your own (`aenv create mine --extends karpathy`). Once a file exists on disk `aenv` won't overwrite it on subsequent runs, so your edits stick.
+The starter namespaces are regular namespaces — edit `~/.aenv/envs/karpathy/CLAUDE.md` to tailor it, or copy one as the starting point for your own (`aenv create mine --extends karpathy`). Once a file exists on disk `aenv` won't overwrite it on subsequent runs, so your edits stick.
+
+## Creating your own namespace
+
+There are four common starting points, in roughly increasing order of "I have something in mind."
+
+### 1. Use `blank` as a scratchpad
+
+The shipped `blank` namespace is a placeholder designed for editing. Activate it in a project, edit the materialized `CLAUDE.md` (which is a symlink pointing straight at `~/.aenv/envs/blank/CLAUDE.md`), and when you like what you have, capture it as a real named namespace:
+
+```bash
+cd ~/code/some-project
+aenv use blank
+aenv activate
+$EDITOR CLAUDE.md           # edits ~/.aenv/envs/blank/CLAUDE.md via the symlink
+aenv fork my-style          # clones the customized blank into a new namespace
+```
+
+`aenv fork <name>` (when `<name>` doesn't refer to a project file) clones the project's active namespace into a new one under `~/.aenv/envs/`, leaving the original untouched. After this, `blank` is back to "blank" the next time you reach for it.
+
+### 2. Extend an existing namespace
+
+Composition is first-class — your namespace inherits everything from its parent and overrides section-by-section:
+
+```bash
+aenv create my-style --extends karpathy
+$EDITOR ~/.aenv/envs/my-style/CLAUDE.md      # adds to / overrides karpathy's content
+```
+
+Use this when an existing namespace is *most* of what you want and you just need to add or tweak a few rules.
+
+### 3. Start from scratch
+
+```bash
+aenv create my-style --adapter claude-code
+echo "## My rules" > ~/.aenv/envs/my-style/CLAUDE.md
+
+# Then declare the file in the manifest:
+#   [adapters.claude-code]
+#   files = ["CLAUDE.md"]
+```
+
+`--adapter` seeds an empty adapter block in the manifest but doesn't declare any files for you — that's your call. Add `files = ["CLAUDE.md", ".claude/**/*"]` if you want a `CLAUDE.md` plus a whole `.claude/` tree.
+
+### 4. Capture an existing project
+
+If you've already shaped a project's `.claude/` tree and `CLAUDE.md` by hand and want to reuse that setup elsewhere, snapshot it:
+
+```bash
+cd ~/code/the-shaped-project
+aenv snapshot my-existing-style
+```
+
+This walks the project, copies every adapter-managed file into a new namespace at `~/.aenv/envs/my-existing-style/`, and registers it. The project's `.aenv` pin is *not* updated — `snapshot` is a one-way capture, not an activation step.
+
+### Iterating
+
+Whatever path you used, the edit-test loop is the same:
+
+```bash
+cd ~/code/some-project
+aenv use my-style && aenv activate
+# work...
+$EDITOR ~/.aenv/envs/my-style/CLAUDE.md   # symlink means edits are live; no re-activate needed
+aenv status                                # confirm provenance
+```
+
+To share a namespace across machines, `git init ~/.aenv/envs/my-style && git push` — namespace directories are just files. Phase 6 adds first-class `aenv install` / `aenv sync` over git remotes.
 
 ## Reading order
 

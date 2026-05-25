@@ -11,9 +11,9 @@ fn layout() -> RegistryLayout {
 }
 
 #[test]
-fn ships_karpathy_and_cherny() {
+fn ships_karpathy_cherny_blank() {
     let names: Vec<&str> = ALL.iter().map(|(n, _)| *n).collect();
-    assert_eq!(names, vec!["karpathy", "cherny"]);
+    assert_eq!(names, vec!["karpathy", "cherny", "blank"]);
 }
 
 #[test]
