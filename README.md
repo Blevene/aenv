@@ -16,7 +16,7 @@ After `phase-3-complete`, `aenv` can:
 - **Read and write parameters from the CLI.** `aenv get <ns>.<param>` or `aenv get .<param>` (active project) shows the effective value with provenance; `aenv set <ns>.<param> <value>` rewrites the named namespace's manifest, inferring the value type.
 - **Fork to a private copy.** `aenv fork` detaches a whole project from its namespace (replacing symlinks with copies); `aenv fork <file>` detaches just one file; `aenv fork <name>` creates a new namespace populated from the current project state.
 
-Ships with built-in adapters for **Claude Code, Cursor, Aider, Cline, Continue, Windsurf, and a generic MCP adapter** — all embedded in the binary, written to `~/.aenv/adapters/` on first run, and overridable by user edit.
+Ships with built-in adapters for **Claude Code, Cursor, Aider, Cline, Continue, Windsurf, Codex, and a generic MCP adapter** — all embedded in the binary, written to `~/.aenv/adapters/` on first run, and overridable by user edit. Also ships with two starter namespaces (`karpathy`, `cherny`) written to `~/.aenv/envs/` on first run so you have something to switch between out of the box.
 
 ## What's still in flight
 
@@ -27,13 +27,74 @@ The roadmap (see [`tasks/todo.md`](./tasks/todo.md)) has four phases left:
 - **Phase 6** — Shell integration (`cd`-based auto-activation), git remotes, `aenv install`, `aenv sync`, `aenv promote`.
 - **Phase 7** — Windows symlink fallback, cross-platform CI, v0.1.0 release.
 
+## Installation
+
+`aenv` ships as a single static binary. Two install paths:
+
+- **Pre-built binary (Linux + macOS).** Recommended once a release has been cut — see [`INSTALL_FROM_BINARY.md`](./INSTALL_FROM_BINARY.md) for the download / checksum / install steps. Windows is not yet supported (Phase 7).
+- **Build from source.** The path below. Always works, no release dependency, and required for Windows users until the Phase 7 symlink fallback lands.
+
+### Prerequisites
+
+- **Rust toolchain 1.85 or newer.** Install via [rustup](https://rustup.rs):
+  ```bash
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+  ```
+- **Git**, to clone the repository.
+- **A POSIX filesystem with symlink support.** Linux and macOS are fully supported today. Windows works for read-only commands (`aenv list`, `aenv status`); `aenv activate` needs the symlink fallback landing in Phase 7.
+
+### Build and install
+
+```bash
+git clone https://github.com/blevene/aenv
+cd aenv
+cargo install --path crates/aenv-cli --locked
+```
+
+`cargo install` compiles the `aenv-cli` package and drops the `aenv` binary into `~/.cargo/bin/`, which `rustup` already adds to your shell's `PATH`. If you didn't install Rust via `rustup`, ensure `~/.cargo/bin` is on `PATH`:
+
+```bash
+echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.zshrc   # or ~/.bashrc
+```
+
+### Verify
+
+```bash
+aenv --version            # → aenv 0.0.1
+aenv list                 # → shows the karpathy + cherny starter namespaces
+```
+
+The first invocation populates the registry at `~/.aenv/`:
+
+```
+~/.aenv/
+├── adapters/             # 8 built-in adapter manifests (claude-code, codex, cursor, …)
+└── envs/
+    ├── karpathy/         # starter namespace + CLAUDE.md
+    └── cherny/           # starter namespace + CLAUDE.md
+```
+
+Override the registry root with `AENV_HOME=/some/path aenv …` — useful for keeping work / personal configs separate, or for testing changes against a clean state.
+
+### Updating
+
+```bash
+cd path/to/aenv && git pull
+cargo install --path crates/aenv-cli --locked --force
+```
+
+`--force` is what tells `cargo install` to overwrite the existing binary. Your `~/.aenv/` registry — including any namespaces you've edited or created — is untouched.
+
+### Uninstalling
+
+```bash
+cargo uninstall aenv-cli   # removes the binary
+rm -rf ~/.aenv             # optional: discard the registry and your namespaces
+```
+
 ## Quick start
 
 ```bash
-# Build (Rust 1.85+ stable)
-cargo build --release --workspace
-alias aenv=./target/release/aenv     # or copy to ~/.local/bin/aenv
-
 # Create a namespace
 aenv create base
 $EDITOR ~/.aenv/envs/base/aenv.toml  # add [adapters], [parameters], [policies]
@@ -49,6 +110,30 @@ aenv doctor base    # check policy compliance
 
 Functional spec §2 sketches three example harnesses (`experiments`, `detailed-execution`, `analyst`) that illustrate the intended composition style.
 
+## Try the built-in namespaces
+
+`aenv` ships with two starter namespaces — `karpathy` (surgical, "minimum code to solve the problem") and `cherny` (plan-first, subagent-heavy) — both wired up against the `claude-code` adapter and materialized to `~/.aenv/envs/` automatically on first run. Use them to see the activate / switch / restore loop without authoring anything yourself.
+
+```bash
+aenv list                 # karpathy and cherny show up out of the box
+
+cd ~/code/my-project
+aenv use karpathy         # write the .aenv pin
+aenv activate             # materialize CLAUDE.md (Symlink into ~/.aenv/envs/karpathy)
+head -3 CLAUDE.md         # → "## 1. Think Before Coding"
+
+# Swap to the other style without leaving the project
+aenv deactivate           # restore whatever CLAUDE.md was there before (or remove it)
+aenv use cherny
+aenv activate
+head -3 CLAUDE.md         # → "## Workflow Orchestration"
+
+aenv deactivate           # back to the original project state
+aenv unpin                # also drop the .aenv pin file
+```
+
+The two starter namespaces are regular namespaces — edit `~/.aenv/envs/karpathy/CLAUDE.md` to tailor it, or copy one as the starting point for your own (`aenv create mine --extends karpathy`). Once a file exists on disk `aenv` won't overwrite it on subsequent runs, so your edits stick.
+
 ## Reading order
 
 - **[`pm_docs/aenv-prd.md`](./pm_docs/aenv-prd.md)** — Product requirements in EARS format. The public contract (87 requirements, R-1 through R-87).
@@ -56,12 +141,14 @@ Functional spec §2 sketches three example harnesses (`experiments`, `detailed-e
 - **[`pm_docs/aenv-engineering.md`](./pm_docs/aenv-engineering.md)** — Internal implementation decisions: Rust, crate selection, error / exit-code strategy, `Filesystem` trait, namespace identity model, hash specification.
 - **[`tasks/todo.md`](./tasks/todo.md)** — Phase-by-phase implementation roadmap mapped back to PRD requirements.
 - **[`tasks/2026-05-22-phase-3-parameters-policies.md`](./tasks/2026-05-22-phase-3-parameters-policies.md)** — Most recent implementation plan (20 tasks, bite-sized, with code and tests inline). Earlier phase plans live alongside it.
+- **[`RELEASING.md`](./RELEASING.md)** — Maintainer guide for cutting a release: tag-triggered GH Actions matrix, version bump, dry-run, rollback.
+- **[`INSTALL_FROM_BINARY.md`](./INSTALL_FROM_BINARY.md)** — End-user guide for installing pre-built Linux / macOS binaries from a GitHub Release (alternative to the build-from-source path in the [Installation section](#installation)).
 
 ## Building & testing
 
 ```bash
 cargo build --workspace
-cargo test --workspace                            # ~330 tests
+cargo test --workspace                            # ~500 tests
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --check
 ```
