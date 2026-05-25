@@ -120,6 +120,8 @@ Trades reproducibility for staying current. State.json records the resolved SHA 
 
 ## What is `--pin` and where do I get the ref from?
 
+**Required?** Optional. `aenv skill import <source> --ns <ns>` works without it — aenv just resolves to whatever the source's default branch HEAD points at on each activation. The recommendation is to *always* pin for anything you'll want to revisit, share with a teammate, or check into git, because without a pin you have no guarantee that two activations a week apart fetch the same content.
+
 `--pin <ref>` locks the skill to a specific point in the source repo's history. Without it, aenv resolves to whatever the repo's default branch points at each time you activate — fine for casually trying a skill, but means two machines (or you, six months later) can see different content for the same namespace.
 
 Three things you can pass to `--pin`:
