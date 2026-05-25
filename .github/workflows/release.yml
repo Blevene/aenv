@@ -15,8 +15,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Pin ubuntu-22.04 (glibc 2.35) for portability — ubuntu-latest is
+          # currently 24.04 which links against glibc 2.39 and breaks on any
+          # distro a release or two behind. aarch64-linux is unaffected because
+          # `cross` builds inside a Docker image with an older glibc baseline.
           - target: x86_64-unknown-linux-gnu
-            runner: ubuntu-latest
+            runner: ubuntu-22.04
             cross: false
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-latest

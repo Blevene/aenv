@@ -14,8 +14,8 @@ End-user install instructions live in [`INSTALL_FROM_BINARY.md`](./INSTALL_FROM_
 
 | Target triple | Runner | Build path |
 |---|---|---|
-| `x86_64-unknown-linux-gnu` | `ubuntu-latest` | Native `cargo build` |
-| `aarch64-unknown-linux-gnu` | `ubuntu-latest` | [`cross`](https://github.com/cross-rs/cross) (Docker) |
+| `x86_64-unknown-linux-gnu` | `ubuntu-22.04` (pinned for glibc 2.35 portability) | Native `cargo build` |
+| `aarch64-unknown-linux-gnu` | `ubuntu-latest` | [`cross`](https://github.com/cross-rs/cross) (Docker; older glibc baseline) |
 | `x86_64-apple-darwin` | `macos-15-intel` | Native `cargo build` |
 | `aarch64-apple-darwin` | `macos-15` | Native `cargo build` |
 
