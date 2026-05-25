@@ -304,7 +304,7 @@ aenv skill list --json         # machine-readable
 - **[`tasks/2026-05-22-phase-3-parameters-policies.md`](./tasks/2026-05-22-phase-3-parameters-policies.md)** — Most recent implementation plan (20 tasks, bite-sized, with code and tests inline). Earlier phase plans live alongside it.
 - **[`RELEASING.md`](./RELEASING.md)** — Maintainer guide for cutting a release: tag-triggered GH Actions matrix, version bump, dry-run, rollback.
 - **[`INSTALL_FROM_BINARY.md`](./INSTALL_FROM_BINARY.md)** — End-user guide for installing pre-built Linux / macOS binaries from a GitHub Release (alternative to the build-from-source path in the [Installation section](#installation)).
-- **[`docs/walkthroughs/`](./docs/walkthroughs/)** — Step-by-step recipes for common journeys: [setup + first swap](./docs/walkthroughs/setup-and-first-swap.md), [build your own namespace](./docs/walkthroughs/build-your-own.md), [install a skill from GitHub](./docs/walkthroughs/install-a-skill-from-github.md), [snapshot an existing project](./docs/walkthroughs/snapshot-an-existing-project.md).
+- **[`docs/walkthroughs/`](./docs/walkthroughs/)** — Step-by-step recipes for common journeys: [setup + first swap](./docs/walkthroughs/setup-and-first-swap.md), [build your own namespace](./docs/walkthroughs/build-your-own.md), [install a skill from GitHub](./docs/walkthroughs/install-a-skill-from-github.md), [snapshot an existing project](./docs/walkthroughs/snapshot-an-existing-project.md), [update an existing profile](./docs/walkthroughs/updating-a-profile.md).
 
 ## Building & testing
 
