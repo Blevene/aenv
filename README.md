@@ -134,6 +134,21 @@ aenv unpin                # also drop the .aenv pin file
 
 The starter namespaces are regular namespaces — edit `~/.aenv/envs/karpathy/CLAUDE.md` to tailor it, or copy one as the starting point for your own (`aenv create mine --extends karpathy`). Once a file exists on disk `aenv` won't overwrite it on subsequent runs, so your edits stick.
 
+## What happens to your existing files
+
+`aenv` only touches files when you run `aenv activate`. Until then — and after `aenv deactivate` — your project is exactly what you left it. A hand-authored `CLAUDE.md` (or `.cursorrules`, or anything else a namespace might manage) sits untouched if you've never activated.
+
+When activation finds a file it's about to manage:
+
+1. The existing file is **renamed to `.aenv-state/backups/<file>.<timestamp>`** and the rename is recorded in `.aenv-state/state.json`.
+2. The namespace's version takes its place — symlinked by default, copied or merged where the strategy demands.
+3. On `aenv deactivate` (and on `aenv unpin`, which auto-deactivates), the backup is `mv`-ed back into place — byte-for-byte identical to what was there before. Files aenv *created* (paths that didn't exist pre-activation) are simply removed; no backup to restore.
+
+Two practical consequences:
+
+- **Editing through the symlink edits the namespace, not your original.** While a namespace is active, opening `CLAUDE.md` in your editor follows the symlink into `~/.aenv/envs/<ns>/CLAUDE.md`. The original sits in `.aenv-state/backups/` until deactivate. If you want to keep edits that diverged from the namespace, capture them with `aenv fork <new-name>` before deactivating.
+- **`.aenv-state/` is the safety net.** Don't delete it by hand while a namespace is active — `aenv` can't restore what it can't see. The directory disappears on its own after a clean deactivate.
+
 ## Creating your own namespace
 
 There are four common starting points, in roughly increasing order of "I have something in mind."
