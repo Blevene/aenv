@@ -118,6 +118,41 @@ aenv skill import git+https://github.com/example/skill --ns my-style
 ```
 Trades reproducibility for staying current. State.json records the resolved SHA each time, so you can audit.
 
+## What is `--pin` and where do I get the ref from?
+
+`--pin <ref>` locks the skill to a specific point in the source repo's history. Without it, aenv resolves to whatever the repo's default branch points at each time you activate — fine for casually trying a skill, but means two machines (or you, six months later) can see different content for the same namespace.
+
+Three things you can pass to `--pin`:
+
+| Form | What it is | Where on GitHub | Stability |
+|---|---|---|---|
+| **Tag** (e.g. `v1.0`, `v2.39.0`) | A human-named release marker | Repo page → **Releases** in the right sidebar, *or* click the branch dropdown (top-left) → **Tags** tab | Usually immutable; a maintainer *can* move a tag but it's a strong convention not to |
+| **Commit SHA** (e.g. `07cbeeabd6022827c7ae88710af247472bd5d77e`) | The hex hash of a specific commit | Click any commit (Repo → **Commits**); the URL ends with the full SHA. The 7-char short form (e.g. `07cbeea`) works too. | Truly immutable — the SHA is computed from the commit's content |
+| **Branch name** (e.g. `main`, `develop`) | A moving pointer | The branch dropdown at top-left of the repo page | Resolves to whatever HEAD of that branch is *at the moment you import*; the recorded `ref` in the manifest is the full SHA at that moment, so it doesn't auto-update on re-activation |
+
+Regardless of which form you pass, aenv records the **full resolved SHA** in your manifest. So `--pin main` at noon and `--pin <sha-at-noon>` produce the same manifest — the difference is what happens if you later re-import (the branch form re-resolves; the SHA form is locked).
+
+### How to read a SHA off a GitHub repo without tags
+
+[`tasteray/skills`](https://github.com/tasteray/skills) is a real example of a repo with no releases or tags. To find a commit SHA:
+
+1. Open the repo page.
+2. Click **Commits** (under the branch dropdown, or at `https://github.com/<owner>/<repo>/commits/main`).
+3. The top entry is the most recent commit. Click the short SHA on the right (~7 chars) — the URL changes to `…/commit/<full-sha>`. Copy the full SHA from the URL.
+4. Alternatively, on any GitHub page press `y` to convert the URL to a permalink that includes the full SHA.
+
+For [`k-dense-ai/scientific-agent-skills`](https://github.com/k-dense-ai/scientific-agent-skills), which *does* have releases:
+
+1. Open the repo page → **Releases** in the right sidebar.
+2. Pick a release (e.g. `v2.39.0`).
+3. Pass `--pin v2.39.0` to aenv. (Tags read more cleanly in the manifest than 40-char SHAs.)
+
+### Which form to use
+
+- **Prefer a tag** if the repo has them. Semantic, stable, easy to read later. Tag names beat SHAs for code-review readability when you check in your namespace's `aenv.toml` to git.
+- **Use a commit SHA** if there are no tags, or if you need a guarantee that a misbehaving maintainer can't move the version under you. SHAs are the only form that's *content-addressed* — they can't lie about what they point at.
+- **Use a branch name** only when you actually want to track that branch's head, *and* you understand that aenv freezes the resolved SHA on import (re-import to pick up newer commits).
+
 ## What to read next
 
 - [Snapshot an existing project](./snapshot-an-existing-project.md) — the opposite direction: capture what's already there
