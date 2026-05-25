@@ -235,6 +235,28 @@ aenv status                                # confirm provenance
 
 To share a namespace across machines, `git init ~/.aenv/envs/my-style && git push` — namespace directories are just files. Phase 6 adds first-class `aenv install` / `aenv sync` over git remotes.
 
+## Updating a profile
+
+Day-to-day changes on an existing namespace — adding a skill, bumping a pinned ref, editing instructions, removing things — follow a few patterns. Full step-by-step in [`docs/walkthroughs/updating-a-profile.md`](./docs/walkthroughs/updating-a-profile.md). The cheat sheet:
+
+```bash
+# Add a skill (authored or imported)
+aenv skill new <name> --ns <profile>
+aenv skill import git+<url> --ns <profile> --pin <ref> [--path <subdir>]
+
+# Edit existing content (CLAUDE.md, an existing SKILL.md, etc.)
+$EDITOR ~/.aenv/envs/<profile>/CLAUDE.md           # live via symlink; no re-activate
+
+# Bump a pinned skill's ref
+$EDITOR ~/.aenv/envs/<profile>/aenv.toml           # change ref = "<new>"
+
+# Remove a skill or file (no CLI command yet — manual two-step)
+$EDITOR ~/.aenv/envs/<profile>/aenv.toml           # delete the [[skills]] block / files[] entry
+rm -rf ~/.aenv/envs/<profile>/.claude/skills/<name>/   # for authored skills only
+```
+
+**The gotcha**: any change that adds or removes a managed path (new skill, new file, removed skill, bumped pin) requires `aenv deactivate && aenv activate` in every project where the namespace is currently active. Edits to existing files are live via the symlink and need no re-activate.
+
 ## Skills
 
 Skills are reusable instruction bundles — typically a `SKILL.md` with YAML frontmatter, plus any supporting `references/`, `scripts/`, `assets/` — that the agent should invoke for specific tasks. aenv manages them as part of a namespace's content: when you activate the namespace, every declared skill materializes under the adapter's `skills_dir` in your project (`.claude/skills/<name>/` for the claude-code adapter).
