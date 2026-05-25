@@ -22,8 +22,11 @@ pub fn run<F: Filesystem>(fs: &F, project_root: &Path) -> Result<()> {
     // Auto-deactivate if active.
     let state_path = project_root.join(".aenv-state/state.json");
     if fs.exists(&state_path)? {
-        deactivate_namespace(fs, project_root)?;
-        println!("Deactivated namespace in {}.", project_root.display());
+        let name = deactivate_namespace(fs, project_root)?;
+        println!(
+            "Deactivated namespace '{name}' in {}.",
+            project_root.display()
+        );
     }
 
     // Remove the pin file.

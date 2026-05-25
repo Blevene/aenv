@@ -14,10 +14,13 @@ use std::path::Path;
 /// are left alone — they were the user's to begin with. After a
 /// successful deactivation, `.aenv-state/state.json` is removed.
 ///
+/// Returns the name of the namespace that was deactivated, so callers can
+/// surface it in user-facing messages without re-reading state.json.
+///
 /// Missing state.json -> `ActivationConflict` (exit 13). A missing pin
 /// file is a distinct condition (`ProjectNotPinned`, exit 20) — a user
 /// can be pinned but not activated.
-pub fn deactivate_namespace<F: Filesystem>(fs: &F, project_root: &Path) -> Result<()> {
+pub fn deactivate_namespace<F: Filesystem>(fs: &F, project_root: &Path) -> Result<String> {
     let state_path = project_root.join(".aenv-state/state.json");
     if !fs.exists(&state_path)? {
         return Err(AenvError::ActivationConflict(format!(
@@ -29,6 +32,7 @@ pub fn deactivate_namespace<F: Filesystem>(fs: &F, project_root: &Path) -> Resul
     let text = std::str::from_utf8(&bytes)
         .map_err(|e| AenvError::ManifestInvalid(format!("state.json: not utf-8: {e}")))?;
     let state = ActivationState::from_json(text)?;
+    let active_namespace = state.active_namespace.clone();
 
     // Remove materialized files first.
     for file in &state.managed_files {
@@ -77,7 +81,7 @@ pub fn deactivate_namespace<F: Filesystem>(fs: &F, project_root: &Path) -> Resul
     let state_dir = project_root.join(".aenv-state");
     let _ = std::fs::remove_dir(&state_dir);
 
-    Ok(())
+    Ok(active_namespace)
 }
 
 /// Remove every empty parent directory of every removed managed file, up to
