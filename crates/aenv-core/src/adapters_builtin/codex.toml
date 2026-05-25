@@ -1,0 +1,12 @@
+name = "codex"
+files = ["AGENTS.md"]
+
+[roles]
+"AGENTS.md" = "instructions"
+
+[soft_limits]
+instructions = 5000
+
+[[parameters]]
+name = "instructions_budget"
+type = "integer"

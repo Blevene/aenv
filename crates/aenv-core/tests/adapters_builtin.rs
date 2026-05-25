@@ -6,8 +6,8 @@ use aenv_core::fs::{Filesystem, MockFilesystem};
 use std::path::Path;
 
 #[test]
-fn all_seven_adapters_parse_cleanly() {
-    assert_eq!(ALL.len(), 7);
+fn all_eight_adapters_parse_cleanly() {
+    assert_eq!(ALL.len(), 8);
     for (name, body) in ALL {
         let parsed: Adapter =
             toml::from_str(body).unwrap_or_else(|e| panic!("adapter {name} failed to parse: {e}"));
@@ -51,6 +51,10 @@ fn instructions_role_present_on_text_rules_adapters() {
             .map(String::as_str),
         Some("instructions")
     );
+    assert_eq!(
+        parsed["codex"].roles.get("AGENTS.md").map(String::as_str),
+        Some("instructions")
+    );
 }
 
 #[test]
@@ -83,7 +87,7 @@ fn deep_default_merge_on_structured_files() {
 }
 
 #[test]
-fn ensure_written_creates_all_seven_files() {
+fn ensure_written_creates_all_eight_files() {
     let fs = MockFilesystem::new();
     let dir = Path::new("/aenv/adapters");
     aenv_core::adapters_builtin::ensure_written(&fs, dir).unwrap();

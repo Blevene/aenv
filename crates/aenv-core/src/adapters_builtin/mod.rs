@@ -22,6 +22,8 @@ pub const CONTINUE: &str = include_str!("continue_.toml");
 pub const WINDSURF: &str = include_str!("windsurf.toml");
 /// The mcp adapter, embedded at compile time.
 pub const MCP: &str = include_str!("mcp.toml");
+/// The codex adapter, embedded at compile time.
+pub const CODEX: &str = include_str!("codex.toml");
 
 /// Every built-in adapter as a (adapter_name, contents) pair.
 pub const ALL: &[(&str, &str)] = &[
@@ -32,6 +34,7 @@ pub const ALL: &[(&str, &str)] = &[
     ("continue", CONTINUE),
     ("windsurf", WINDSURF),
     ("mcp", MCP),
+    ("codex", CODEX),
 ];
 
 /// Every built-in adapter as a (filename, contents) pair.

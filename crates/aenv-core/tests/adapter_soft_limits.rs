@@ -41,7 +41,7 @@ fn builtins_declare_expected_limits() {
                 assert_eq!(adapter.soft_limits.get("instructions"), Some(&6000));
                 found_windsurf = true;
             }
-            "cursor" | "cline" | "continue" | "aider" => {
+            "cursor" | "cline" | "continue" | "aider" | "codex" => {
                 assert_eq!(
                     adapter.soft_limits.get("instructions"),
                     Some(&5000),
