@@ -15,14 +15,14 @@ After `phase-3-complete`, `aenv` can:
 - **Run a doctor check.** `aenv doctor [<ns>]` evaluates four built-in policy evaluators (`instructions_max_chars`, `skill_requires_description`, `mcp_requires_command_or_url`, `forbid_paths`) against the resolved namespace and prints per-policy outcomes. Enforced violations also block `aenv activate` with exit 17 — *before* any file is touched.
 - **Read and write parameters from the CLI.** `aenv get <ns>.<param>` or `aenv get .<param>` (active project) shows the effective value with provenance; `aenv set <ns>.<param> <value>` rewrites the named namespace's manifest, inferring the value type.
 - **Fork to a private copy.** `aenv fork` detaches a whole project from its namespace (replacing symlinks with copies); `aenv fork <file>` detaches just one file; `aenv fork <name>` creates a new namespace populated from the current project state.
+- **Manage skills.** `aenv skill new <name> --ns <ns>` scaffolds an authored skill whose files live in the namespace tree; `aenv skill import <source> --ns <ns>` pulls one in from a local path or git URL, with `--pin <ref>` for reproducibility and `--path <subdir>` for monorepo skill collections (k-dense-ai's `scientific-agent-skills`, etc.).
 
 Ships with built-in adapters for **Claude Code, Cursor, Aider, Cline, Continue, Windsurf, Codex, and a generic MCP adapter** — all embedded in the binary, written to `~/.aenv/adapters/` on first run, and overridable by user edit. Also ships with three starter namespaces (`karpathy`, `cherny`, `blank`) written to `~/.aenv/envs/` on first run so you have something to switch between out of the box.
 
 ## What's still in flight
 
-The roadmap (see [`tasks/todo.md`](./tasks/todo.md)) has four phases left:
+The roadmap (see [`tasks/todo.md`](./tasks/todo.md)) has three phases left:
 
-- **Phase 4** — Skills lifecycle: `aenv skill new`, `aenv skill import` (local + git), pinned vs floating refs.
 - **Phase 5** — Resolved-namespace hash + `--json` on every read-oriented command + `aenv diff`. Designed for downstream eval tools.
 - **Phase 6** — Shell integration (`cd`-based auto-activation), git remotes, `aenv install`, `aenv sync`, `aenv promote`.
 - **Phase 7** — Windows symlink fallback, cross-platform CI, v0.1.0 release.
@@ -200,6 +200,55 @@ aenv status                                # confirm provenance
 ```
 
 To share a namespace across machines, `git init ~/.aenv/envs/my-style && git push` — namespace directories are just files. Phase 6 adds first-class `aenv install` / `aenv sync` over git remotes.
+
+## Skills
+
+Skills are reusable instruction bundles — typically a `SKILL.md` with YAML frontmatter, plus any supporting `references/`, `scripts/`, `assets/` — that the agent should invoke for specific tasks. aenv manages them as part of a namespace's content: when you activate the namespace, every declared skill materializes under the adapter's `skills_dir` in your project (`.claude/skills/<name>/` for the claude-code adapter).
+
+Two flavors, distinguished by where the files live.
+
+### Authored skills — `aenv skill new`
+
+Files live under the namespace's own directory. Use this when you're writing your own skills from scratch.
+
+```bash
+aenv skill new my-checker --ns my-style
+# Creates ~/.aenv/envs/my-style/.claude/skills/my-checker/SKILL.md
+# and adds the [[skills]] entry to my-style's aenv.toml.
+$EDITOR ~/.aenv/envs/my-style/.claude/skills/my-checker/SKILL.md
+```
+
+When `my-style` is activated in a project, `my-checker/SKILL.md` materializes at `.claude/skills/my-checker/SKILL.md` (symlinked to the namespace dir, so edits are live).
+
+### Imported skills — `aenv skill import`
+
+Files live somewhere external — a local path or a git URL — and are fetched at activation time, cached under `~/.aenv/cache/skills/<source-hash>/<ref>/`. Use this when you're pulling in someone else's skill.
+
+```bash
+# From a git repo whose SKILL.md sits at the root
+aenv skill import git+https://github.com/example/some-skill --ns my-style --pin v1.0
+
+# From a local path
+aenv skill import ~/code/skills/notes --ns my-style
+
+# From a monorepo: pick one skill by its sub-path
+aenv skill import git+https://github.com/k-dense-ai/scientific-agent-skills \
+    --ns my-style \
+    --path scientific-skills/scanpy \
+    --pin v2.39.0
+```
+
+The `--path` flag is the one to reach for when the source repo bundles many skills under a directory (k-dense-ai's layout is `scientific-skills/<name>/SKILL.md`; other community skill collections use similar conventions). Without `--path`, aenv looks for `SKILL.md` at the cache root or under `<skill_name>/`; with it, aenv looks under the named sub-directory and the skill name defaults to that sub-directory's basename. Path values must be relative and free of `..` segments.
+
+`--pin <ref>` resolves once at import time and locks the recorded commit SHA in the manifest, so activations are reproducible across machines. Omit it to re-resolve to `HEAD` on each activation.
+
+### Listing what's declared
+
+```bash
+aenv skill list                # every skill across every namespace
+aenv skill list --ns my-style  # just one namespace's
+aenv skill list --json         # machine-readable
+```
 
 ## Reading order
 
