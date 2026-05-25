@@ -1,4 +1,0 @@
-name = "blank"
-
-[adapters.claude-code]
-files = ["CLAUDE.md"]

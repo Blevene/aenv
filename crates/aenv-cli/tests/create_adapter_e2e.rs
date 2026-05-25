@@ -8,7 +8,11 @@ fn bin() -> std::path::PathBuf {
 }
 
 #[test]
-fn create_with_adapter_seeds_block() {
+fn create_with_adapter_scaffolds_usable_namespace() {
+    // `aenv create --adapter claude-code` should produce a namespace that
+    // works out of the box: the manifest declares the file(s) the adapter
+    // manages, AND those files exist (empty) on disk so `aenv activate`
+    // materializes something the user can edit.
     let aenv_home = TempDir::new().unwrap();
     let out = Command::new(bin())
         .args(["create", "foo", "--adapter", "claude-code"])
@@ -21,15 +25,25 @@ fn create_with_adapter_seeds_block() {
         String::from_utf8_lossy(&out.stderr)
     );
 
-    let manifest = aenv_home.path().join("envs/foo/aenv.toml");
-    let text = std::fs::read_to_string(&manifest).unwrap();
+    let ns_dir = aenv_home.path().join("envs/foo");
+    let text = std::fs::read_to_string(ns_dir.join("aenv.toml")).unwrap();
     assert!(
         text.contains("[adapters.claude-code]"),
         "expected [adapters.claude-code] in manifest: {text}"
     );
+    // Claude-code declares `["CLAUDE.md", ".claude/"]`. The trailing-slash
+    // entry is a directory marker (user populates via `aenv skill new`), so
+    // only CLAUDE.md gets scaffolded.
     assert!(
-        text.contains("files = []"),
-        "should seed empty files vec: {text}"
+        text.contains("files = [\"CLAUDE.md\"]"),
+        "should declare files = [\"CLAUDE.md\"]: {text}"
+    );
+    let claude_md = ns_dir.join("CLAUDE.md");
+    assert!(claude_md.exists(), "CLAUDE.md should be scaffolded on disk");
+    assert_eq!(
+        std::fs::metadata(&claude_md).unwrap().len(),
+        0,
+        "scaffolded CLAUDE.md should be empty — user fills it in"
     );
 }
 
@@ -86,8 +100,8 @@ fn create_with_multiple_adapters_seeds_all_blocks() {
         String::from_utf8_lossy(&out.stderr)
     );
 
-    let manifest = aenv_home.path().join("envs/foo/aenv.toml");
-    let text = std::fs::read_to_string(&manifest).unwrap();
+    let ns_dir = aenv_home.path().join("envs/foo");
+    let text = std::fs::read_to_string(ns_dir.join("aenv.toml")).unwrap();
     assert!(
         text.contains("[adapters.claude-code]"),
         "expected [adapters.claude-code]: {text}"
@@ -96,4 +110,7 @@ fn create_with_multiple_adapters_seeds_all_blocks() {
         text.contains("[adapters.cursor]"),
         "expected [adapters.cursor]: {text}"
     );
+    // Both adapters' concrete files should be scaffolded.
+    assert!(ns_dir.join("CLAUDE.md").exists(), "claude-code CLAUDE.md");
+    assert!(ns_dir.join(".cursorrules").exists(), "cursor .cursorrules");
 }
