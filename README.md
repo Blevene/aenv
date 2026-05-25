@@ -184,7 +184,38 @@ cd ~/code/the-shaped-project
 aenv snapshot my-existing-style
 ```
 
-This walks the project, copies every adapter-managed file into a new namespace at `~/.aenv/envs/my-existing-style/`, and registers it. The project's `.aenv` pin is *not* updated — `snapshot` is a one-way capture, not an activation step.
+aenv walks the project against every installed adapter's declared `files = [...]` patterns — globs, trailing-slash directory markers, and literal paths all expand to concrete files — then copies each match into `~/.aenv/envs/my-existing-style/` and writes a manifest that declares every captured path explicitly.
+
+**Before — a project shaped by hand:**
+
+```
+~/code/the-shaped-project/
+├── CLAUDE.md                                 # your working agreements
+├── .claude/
+│   ├── skills/linter-discipline/SKILL.md
+│   └── commands/review.md
+└── .mcp.json                                 # MCP server config
+```
+
+**After — the captured namespace:**
+
+```
+~/.aenv/envs/my-existing-style/
+├── aenv.toml                                 # [adapters.claude-code].files = [..every path expanded..]
+├── CLAUDE.md
+├── .claude/skills/linter-discipline/SKILL.md
+├── .claude/commands/review.md
+└── .mcp.json
+```
+
+The project's `.aenv` pin is *not* updated — `snapshot` is a one-way capture, not an activation step. To reuse the captured namespace elsewhere:
+
+```bash
+cd ~/other-project
+aenv use my-existing-style && aenv activate
+```
+
+Skills captured this way are recorded as `mode = "authored"` (files live in the namespace tree itself, so the snapshot is self-contained). If you'd rather track a skill against an upstream git repo, edit the manifest to flip its `[[skills]]` entry to `mode = "imported"` and add `source = "git+https://..."` — `aenv` will then fetch on the next activation instead of using the captured copy.
 
 ### Iterating
 
@@ -240,6 +271,15 @@ aenv skill import git+https://github.com/k-dense-ai/scientific-agent-skills \
 The `--path` flag is the one to reach for when the source repo bundles many skills under a directory (k-dense-ai's layout is `scientific-skills/<name>/SKILL.md`; other community skill collections use similar conventions). Without `--path`, aenv looks for `SKILL.md` at the cache root or under `<skill_name>/`; with it, aenv looks under the named sub-directory and the skill name defaults to that sub-directory's basename. Path values must be relative and free of `..` segments.
 
 `--pin <ref>` resolves once at import time and locks the recorded commit SHA in the manifest, so activations are reproducible across machines. Omit it to re-resolve to `HEAD` on each activation.
+
+### What import + activate actually do
+
+`aenv skill import` writes the manifest entry but does *not* fetch content yet — that happens on the next `aenv activate`. The full sequence:
+
+1. **Import** — `aenv skill import …` validates the source format, derives the skill name (from `--path` basename, URL fragment, or repo name), and appends a `[[skills]]` entry to the namespace's `aenv.toml`. With `--pin`, it does a one-shot resolution to verify reachability and lock the commit SHA.
+2. **Activate** — for each imported skill not yet cached, aenv shallow-clones the source into `~/.aenv/cache/skills/<source-hash>/<ref>/`. Repeats hit the cache; pinned refs are immutable, so they only fetch once per machine.
+3. **Materialize** — the skill's entire directory tree under the source (`SKILL.md` plus any `references/`, `scripts/`, `assets/`) is symlinked into your project at `.claude/skills/<skill_name>/`. The `--path` sub-tree, if specified, scopes which files come along.
+4. **Inspect** — `aenv status` reports each managed file's source URL, resolved commit SHA, and content hash, so you can verify reproducibility across machines.
 
 ### Listing what's declared
 
