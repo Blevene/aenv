@@ -1,6 +1,7 @@
 //! CLI subcommand handlers.
 
 pub mod activate;
+pub mod activate_if_needed;
 pub mod adapter;
 pub mod create;
 pub mod deactivate;
@@ -9,6 +10,7 @@ pub mod diff;
 pub mod doctor;
 pub mod fork;
 pub mod get;
+pub mod init_shell;
 pub mod list;
 pub mod restore;
 pub mod set;

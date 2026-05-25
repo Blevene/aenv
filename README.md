@@ -26,7 +26,7 @@ Ships with built-in adapters for **Claude Code, Cursor, Aider, Cline, Continue, 
 
 The roadmap (see [`tasks/todo.md`](./tasks/todo.md)) has two phases left:
 
-- **Phase 6** — Shell integration (`cd`-based auto-activation), git remotes, `aenv install`, `aenv sync`, `aenv promote`.
+- **Phase 6** — Partial. `cd`-based auto-activation ships now via `aenv init-shell` (see [§Shell integration](#shell-integration)); git remotes / `aenv install` / `aenv sync` / `aenv promote` still pending.
 - **Phase 7** — Windows symlink fallback, cross-platform CI, v0.1.0 release.
 
 ## Installation
@@ -269,6 +269,25 @@ rm -rf ~/.aenv/envs/<profile>/.claude/skills/<name>/   # for authored skills onl
 
 **The gotcha**: any change that adds or removes a managed path (new skill, new file, removed skill, bumped pin) requires `aenv deactivate && aenv activate` in every project where the namespace is currently active. Edits to existing files are live via the symlink and need no re-activate.
 
+## Shell integration
+
+After authoring some namespaces, you'll get tired of typing `aenv use && aenv activate` every time you `cd` into a project. The shell hook automates that — `cd` between pinned projects auto-activates the right namespace; `cd` to anywhere unpinned auto-deactivates. Full walkthrough in [`docs/walkthroughs/shell-integration.md`](./docs/walkthroughs/shell-integration.md).
+
+```bash
+# zsh — add to ~/.zshrc
+eval "$(aenv init-shell zsh)"
+
+# bash — add to ~/.bashrc
+eval "$(aenv init-shell bash)"
+
+# fish — add to ~/.config/fish/config.fish
+aenv init-shell fish | source
+```
+
+On every `chpwd`, the hook calls `aenv activate-if-needed "$_AENV_ACTIVE"` — which walks the cwd's ancestors for a `.aenv` pin, compares to the previous active project, and transitions only when needed. The no-change path is just an ancestor walk + string compare (sub-millisecond), so the hook is safe to run on every prompt.
+
+Track which project the hook thinks is active with the `_AENV_ACTIVE` env var.
+
 ## Skills
 
 Skills are reusable instruction bundles — typically a `SKILL.md` with YAML frontmatter, plus any supporting `references/`, `scripts/`, `assets/` — that the agent should invoke for specific tasks. aenv manages them as part of a namespace's content: when you activate the namespace, every declared skill materializes under the adapter's `skills_dir` in your project (`.claude/skills/<name>/` for the claude-code adapter).
@@ -338,7 +357,7 @@ aenv skill list --json         # machine-readable
 - **[`tasks/2026-05-22-phase-3-parameters-policies.md`](./tasks/2026-05-22-phase-3-parameters-policies.md)** — Most recent implementation plan (20 tasks, bite-sized, with code and tests inline). Earlier phase plans live alongside it.
 - **[`RELEASING.md`](./RELEASING.md)** — Maintainer guide for cutting a release: tag-triggered GH Actions matrix, version bump, dry-run, rollback.
 - **[`INSTALL_FROM_BINARY.md`](./INSTALL_FROM_BINARY.md)** — End-user guide for installing pre-built Linux / macOS binaries from a GitHub Release (alternative to the build-from-source path in the [Installation section](#installation)).
-- **[`docs/walkthroughs/`](./docs/walkthroughs/)** — Step-by-step recipes for common journeys: [setup + first swap](./docs/walkthroughs/setup-and-first-swap.md), [build your own namespace](./docs/walkthroughs/build-your-own.md), [install a skill from GitHub](./docs/walkthroughs/install-a-skill-from-github.md), [snapshot an existing project](./docs/walkthroughs/snapshot-an-existing-project.md), [update an existing profile](./docs/walkthroughs/updating-a-profile.md).
+- **[`docs/walkthroughs/`](./docs/walkthroughs/)** — Step-by-step recipes for common journeys: [setup + first swap](./docs/walkthroughs/setup-and-first-swap.md), [build your own namespace](./docs/walkthroughs/build-your-own.md), [install a skill from GitHub](./docs/walkthroughs/install-a-skill-from-github.md), [snapshot an existing project](./docs/walkthroughs/snapshot-an-existing-project.md), [update an existing profile](./docs/walkthroughs/updating-a-profile.md), [shell integration (cd-based auto-activation)](./docs/walkthroughs/shell-integration.md).
 
 ## Building & testing
 

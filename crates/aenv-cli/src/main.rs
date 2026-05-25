@@ -160,6 +160,25 @@ enum Command {
         #[command(subcommand)]
         action: SkillAction,
     },
+    /// Print a shell hook script for sourcing in your rc file. The hook
+    /// auto-activates the right namespace as you `cd` between projects.
+    ///
+    /// Usage: `eval "$(aenv init-shell <bash|zsh|fish>)"` (or `| source` for fish).
+    InitShell {
+        /// Shell to emit a hook for.
+        shell: String,
+    },
+    /// Fast-path the shell hook calls on every chpwd. Walks ancestors for
+    /// a `.aenv` pin and transitions to the right namespace. Prints the
+    /// new active project root (or empty line if none) to stdout.
+    ///
+    /// Not intended for direct user invocation.
+    ActivateIfNeeded {
+        /// Project root the previous invocation activated; pass an empty
+        /// string when nothing was active (typical first shell-hook call).
+        #[arg(default_value = "")]
+        last_active: String,
+    },
     /// Diff against the active namespace (drift) or between two namespaces.
     Diff {
         /// First namespace name for structural diff (omit for drift).
@@ -379,6 +398,17 @@ fn main() -> ExitCode {
                     cmd::skill::list::run(&fs, &layout, ns.as_deref(), json)
                 }
             },
+            Command::InitShell { shell } => cmd::init_shell::run(&shell),
+            Command::ActivateIfNeeded { last_active } => {
+                let last_path;
+                let last = if last_active.is_empty() {
+                    None
+                } else {
+                    last_path = std::path::PathBuf::from(&last_active);
+                    Some(last_path.as_path())
+                };
+                cmd::activate_if_needed::run(&fs, &layout, last)
+            }
             Command::Diff {
                 ns_a,
                 ns_b,
