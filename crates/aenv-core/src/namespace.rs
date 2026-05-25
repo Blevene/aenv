@@ -119,8 +119,20 @@ pub fn create_namespace_from_project<F: Filesystem>(
     for (_, adapter) in adapters.iter() {
         let mut files: Vec<String> = Vec::new();
         for rel in &adapter.files {
-            if rel.contains('*') {
-                let prefix = literal_prefix(rel);
+            // Two "walk this subtree" forms:
+            //   - explicit glob: `.cursor/**/*`
+            //   - trailing-slash directory marker: `.claude/`
+            // Both expand to the same set of literal file paths in the captured
+            // manifest. Plain literals (`CLAUDE.md`, `.mcp.json`) hit the else
+            // branch and are read directly.
+            let is_glob = rel.contains('*');
+            let is_dir_marker = !is_glob && rel.ends_with('/');
+            if is_glob || is_dir_marker {
+                let prefix = if is_glob {
+                    literal_prefix(rel)
+                } else {
+                    rel.trim_end_matches('/')
+                };
                 let walk_root = project_root.join(prefix);
                 if fs.exists(&walk_root)? {
                     let mut found: Vec<String> = Vec::new();

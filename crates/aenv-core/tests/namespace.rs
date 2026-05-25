@@ -226,3 +226,51 @@ fn fork_name_walks_glob_directories_and_copies_every_file() {
     assert!(files.iter().any(|p| p == ".claude/skills/b/SKILL.md"));
     assert!(!files.iter().any(|p| p.contains('*')));
 }
+
+#[test]
+fn fork_name_walks_trailing_slash_directory_marker() {
+    // Regression: the shipped claude-code adapter declares `.claude/` (no
+    // glob) as one of its files. Snapshot used to treat that as a literal
+    // path, call fs.read() on a directory, and crash with EISDIR. The fix
+    // recognizes a trailing-slash entry as a directory walk, the same way
+    // `.cursor/**/*` is.
+    use aenv_core::adapter::{Adapter, AdapterRegistry};
+    use aenv_core::namespace::create_namespace_from_project;
+    use std::path::Path;
+
+    let fs = MockFilesystem::new();
+    fs.write(Path::new("/p/CLAUDE.md"), b"# proj\n").unwrap();
+    fs.write(Path::new("/p/.claude/skills/notes/SKILL.md"), b"notes")
+        .unwrap();
+    fs.write(Path::new("/p/.claude/agents/planner.md"), b"planner")
+        .unwrap();
+
+    // Exactly the shipped claude-code adapter declaration.
+    let cc: Adapter =
+        toml::from_str("name = \"claude-code\"\nfiles = [\"CLAUDE.md\", \".claude/\"]\n").unwrap();
+    let mut adapters = AdapterRegistry::default();
+    adapters.insert(cc);
+
+    let reg = RegistryLayout::new(PathBuf::from("/aenv"));
+    create_namespace_from_project(
+        &fs,
+        &reg,
+        &adapters,
+        "from-trailing-slash",
+        Path::new("/p"),
+        &[],
+    )
+    .unwrap();
+
+    let body = fs
+        .read(Path::new("/aenv/envs/from-trailing-slash/aenv.toml"))
+        .unwrap();
+    let m: aenv_core::manifest::AenvManifest =
+        toml::from_str(std::str::from_utf8(&body).unwrap()).unwrap();
+    let files = &m.adapters["claude-code"].files;
+    assert!(files.iter().any(|p| p == "CLAUDE.md"));
+    assert!(files.iter().any(|p| p == ".claude/skills/notes/SKILL.md"));
+    assert!(files.iter().any(|p| p == ".claude/agents/planner.md"));
+    // Expanded into concrete paths — no trailing-slash markers in the output.
+    assert!(!files.iter().any(|p| p.ends_with('/')));
+}
