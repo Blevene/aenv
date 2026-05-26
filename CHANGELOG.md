@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.3] — 2026-05-26
+
+### Added
+
+- **`skills/aenv/SKILL.md`** — a Claude Code skill (importable via `aenv skill import git+https://github.com/Blevene/aenv --ns <ns> --path skills/aenv --pin v0.0.3`) that gives an agent the user-request-to-command map, gotchas, and "when to escalate" rules for aenv operations.
+- **Community files** — `CHANGELOG.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1 by reference), `SECURITY.md` (supported versions + scoped threat model + private-disclosure email).
+- **README badges** — CI status, latest release, MIT license, Rust MSRV.
+
+### Changed
+
+- **`aenv --help` descriptions for `use` / `activate` / `deactivate` / `restore`** expanded from one-liners to explain how the commands fit together. `aenv use` now says "Does NOT materialize any files — follow with `aenv activate`"; `aenv activate` names the input (`.aenv` pin or explicit name) and the backup destination; `aenv deactivate` describes the restore-byte-for-byte guarantee; `aenv restore` is framed as the recovery path with copy-vs-move semantics.
+- **README reorganized**: Installation / Quick start / Try-the-built-ins / safety / authoring / updating / shell / skills now appear *before* the feature-list and roadmap reference sections, so a new reader's path to first use is shorter.
+- **Status line in README** refreshed to reference v0.0.2/Phase 5 (was stuck on `phase-3-complete`).
+
 ## [0.0.2] — 2026-05-25
 
 ### Changed
@@ -39,6 +53,7 @@ Initial tagged release. Everything described in the README's "What works today" 
 - **Phase 6 (partial)** — `aenv install` / `aenv sync` / `aenv promote` for git-remote-backed multi-machine sync.
 - **Phase 7** — Windows symlink fallback to copy-mode + Windows CI; macOS notarization.
 
-[Unreleased]: https://github.com/Blevene/aenv/compare/v0.0.2...HEAD
+[Unreleased]: https://github.com/Blevene/aenv/compare/v0.0.3...HEAD
+[0.0.3]: https://github.com/Blevene/aenv/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/Blevene/aenv/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/Blevene/aenv/releases/tag/v0.0.1

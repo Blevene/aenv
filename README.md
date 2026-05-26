@@ -263,7 +263,7 @@ If you'd rather not memorize the CLI surface, this repo ships its own Claude Cod
 aenv skill import git+https://github.com/Blevene/aenv \
     --ns <your-namespace> \
     --path skills/aenv \
-    --pin v0.0.2
+    --pin v0.0.3
 ```
 
 On the next `aenv activate`, the skill materializes at `.claude/skills/aenv/SKILL.md` in your project, and Claude Code's agent will load it when you ask aenv-shaped questions ("switch profile", "install a skill", "auto-activate on cd," etc.).
