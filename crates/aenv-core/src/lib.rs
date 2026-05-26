@@ -32,6 +32,7 @@ pub mod policies;
 pub mod project;
 pub mod resolve;
 pub mod restore;
+pub mod scope;
 pub mod shadow;
 pub mod skills;
 pub mod state;
