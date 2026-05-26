@@ -1,5 +1,10 @@
 # aenv — Virtual environments for AI coding harness configs
 
+[![CI](https://github.com/Blevene/aenv/actions/workflows/ci.yml/badge.svg)](https://github.com/Blevene/aenv/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Blevene/aenv?sort=semver)](https://github.com/Blevene/aenv/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Rust MSRV](https://img.shields.io/badge/rustc-1.85+-blue.svg)](https://www.rust-lang.org)
+
 `aenv` is a Rust CLI for managing named, composable, version-controlled bundles of AI-coding-agent configuration (`CLAUDE.md`, `.cursorrules`, `.mcp.json`, skills, agents, slash commands, MCP entries). Think Python's `venv`, but for the rules and configurations that shape how AI coding agents behave.
 
 > **Status:** Active development. Phase 3 (parameters & policies) is the most recent milestone, tagged [`phase-3-complete`](../../tree/phase-3-complete). The roadmap is in [`tasks/todo.md`](./tasks/todo.md).
@@ -274,6 +279,19 @@ aenv cache prune
 ```
 
 **The gotcha**: any change that adds or removes a managed path (new skill, new file, removed skill, bumped pin) requires `aenv deactivate && aenv activate` in every project where the namespace is currently active. Edits to existing files are live via the symlink and need no re-activate.
+
+### Agent-side guidance: the `aenv` skill
+
+If you'd rather not memorize the CLI surface, this repo ships its own Claude Code skill that gives an agent the user-request-to-command map plus the gotchas. Import it into any namespace you're using in a project:
+
+```bash
+aenv skill import git+https://github.com/Blevene/aenv \
+    --ns <your-namespace> \
+    --path skills/aenv \
+    --pin v0.0.2
+```
+
+On the next `aenv activate`, the skill materializes at `.claude/skills/aenv/SKILL.md` in your project, and Claude Code's agent will load it when you ask aenv-shaped questions ("switch profile", "install a skill", "auto-activate on cd," etc.).
 
 ## Shell integration
 
