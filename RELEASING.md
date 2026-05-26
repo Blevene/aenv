@@ -33,7 +33,7 @@ aenv-<version>-<target>.tar.gz
 aenv-<version>-<target>.tar.gz.sha256    # shasum -a 256 of the tarball
 ```
 
-`<version>` is the tag with the leading `v` stripped (`v0.0.2` → `0.0.2`).
+`<version>` is the tag with the leading `v` stripped (e.g. `v0.0.3` → `0.0.3`).
 
 ### Release-creation step
 
@@ -72,15 +72,15 @@ Commit:
 
 ```bash
 git add Cargo.toml Cargo.lock
-git commit -m "Release: v0.0.2"
+git commit -m "Release: vX.Y.Z"
 git push origin main
 ```
 
 ### 3. Tag and push
 
 ```bash
-git tag -a v0.0.2 -m "Release v0.0.2"
-git push origin v0.0.2
+git tag -a vX.Y.Z -m "Release vX.Y.Z"
+git push origin vX.Y.Z
 ```
 
 Pushing the tag triggers `release.yml`. Track it under the repo's Actions tab. The full pipeline (4 builds in parallel + release job) typically takes 8–12 minutes; the aarch64-linux cross build is usually the long-pole because it spins up a Docker image.
@@ -90,7 +90,7 @@ Pushing the tag triggers `release.yml`. Track it under the repo's Actions tab. T
 Once the workflow finishes:
 
 ```bash
-gh release view v0.0.2
+gh release view vX.Y.Z
 ```
 
 Should list four `.tar.gz` files and four `.sha256` files. Pull one down and smoke-test:
@@ -130,9 +130,9 @@ GitHub Releases can be deleted; binaries cannot be unringed once anyone has down
 If you must yank:
 
 ```bash
-gh release delete v0.0.2 --yes
-git push --delete origin v0.0.2
-git tag -d v0.0.2
+gh release delete vX.Y.Z --yes
+git push --delete origin vX.Y.Z
+git tag -d vX.Y.Z
 ```
 
 Then publish a fix release at `v0.0.3` (don't reuse the yanked tag — caches and mirrors may still serve it).

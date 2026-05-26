@@ -19,7 +19,7 @@ The steps are the same on Linux and macOS; substitute the tarball name for your 
 
 ```bash
 # 1. Set version (latest release; check the Releases page)
-VERSION=0.0.1
+VERSION=0.0.3
 TARGET=aarch64-apple-darwin   # or x86_64-unknown-linux-gnu, etc.
 
 # 2. Download the tarball and its checksum

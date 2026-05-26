@@ -7,7 +7,7 @@
 
 `aenv` is a Rust CLI for managing named, composable, version-controlled bundles of AI-coding-agent configuration (`CLAUDE.md`, `.cursorrules`, `.mcp.json`, skills, agents, slash commands, MCP entries). Think Python's `venv`, but for the rules and configurations that shape how AI coding agents behave.
 
-> **Status:** Active development. Latest release is [`v0.0.2`](https://github.com/Blevene/aenv/releases/tag/v0.0.2). Phase 5 (resolved-namespace hash, `--json` everywhere, `aenv diff`) is the most recent milestone — see [§What works today](#what-works-today) for the full feature surface and [§Roadmap](#roadmap--whats-still-in-flight) for what's pending.
+> **Status:** Active development. Latest release is [`v0.0.3`](https://github.com/Blevene/aenv/releases/tag/v0.0.3). Phase 5 (resolved-namespace hash, `--json` everywhere, `aenv diff`) is the most recent milestone — see [§What works today](#what-works-today) for the full feature surface and [§Roadmap](#roadmap--whats-still-in-flight) for what's pending.
 
 ## Installation
 
