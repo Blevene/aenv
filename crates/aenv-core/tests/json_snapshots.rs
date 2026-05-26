@@ -373,6 +373,7 @@ fn skill_entry_via_builder() {
         ref_: Some("v1.2.0".into()),
         path: None,
         required: true,
+        scope: aenv_core::scope::Scope::default(),
     };
     let entry = SkillEntry::from_decl("leaf", &decl);
     insta::assert_json_snapshot!(entry);

@@ -126,3 +126,30 @@ source = "/p"
     let m2 = AenvManifest::from_toml(&rendered).unwrap();
     assert_eq!(m, m2);
 }
+
+#[test]
+fn skill_scope_defaults_to_project() {
+    let toml = r#"
+name = "ns"
+[[skills]]
+name = "code-reviewer"
+adapter = "claude-code"
+mode = "authored"
+"#;
+    let m = aenv_core::manifest::AenvManifest::from_toml(toml).unwrap();
+    assert_eq!(m.skills[0].scope, aenv_core::scope::Scope::Project);
+}
+
+#[test]
+fn skill_scope_user_round_trips() {
+    let toml = r#"
+name = "ns"
+[[skills]]
+name = "personal-helper"
+adapter = "claude-code"
+mode = "authored"
+scope = "user"
+"#;
+    let m = aenv_core::manifest::AenvManifest::from_toml(toml).unwrap();
+    assert_eq!(m.skills[0].scope, aenv_core::scope::Scope::User);
+}

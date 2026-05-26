@@ -23,6 +23,7 @@ fn resolves_when_local_source_exists() {
         ref_: None,
         path: None,
         required: false,
+        scope: aenv_core::scope::Scope::default(),
     };
     let result = resolve_imported_skill(&fs, &layout(), &decl).unwrap();
     assert_eq!(result.source_path, PathBuf::from("/local/skill"));
@@ -39,6 +40,7 @@ fn required_unreachable_propagates_error() {
         ref_: None,
         path: None,
         required: true,
+        scope: aenv_core::scope::Scope::default(),
     };
     let outcome = apply_required_rule(&fs, &layout(), &decl);
     let err = outcome.expect_err("required + missing should error");
@@ -56,6 +58,7 @@ fn unrequired_unreachable_returns_skipped_marker() {
         ref_: None,
         path: None,
         required: false,
+        scope: aenv_core::scope::Scope::default(),
     };
     let outcome = apply_required_rule(&fs, &layout(), &decl).unwrap();
     assert!(outcome.is_none());
@@ -72,6 +75,7 @@ fn authored_decls_panic_or_error() {
         ref_: None,
         path: None,
         required: false,
+        scope: aenv_core::scope::Scope::default(),
     };
     let err = apply_required_rule(&fs, &layout(), &decl).unwrap_err();
     assert!(err.to_string().contains("authored"));

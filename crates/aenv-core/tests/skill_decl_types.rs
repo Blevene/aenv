@@ -10,6 +10,7 @@ fn authored_decl_shape() {
         ref_: None,
         path: None,
         required: false,
+        scope: aenv_core::scope::Scope::default(),
     };
     assert_eq!(s.name, "write-tests");
     assert!(matches!(s.mode, SkillMode::Authored));
@@ -27,6 +28,7 @@ fn imported_decl_shape() {
         ref_: Some("v1.2.0".into()),
         path: None,
         required: true,
+        scope: aenv_core::scope::Scope::default(),
     };
     assert!(matches!(s.mode, SkillMode::Imported));
     assert!(s.required);
@@ -58,6 +60,7 @@ fn skill_decl_round_trips_via_toml() {
         ref_: None,
         path: None,
         required: false,
+        scope: aenv_core::scope::Scope::default(),
     };
     let rendered = toml::to_string(&s).unwrap();
     let back: SkillDecl = toml::from_str(&rendered).unwrap();

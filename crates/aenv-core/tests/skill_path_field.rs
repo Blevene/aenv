@@ -182,6 +182,7 @@ fn resolve_imported_skill_passes_path_through() {
         ref_: None,
         path: Some("scientific-skills/biopython".into()),
         required: false,
+        scope: aenv_core::scope::Scope::default(),
     };
     let r = resolve_imported_skill(&fs, &layout(), &decl).unwrap();
     assert_eq!(

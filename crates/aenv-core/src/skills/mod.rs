@@ -50,6 +50,14 @@ pub struct SkillDecl {
     /// `false` means: report the failure, omit this skill, continue.
     #[serde(default)]
     pub required: bool,
+    /// Activation scope. Defaults to `Project`; `User` materializes under
+    /// the adapter's `user_skills_dir` (e.g. `~/.claude/skills/<name>/`).
+    #[serde(default, skip_serializing_if = "is_default_scope")]
+    pub scope: crate::scope::Scope,
+}
+
+fn is_default_scope(s: &crate::scope::Scope) -> bool {
+    *s == crate::scope::Scope::default()
 }
 
 /// Whether a skill's files live in the namespace tree or come from outside.

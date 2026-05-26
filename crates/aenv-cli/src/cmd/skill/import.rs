@@ -72,6 +72,7 @@ pub fn run<F: Filesystem>(
         ref_: pin.map(String::from),
         path: path_arg.map(String::from),
         required: false,
+        scope: aenv_core::scope::Scope::default(),
     };
 
     if let Some(pin_ref) = pin {

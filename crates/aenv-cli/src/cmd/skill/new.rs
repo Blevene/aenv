@@ -74,6 +74,7 @@ pub fn run<F: Filesystem>(
         ref_: None,
         path: None,
         required: false,
+        scope: aenv_core::scope::Scope::default(),
     });
     fs.write(&manifest_path, manifest.to_toml().as_bytes())?;
     println!("Created authored skill '{skill_name}' in namespace '{namespace}':");
