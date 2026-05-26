@@ -11,6 +11,7 @@ fn cand(ns: &str, path: &str, adapter: &str, override_: Option<&str>) -> Candida
         path: PathBuf::from(path),
         source_path: PathBuf::from(format!("/aenv/envs/{ns}/{path}")),
         adapter: adapter.to_string(),
+        scope: aenv_core::scope::Scope::Project,
         merge_override: override_.map(std::string::ToString::to_string),
         skill_provenance: None,
     }

@@ -11,6 +11,7 @@ fn cand(ns: &str, path: &str, adapter: &str) -> Candidate {
         path: PathBuf::from(path),
         source_path: PathBuf::from(format!("/aenv/envs/{ns}/{path}")),
         adapter: adapter.to_string(),
+        scope: aenv_core::scope::Scope::Project,
         merge_override: None,
         skill_provenance: None,
     }

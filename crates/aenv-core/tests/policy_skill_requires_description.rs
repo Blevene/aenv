@@ -43,6 +43,7 @@ fn skill_candidate(ns_name: &str, skill: &str, source: PathBuf) -> Candidate {
         path: PathBuf::from(format!(".claude/skills/{skill}/SKILL.md")),
         source_path: source,
         adapter: "claude-code".into(),
+        scope: aenv_core::scope::Scope::Project,
         merge_override: None,
         skill_provenance: None,
     }
@@ -253,6 +254,7 @@ fn skips_non_skill_files() {
             adapter: "claude-code".into(),
             merge_override: None,
             skill_provenance: None,
+            scope: aenv_core::scope::Scope::Project,
         }],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),

@@ -37,6 +37,7 @@ fn candidate(rel: &str) -> Candidate {
         path: PathBuf::from(rel),
         source_path: PathBuf::from(format!("/h/envs/base/{rel}")),
         adapter: "claude-code".into(),
+        scope: aenv_core::scope::Scope::Project,
         merge_override: None,
         skill_provenance: None,
     }

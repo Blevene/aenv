@@ -58,6 +58,7 @@ fn instructions_budget_narrows_effective_limit() {
             path: PathBuf::from("CLAUDE.md"),
             source_path: PathBuf::from("/h/envs/base/CLAUDE.md"),
             adapter: "claude-code".into(),
+            scope: aenv_core::scope::Scope::Project,
             merge_override: None,
             skill_provenance: None,
         }],

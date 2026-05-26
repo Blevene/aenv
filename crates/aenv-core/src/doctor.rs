@@ -130,14 +130,25 @@ fn synthesize_instructions_limit(
         let Some(adapter) = adapters.get(&c.adapter) else {
             continue;
         };
-        let role = adapter
-            .roles
-            .get(c.path.to_string_lossy().as_ref())
+        let (roles_map, limits_map, lookup_key) = match c.scope {
+            crate::scope::Scope::Project => (
+                &adapter.roles,
+                &adapter.soft_limits,
+                c.path.to_string_lossy().into_owned(),
+            ),
+            crate::scope::Scope::User => (
+                &adapter.user_roles,
+                &adapter.user_soft_limits,
+                format!("~/{}", c.path.display()),
+            ),
+        };
+        let role = roles_map
+            .get(lookup_key.as_str())
             .map_or("", String::as_str);
         if role != "instructions" {
             continue;
         }
-        if let Some(&limit) = adapter.soft_limits.get("instructions") {
+        if let Some(&limit) = limits_map.get("instructions") {
             min_limit = Some(min_limit.map_or(limit, |m| m.min(limit)));
         }
     }

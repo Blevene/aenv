@@ -54,16 +54,19 @@ pub fn evaluate<F: Filesystem>(
             Some(a) => a,
             None => continue,
         };
-        let role = adapter
-            .roles
-            .get(c.path.to_string_lossy().as_ref())
+        let (roles_map, lookup_key) = match c.scope {
+            crate::scope::Scope::Project => (&adapter.roles, c.path.to_string_lossy().into_owned()),
+            crate::scope::Scope::User => (&adapter.user_roles, format!("~/{}", c.path.display())),
+        };
+        let role = roles_map
+            .get(lookup_key.as_str())
             .map_or("", String::as_str);
         if role != "instructions" {
             continue;
         }
         let target = QualifiedName::new(
             c.namespace.clone(),
-            ShortName::new(c.path.to_string_lossy().to_string()).unwrap_or_else(|_| {
+            ShortName::new(target_label(c)).unwrap_or_else(|_| {
                 ShortName::new("?".to_string()).expect("trivial short name is valid")
             }),
         );
@@ -117,4 +120,11 @@ pub fn evaluate<F: Filesystem>(
         outcomes.push(PolicyOutcome::pass(KEY, None));
     }
     outcomes
+}
+
+fn target_label(c: &crate::resolve::Candidate) -> String {
+    match c.scope {
+        crate::scope::Scope::Project => c.path.to_string_lossy().into_owned(),
+        crate::scope::Scope::User => format!("~/{}", c.path.display()),
+    }
 }

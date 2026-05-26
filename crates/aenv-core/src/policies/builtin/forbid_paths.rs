@@ -35,14 +35,18 @@ pub fn evaluate<F: Filesystem>(
         if !hit {
             continue;
         }
+        let label = match c.scope {
+            crate::scope::Scope::Project => rel.clone(),
+            crate::scope::Scope::User => format!("~/{rel}"),
+        };
         let target = QualifiedName::new(
             c.namespace.clone(),
-            ShortName::new(rel.clone()).unwrap_or_else(|_| {
+            ShortName::new(label.clone()).unwrap_or_else(|_| {
                 ShortName::new("?".to_string()).expect("trivial short name is valid")
             }),
         );
         let msg =
-            format!("{rel} matches forbid_paths pattern; namespace must not declare this path.");
+            format!("{label} matches forbid_paths pattern; namespace must not declare this path.");
         outcomes.push(if policy.enforce {
             PolicyOutcome::fail(KEY, Some(target), msg)
         } else {

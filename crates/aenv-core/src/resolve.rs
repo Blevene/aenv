@@ -116,6 +116,8 @@ pub struct Candidate {
     pub source_path: PathBuf,
     /// Name of the adapter that manages this path.
     pub adapter: String,
+    /// Activation scope this candidate belongs to.
+    pub scope: crate::scope::Scope,
     /// Per-file merge strategy override from the manifest, if any.
     pub merge_override: Option<String>,
     /// Skill provenance for skill SKILL.md files. `None` for regular files.
@@ -295,6 +297,16 @@ fn validate_candidate_paths(candidates: &[Candidate]) -> Result<(), ResolutionEr
                 ),
             });
         }
+        if c.scope == crate::scope::Scope::User && s.starts_with("~/") {
+            return Err(ResolutionError::ManifestInvalid {
+                namespace: c.namespace.clone(),
+                reason: format!(
+                    "user-scope candidate path begins with '~/': {} \
+                     (drop the prefix; expansion happens at activation time)",
+                    p.display()
+                ),
+            });
+        }
     }
     Ok(())
 }
@@ -389,6 +401,7 @@ fn gather_candidates<F: Filesystem>(
                             path: PathBuf::from(&literal),
                             source_path: ns_root.join(&literal),
                             adapter: adapter_name.clone(),
+                            scope: crate::scope::Scope::Project,
                             merge_override: entry
                                 .merge
                                 .as_ref()
@@ -409,7 +422,41 @@ fn gather_candidates<F: Filesystem>(
                     path: PathBuf::from(rel),
                     source_path: source,
                     adapter: adapter_name.clone(),
+                    scope: crate::scope::Scope::Project,
                     merge_override: entry.merge.as_ref().and_then(|m| m.get(rel).cloned()),
+                    skill_provenance: None,
+                });
+            }
+        }
+
+        let user_root = ns_root.join("user");
+        for rel in &entry.user_files {
+            if rel.contains('*') {
+                expand_glob(fs, &user_root, rel)
+                    .map_err(|e| ResolutionError::Io(e.to_string()))?
+                    .into_iter()
+                    .for_each(|literal| {
+                        out.push(Candidate {
+                            namespace: ns.clone(),
+                            path: PathBuf::from(&literal),
+                            source_path: user_root.join(&literal),
+                            adapter: adapter_name.clone(),
+                            scope: crate::scope::Scope::User,
+                            merge_override: entry
+                                .user_merge
+                                .as_ref()
+                                .and_then(|m| m.get(&literal).cloned()),
+                            skill_provenance: None,
+                        })
+                    });
+            } else {
+                out.push(Candidate {
+                    namespace: ns.clone(),
+                    path: PathBuf::from(rel),
+                    source_path: user_root.join(rel),
+                    adapter: adapter_name.clone(),
+                    scope: crate::scope::Scope::User,
+                    merge_override: entry.user_merge.as_ref().and_then(|m| m.get(rel).cloned()),
                     skill_provenance: None,
                 });
             }
@@ -527,6 +574,7 @@ fn gather_skill_candidates<F: Filesystem>(
                         path: PathBuf::from(&rel_str),
                         source_path,
                         adapter: adapter_name.clone(),
+                        scope: crate::scope::Scope::Project,
                         merge_override: None,
                         skill_provenance,
                     });
@@ -564,6 +612,7 @@ fn gather_skill_candidates<F: Filesystem>(
                                 path: PathBuf::from(&dest_path),
                                 source_path,
                                 adapter: adapter_name.clone(),
+                                scope: crate::scope::Scope::Project,
                                 merge_override: None,
                                 skill_provenance,
                             });
