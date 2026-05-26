@@ -42,7 +42,9 @@ enum Command {
         /// Name of the namespace.
         name: String,
     },
-    /// Pin the current project to a namespace by writing `.aenv`.
+    /// Pin the current project to a namespace by writing a `.aenv` file
+    /// at the project root. Does NOT materialize any files — follow with
+    /// `aenv activate` to symlink the namespace's content into the project.
     Use {
         /// Name of the namespace.
         name: String,
@@ -50,19 +52,29 @@ enum Command {
         #[arg(long)]
         project: Option<PathBuf>,
     },
-    /// Activate the pinned namespace (or a named one) in a project.
+    /// Materialize the active namespace's content into the project as
+    /// symlinks (or merged files where strategy demands). Reads the
+    /// namespace name from the `.aenv` pin unless one is passed
+    /// explicitly. Backs up any displaced originals to
+    /// `.aenv-state/backup/<timestamp>/`.
     Activate {
         /// Namespace name (defaults to the .aenv pin).
         name: Option<String>,
         #[arg(long)]
         project: Option<PathBuf>,
     },
-    /// Deactivate the active namespace in a project.
+    /// Reverse `aenv activate`: remove every file aenv materialized,
+    /// restore any backed-up originals byte-for-byte, and delete the
+    /// `.aenv-state/` directory. Leaves the `.aenv` pin file in place
+    /// (use `aenv unpin` to remove that too).
     Deactivate {
         #[arg(long)]
         project: Option<PathBuf>,
     },
-    /// Restore the most recent backup set in a project.
+    /// Recovery path when `aenv deactivate` didn't run cleanly. Copies
+    /// the most recent `.aenv-state/backup/<timestamp>/` set back into
+    /// the project. Uses copy semantics (not move) so the backup is
+    /// re-runnable. Errors if no backup exists.
     Restore {
         #[arg(long)]
         project: Option<PathBuf>,
