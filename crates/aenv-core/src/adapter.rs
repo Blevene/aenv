@@ -78,6 +78,26 @@ pub struct Adapter {
     /// declare any role with a size guard.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub soft_limits: BTreeMap<String, usize>,
+    /// User-scope analog of `files`. Paths typically start with `~/` and are
+    /// expanded against `$HOME` at activation time. Empty when the adapter has
+    /// no user-level surface.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub user_files: Vec<String>,
+    /// User-scope analog of `roles`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub user_roles: BTreeMap<String, String>,
+    /// User-scope analog of `default_merge`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub user_default_merge: BTreeMap<String, String>,
+    /// User-scope analog of `merge_strategies` (Phase-1 holdover; kept for symmetry).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub user_merge_strategies: BTreeMap<String, String>,
+    /// User-scope analog of `soft_limits`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub user_soft_limits: BTreeMap<String, usize>,
+    /// User-scope analog of `skills_dir`. For claude-code this is `~/.claude/skills`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_skills_dir: Option<String>,
 }
 
 impl Adapter {

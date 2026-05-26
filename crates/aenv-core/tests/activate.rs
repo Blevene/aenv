@@ -26,6 +26,12 @@ fn claude_adapter() -> Adapter {
         parameters: vec![],
         skills_dir: None,
         soft_limits: Default::default(),
+        user_files: Default::default(),
+        user_roles: Default::default(),
+        user_default_merge: Default::default(),
+        user_merge_strategies: Default::default(),
+        user_soft_limits: Default::default(),
+        user_skills_dir: None,
     }
 }
 

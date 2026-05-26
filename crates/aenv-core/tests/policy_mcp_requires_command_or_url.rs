@@ -25,6 +25,12 @@ fn make_adapters() -> AdapterRegistry {
         parameters: vec![],
         skills_dir: None,
         soft_limits: BTreeMap::new(),
+        user_files: vec![],
+        user_roles: BTreeMap::new(),
+        user_default_merge: BTreeMap::new(),
+        user_merge_strategies: BTreeMap::new(),
+        user_soft_limits: BTreeMap::new(),
+        user_skills_dir: None,
     });
     adapters
 }
@@ -176,6 +182,12 @@ fn skips_non_mcp_files() {
         parameters: vec![],
         skills_dir: None,
         soft_limits: BTreeMap::new(),
+        user_files: vec![],
+        user_roles: BTreeMap::new(),
+        user_default_merge: BTreeMap::new(),
+        user_merge_strategies: BTreeMap::new(),
+        user_soft_limits: BTreeMap::new(),
+        user_skills_dir: None,
     });
     let resolved = ResolutionResult {
         chain: vec![ns("base")],

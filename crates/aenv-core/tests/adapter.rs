@@ -53,6 +53,12 @@ fn registry_insert_then_lookup() {
         parameters: vec![],
         skills_dir: None,
         soft_limits: Default::default(),
+        user_files: Default::default(),
+        user_roles: Default::default(),
+        user_default_merge: Default::default(),
+        user_merge_strategies: Default::default(),
+        user_soft_limits: Default::default(),
+        user_skills_dir: None,
     };
     reg.insert(a.clone());
     assert_eq!(reg.get("claude-code"), Some(&a));
@@ -162,4 +168,58 @@ files = ["CLAUDE.md"]
 "#;
     let a: aenv_core::adapter::Adapter = toml::from_str(toml).unwrap();
     assert_eq!(a.roles.get("CLAUDE.md").unwrap(), "instructions");
+}
+
+#[test]
+fn adapter_user_files_round_trip() {
+    let toml = r#"
+name = "claude-code"
+files = ["CLAUDE.md", ".claude/"]
+user_files = ["~/.claude/CLAUDE.md", "~/.claude/agents/", "~/.claude/settings.json"]
+user_skills_dir = "~/.claude/skills"
+
+[user_roles]
+"~/.claude/CLAUDE.md" = "instructions"
+
+[user_soft_limits]
+instructions = 5000
+
+[user_default_merge]
+"~/.claude/settings.json" = "deep"
+"#;
+    let a = aenv_core::adapter::Adapter::from_toml(toml).unwrap();
+    assert_eq!(
+        a.user_files,
+        vec![
+            "~/.claude/CLAUDE.md".to_string(),
+            "~/.claude/agents/".to_string(),
+            "~/.claude/settings.json".to_string(),
+        ]
+    );
+    assert_eq!(a.user_skills_dir.as_deref(), Some("~/.claude/skills"));
+    assert_eq!(
+        a.user_roles.get("~/.claude/CLAUDE.md").map(String::as_str),
+        Some("instructions")
+    );
+    assert_eq!(a.user_soft_limits.get("instructions").copied(), Some(5000));
+    assert_eq!(
+        a.user_default_merge
+            .get("~/.claude/settings.json")
+            .map(String::as_str),
+        Some("deep")
+    );
+}
+
+#[test]
+fn adapter_without_user_fields_still_parses() {
+    let toml = r#"
+name = "cline"
+files = [".clinerules"]
+"#;
+    let a = aenv_core::adapter::Adapter::from_toml(toml).unwrap();
+    assert!(a.user_files.is_empty());
+    assert!(a.user_roles.is_empty());
+    assert!(a.user_soft_limits.is_empty());
+    assert!(a.user_default_merge.is_empty());
+    assert!(a.user_skills_dir.is_none());
 }

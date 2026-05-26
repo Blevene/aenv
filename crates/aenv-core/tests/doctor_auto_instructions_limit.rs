@@ -31,6 +31,12 @@ fn auto_fires_when_manifest_silent_and_oversized() {
         parameters: vec![],
         skills_dir: Some(".claude/skills".into()),
         soft_limits: BTreeMap::from([("instructions".into(), 5000usize)]),
+        user_files: vec![],
+        user_roles: BTreeMap::new(),
+        user_default_merge: BTreeMap::new(),
+        user_merge_strategies: BTreeMap::new(),
+        user_soft_limits: BTreeMap::new(),
+        user_skills_dir: None,
     });
     let layout = RegistryLayout::new(PathBuf::from("/h"));
 
@@ -89,6 +95,12 @@ fn does_not_fire_when_manifest_declares_explicitly() {
         parameters: vec![],
         skills_dir: Some(".claude/skills".into()),
         soft_limits: BTreeMap::from([("instructions".into(), 5000usize)]),
+        user_files: vec![],
+        user_roles: BTreeMap::new(),
+        user_default_merge: BTreeMap::new(),
+        user_merge_strategies: BTreeMap::new(),
+        user_soft_limits: BTreeMap::new(),
+        user_skills_dir: None,
     });
     let layout = RegistryLayout::new(PathBuf::from("/h"));
 

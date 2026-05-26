@@ -33,6 +33,12 @@ fn instructions_budget_narrows_effective_limit() {
         parameters: vec![],
         skills_dir: Some(".claude/skills".into()),
         soft_limits: BTreeMap::from([("instructions".into(), 5000usize)]),
+        user_files: vec![],
+        user_roles: BTreeMap::new(),
+        user_default_merge: BTreeMap::new(),
+        user_merge_strategies: BTreeMap::new(),
+        user_soft_limits: BTreeMap::new(),
+        user_skills_dir: None,
     });
     let layout = RegistryLayout::new(PathBuf::from("/h"));
 

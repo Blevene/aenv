@@ -22,6 +22,12 @@ fn dummy_adapter() -> Adapter {
         parameters: vec![],
         skills_dir: None,
         soft_limits: BTreeMap::new(),
+        user_files: vec![],
+        user_roles: BTreeMap::new(),
+        user_default_merge: BTreeMap::new(),
+        user_merge_strategies: BTreeMap::new(),
+        user_soft_limits: BTreeMap::new(),
+        user_skills_dir: None,
     }
 }
 

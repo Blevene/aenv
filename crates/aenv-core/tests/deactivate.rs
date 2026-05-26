@@ -24,6 +24,12 @@ fn registry_with_claude() -> AdapterRegistry {
         parameters: vec![],
         skills_dir: None,
         soft_limits: Default::default(),
+        user_files: Default::default(),
+        user_roles: Default::default(),
+        user_default_merge: Default::default(),
+        user_merge_strategies: Default::default(),
+        user_soft_limits: Default::default(),
+        user_skills_dir: None,
     });
     r
 }
@@ -185,6 +191,12 @@ fn deactivate_removes_empty_state_directory() {
         parameters: vec![],
         skills_dir: None,
         soft_limits: Default::default(),
+        user_files: Default::default(),
+        user_roles: Default::default(),
+        user_default_merge: Default::default(),
+        user_merge_strategies: Default::default(),
+        user_soft_limits: Default::default(),
+        user_skills_dir: None,
     });
 
     activate_namespace(
@@ -247,6 +259,12 @@ fn deactivate_prunes_empty_parent_directories() {
         parameters: vec![],
         skills_dir: None,
         soft_limits: Default::default(),
+        user_files: Default::default(),
+        user_roles: Default::default(),
+        user_default_merge: Default::default(),
+        user_merge_strategies: Default::default(),
+        user_soft_limits: Default::default(),
+        user_skills_dir: None,
     });
 
     // A USER file sitting next to the managed tree must survive deactivate.
