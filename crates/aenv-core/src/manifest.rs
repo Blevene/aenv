@@ -51,6 +51,13 @@ pub struct AdapterEntry {
     /// "section", "deep", "last-wins", "symlink".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub merge: Option<std::collections::BTreeMap<String, String>>,
+    /// User-scope analog of `files`. Paths are relative to the namespace's
+    /// `user/` source subdir, and to `$HOME` at activation time.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub user_files: Vec<String>,
+    /// User-scope analog of `merge`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_merge: Option<std::collections::BTreeMap<String, String>>,
 }
 
 impl AenvManifest {
@@ -77,6 +84,10 @@ impl AenvManifest {
             files: Vec<String>,
             #[serde(default)]
             merge: Option<MergeRaw>,
+            #[serde(default)]
+            user_files: Vec<String>,
+            #[serde(default)]
+            user_merge: Option<MergeRaw>,
         }
 
         // Stage 1: structural parse into a raw shape that holds parameters as
@@ -106,6 +117,8 @@ impl AenvManifest {
                 let RawAdapterEntry {
                     files,
                     merge: merge_raw,
+                    user_files,
+                    user_merge: user_merge_raw,
                 } = raw_entry;
                 let merge = merge_raw.map(|m| match m {
                     MergeRaw::PerFile(map) => map,
@@ -114,7 +127,22 @@ impl AenvManifest {
                         .map(|f| (f.clone(), strategy.clone()))
                         .collect(),
                 });
-                (name, AdapterEntry { files, merge })
+                let user_merge = user_merge_raw.map(|m| match m {
+                    MergeRaw::PerFile(map) => map,
+                    MergeRaw::Uniform(strategy) => user_files
+                        .iter()
+                        .map(|f| (f.clone(), strategy.clone()))
+                        .collect(),
+                });
+                (
+                    name,
+                    AdapterEntry {
+                        files,
+                        merge,
+                        user_files,
+                        user_merge,
+                    },
+                )
             })
             .collect();
 

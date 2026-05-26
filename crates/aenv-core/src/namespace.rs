@@ -160,7 +160,12 @@ pub fn create_namespace_from_project<F: Filesystem>(
         if !files.is_empty() {
             manifest_adapters.insert(
                 adapter.name.clone(),
-                crate::manifest::AdapterEntry { files, merge: None },
+                crate::manifest::AdapterEntry {
+                    files,
+                    merge: None,
+                    user_files: Vec::new(),
+                    user_merge: None,
+                },
             );
         }
     }

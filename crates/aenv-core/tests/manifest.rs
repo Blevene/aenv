@@ -123,6 +123,8 @@ fn adapter_entry_fields_are_publicly_constructible() {
     let entry = AdapterEntry {
         files: vec!["CLAUDE.md".to_string()],
         merge: None,
+        user_files: vec![],
+        user_merge: None,
     };
     assert_eq!(entry.files.len(), 1);
 }
@@ -174,4 +176,67 @@ merge = "deep"
     for f in &["a.json", "b.json", "c.json"] {
         assert_eq!(merge.get(*f), Some(&"deep".to_string()), "missing key {f}");
     }
+}
+
+#[test]
+fn manifest_user_files_round_trip() {
+    let toml = r#"
+name = "research"
+
+[adapters.claude-code]
+files = ["CLAUDE.md"]
+user_files = [".claude/CLAUDE.md", ".claude/agents/code-reviewer.md", ".claude/settings.json"]
+user_merge = { ".claude/settings.json" = "deep" }
+"#;
+    let m = aenv_core::manifest::AenvManifest::from_toml(toml).unwrap();
+    let entry = m.adapters.get("claude-code").expect("adapter present");
+    assert_eq!(
+        entry.user_files,
+        vec![
+            ".claude/CLAUDE.md".to_string(),
+            ".claude/agents/code-reviewer.md".to_string(),
+            ".claude/settings.json".to_string(),
+        ]
+    );
+    let user_merge = entry.user_merge.as_ref().expect("user_merge present");
+    assert_eq!(
+        user_merge.get(".claude/settings.json").map(String::as_str),
+        Some("deep")
+    );
+}
+
+#[test]
+fn manifest_user_files_optional() {
+    let toml = r#"
+name = "legacy"
+
+[adapters.claude-code]
+files = ["CLAUDE.md"]
+"#;
+    let m = aenv_core::manifest::AenvManifest::from_toml(toml).unwrap();
+    let entry = m.adapters.get("claude-code").unwrap();
+    assert!(entry.user_files.is_empty());
+    assert!(entry.user_merge.is_none());
+}
+
+#[test]
+fn manifest_user_files_uniform_merge() {
+    let toml = r#"
+name = "uniform"
+
+[adapters.claude-code]
+user_files = [".claude/a.json", ".claude/b.json"]
+user_merge = "deep"
+"#;
+    let m = aenv_core::manifest::AenvManifest::from_toml(toml).unwrap();
+    let entry = m.adapters.get("claude-code").unwrap();
+    let user_merge = entry.user_merge.as_ref().unwrap();
+    assert_eq!(
+        user_merge.get(".claude/a.json").map(String::as_str),
+        Some("deep")
+    );
+    assert_eq!(
+        user_merge.get(".claude/b.json").map(String::as_str),
+        Some("deep")
+    );
 }
