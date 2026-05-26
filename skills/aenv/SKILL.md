@@ -1,6 +1,6 @@
 ---
 name: aenv
-description: Use when the user wants to set up, switch between, or manage `aenv` namespaces — named bundles of CLAUDE.md, .cursorrules, .mcp.json, skills, agents, slash commands, and other AI-coding-harness configuration. Triggers include "switch namespace", "switch profile", "activate", "deactivate", "create a namespace", "install a skill (from GitHub)", "snapshot my CLAUDE.md", "auto-activate on cd", "what namespace am I using", `aenv …` mentioned directly, or any harness-config management ask. Don't use for unrelated dotfile/secrets management or Python `venv`.
+description: Use when the user wants to set up, switch between, or manage `aenv` namespaces — named bundles of CLAUDE.md, skills, MCP entries, and other AI-coding-harness config. Triggers include `aenv …` mentioned directly, "switch namespace/profile", "activate/deactivate", "create/snapshot a namespace", "install a skill (from GitHub)", "auto-activate on cd", "what namespace am I using". Don't use for secrets, Python venv, or Claude Code plugin marketplace ops.
 ---
 
 # aenv
@@ -18,7 +18,7 @@ Namespaces live at `~/.aenv/envs/<name>/` and own a manifest (`aenv.toml`) plus 
 | Set up a new namespace from scratch | `aenv create <name> --adapter claude-code` (also creates an empty `CLAUDE.md`; user edits it) |
 | Build on top of an existing namespace | `aenv create <name> --extends <parent>` (composition; child overrides win section-by-section) |
 | Capture a hand-shaped project as a reusable namespace | `aenv snapshot <name>` from inside the project |
-| Pin + activate in a project | `aenv use <name>` then `aenv activate` (or just `aenv activate <name>` to do both in some flows) |
+| Pin + activate in a project | `aenv use <name>` then `aenv activate`. (Avoid `aenv activate <name>` without `use` first — it activates without writing a `.aenv` pin, leaving the project in a half-state where `aenv status` works but no future invocation knows what namespace was intended.) |
 | Switch active namespace in a project | `aenv deactivate && aenv use <other> && aenv activate` |
 | Restore project to pre-aenv state | `aenv deactivate` (then `aenv unpin` if they want the `.aenv` pin file gone too) |
 | Add a skill they wrote themselves | `aenv skill new <skill-name> --ns <namespace>` |
@@ -55,7 +55,7 @@ When the user wants to import a skill, ask which form of pin they want (or pick 
 Before running these, confirm with the user:
 
 - `aenv delete <ns>` — permanently removes a namespace from `~/.aenv/envs/`. Irreversible. Ask if they have a backup or if the namespace is pinned in any other project.
-- `aenv fork` with no argument — detaches the *whole* project from its namespace by replacing every symlink with a copy. Reversible only via git on the project side.
+- `aenv fork` with no argument — detaches the *whole* project from its namespace by replacing every symlink with a real file copy. To re-attach, run `aenv activate` again — but the current local copies become the new backup, so any divergent edits the user made post-detach end up in `.aenv-state/backup/<timestamp>/` rather than as the live files. Ask whether they want to keep the detached copies or re-attach.
 - `rm -rf ~/.aenv/envs/<ns>/` — manual, not aenv. Ask before running.
 
 For non-destructive ops (`aenv use`, `aenv activate`, `aenv deactivate`, `aenv status`, `aenv list`, etc.) just run them.
