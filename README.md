@@ -7,32 +7,7 @@
 
 `aenv` is a Rust CLI for managing named, composable, version-controlled bundles of AI-coding-agent configuration (`CLAUDE.md`, `.cursorrules`, `.mcp.json`, skills, agents, slash commands, MCP entries). Think Python's `venv`, but for the rules and configurations that shape how AI coding agents behave.
 
-> **Status:** Active development. Phase 3 (parameters & policies) is the most recent milestone, tagged [`phase-3-complete`](../../tree/phase-3-complete). The roadmap is in [`tasks/todo.md`](./tasks/todo.md).
-
-## What works today
-
-After `phase-3-complete`, `aenv` can:
-
-- **Create and compose namespaces.** A namespace bundles `CLAUDE.md`, `.cursorrules`, skills, agents, settings — anything an AI coding harness reads — and can `extends` another namespace. Composition produces section-merged Markdown, deep-merged JSON / YAML / TOML, and qualified-name provenance for every artifact. Cycles are caught (exit 15).
-- **Pin and activate projects.** `aenv use <name>` writes a `.aenv` pin file; `aenv activate` materializes the resolved namespace as symlinks (or merged files where strategy demands) and records every move in `.aenv-state/state.json`. `aenv deactivate` puts the project back exactly as it was, restoring any files it displaced.
-- **Inspect provenance.** `aenv status` shows the resolution chain, every managed file with its qualified source, the shadow chain, effective parameters, and active policies. `aenv which <path>` answers "where did this file come from?".
-- **Declare typed parameters and policies.** Manifests carry `[parameters]` (string / int / bool / list-of-string) that inherit last-wins across the extends chain, and `[policies]` (advisory by default, or `enforce = true`) that inherit with R-75 enforce-protection — a child can tighten but not weaken a parent's enforced policy.
-- **Run a doctor check.** `aenv doctor [<ns>]` evaluates four built-in policy evaluators (`instructions_max_chars`, `skill_requires_description`, `mcp_requires_command_or_url`, `forbid_paths`) against the resolved namespace and prints per-policy outcomes. Enforced violations also block `aenv activate` with exit 17 — *before* any file is touched.
-- **Read and write parameters from the CLI.** `aenv get <ns>.<param>` or `aenv get .<param>` (active project) shows the effective value with provenance; `aenv set <ns>.<param> <value>` rewrites the named namespace's manifest, inferring the value type.
-- **Fork to a private copy.** `aenv fork` detaches a whole project from its namespace (replacing symlinks with copies); `aenv fork <file>` detaches just one file; `aenv fork <name>` creates a new namespace populated from the current project state.
-- **Manage skills.** `aenv skill new <name> --ns <ns>` scaffolds an authored skill whose files live in the namespace tree; `aenv skill import <source> --ns <ns>` pulls one in from a local path or git URL, with `--pin <ref>` for reproducibility and `--path <subdir>` for monorepo skill collections (k-dense-ai's `scientific-agent-skills`, etc.). `aenv skill remove <name> --ns <ns>` undoes either flavor; `aenv cache prune` reclaims `~/.aenv/cache/skills/` dirs nothing references.
-- **Snapshot an existing project.** `aenv snapshot <name>` walks the project against every installed adapter's `files = [...]` and copies the matches into a new namespace at `~/.aenv/envs/<name>/` — useful for capturing a hand-shaped `.claude/` tree as something portable.
-- **Diff resolved namespaces.** `aenv diff` compares a project's materialized files against the namespace declaration (drift detection); `aenv diff <ns_a> <ns_b>` shows the structural delta between two namespaces. Both ship `--json` for downstream tooling.
-- **Scriptability.** Every read-oriented command — `list`, `status`, `which`, `get`, `doctor`, `skill list`, `adapter list`, `diff` — accepts `--json` and emits a stable schema. Each namespace also carries a resolved-namespace hash you can read off `aenv status` / `aenv list --json` to compare configurations across machines.
-
-Ships with built-in adapters for **Claude Code, Cursor, Aider, Cline, Continue, Windsurf, Codex, and a generic MCP adapter** — all embedded in the binary, written to `~/.aenv/adapters/` on first run, and overridable by user edit. `aenv adapter list` shows what's installed; `aenv adapter add <path>` registers a new one. Also ships with two starter namespaces (`karpathy`, `cherny`) written to `~/.aenv/envs/` on first run so you have something to switch between out of the box.
-
-## What's still in flight
-
-The roadmap (see [`tasks/todo.md`](./tasks/todo.md)) has two phases left:
-
-- **Phase 6** — Partial. `cd`-based auto-activation ships now via `aenv init-shell` (see [§Shell integration](#shell-integration)); git remotes / `aenv install` / `aenv sync` / `aenv promote` still pending.
-- **Phase 7** — Windows symlink fallback, cross-platform CI, v0.1.0 release.
+> **Status:** Active development. Latest release is [`v0.0.2`](https://github.com/Blevene/aenv/releases/tag/v0.0.2). Phase 5 (resolved-namespace hash, `--json` everywhere, `aenv diff`) is the most recent milestone — see [§What works today](#what-works-today) for the full feature surface and [§Roadmap](#roadmap--whats-still-in-flight) for what's pending.
 
 ## Installation
 
@@ -371,6 +346,31 @@ aenv skill list                # every skill across every namespace
 aenv skill list --ns my-style  # just one namespace's
 aenv skill list --json         # machine-readable
 ```
+
+## What works today
+
+`aenv` can:
+
+- **Create and compose namespaces.** A namespace bundles `CLAUDE.md`, `.cursorrules`, skills, agents, settings — anything an AI coding harness reads — and can `extends` another namespace. Composition produces section-merged Markdown, deep-merged JSON / YAML / TOML, and qualified-name provenance for every artifact. Cycles are caught (exit 15).
+- **Pin and activate projects.** `aenv use <name>` writes a `.aenv` pin file; `aenv activate` materializes the resolved namespace as symlinks (or merged files where strategy demands) and records every move in `.aenv-state/state.json`. `aenv deactivate` puts the project back exactly as it was, restoring any files it displaced.
+- **Inspect provenance.** `aenv status` shows the resolution chain, every managed file with its qualified source, the shadow chain, effective parameters, and active policies. `aenv which <path>` answers "where did this file come from?".
+- **Declare typed parameters and policies.** Manifests carry `[parameters]` (string / int / bool / list-of-string) that inherit last-wins across the extends chain, and `[policies]` (advisory by default, or `enforce = true`) that inherit with R-75 enforce-protection — a child can tighten but not weaken a parent's enforced policy.
+- **Run a doctor check.** `aenv doctor [<ns>]` evaluates four built-in policy evaluators (`instructions_max_chars`, `skill_requires_description`, `mcp_requires_command_or_url`, `forbid_paths`) against the resolved namespace and prints per-policy outcomes. Enforced violations also block `aenv activate` with exit 17 — *before* any file is touched.
+- **Read and write parameters from the CLI.** `aenv get <ns>.<param>` or `aenv get .<param>` (active project) shows the effective value with provenance; `aenv set <ns>.<param> <value>` rewrites the named namespace's manifest, inferring the value type.
+- **Fork to a private copy.** `aenv fork` detaches a whole project from its namespace (replacing symlinks with copies); `aenv fork <file>` detaches just one file; `aenv fork <name>` creates a new namespace populated from the current project state.
+- **Manage skills.** `aenv skill new <name> --ns <ns>` scaffolds an authored skill whose files live in the namespace tree; `aenv skill import <source> --ns <ns>` pulls one in from a local path or git URL, with `--pin <ref>` for reproducibility and `--path <subdir>` for monorepo skill collections (k-dense-ai's `scientific-agent-skills`, etc.). `aenv skill remove <name> --ns <ns>` undoes either flavor; `aenv cache prune` reclaims `~/.aenv/cache/skills/` dirs nothing references.
+- **Snapshot an existing project.** `aenv snapshot <name>` walks the project against every installed adapter's `files = [...]` and copies the matches into a new namespace at `~/.aenv/envs/<name>/` — useful for capturing a hand-shaped `.claude/` tree as something portable.
+- **Diff resolved namespaces.** `aenv diff` compares a project's materialized files against the namespace declaration (drift detection); `aenv diff <ns_a> <ns_b>` shows the structural delta between two namespaces. Both ship `--json` for downstream tooling.
+- **Scriptability.** Every read-oriented command — `list`, `status`, `which`, `get`, `doctor`, `skill list`, `adapter list`, `diff` — accepts `--json` and emits a stable schema. Each namespace also carries a resolved-namespace hash you can read off `aenv status` / `aenv list --json` to compare configurations across machines.
+
+Ships with built-in adapters for **Claude Code, Cursor, Aider, Cline, Continue, Windsurf, Codex, and a generic MCP adapter** — all embedded in the binary, written to `~/.aenv/adapters/` on first run, and overridable by user edit. `aenv adapter list` shows what's installed; `aenv adapter add <path>` registers a new one. Also ships with two starter namespaces (`karpathy`, `cherny`) written to `~/.aenv/envs/` on first run so you have something to switch between out of the box.
+
+## Roadmap — what's still in flight
+
+The full plan lives in [`tasks/todo.md`](./tasks/todo.md). Two phases remain:
+
+- **Phase 6** — Partial. `cd`-based auto-activation ships now via `aenv init-shell` (see [§Shell integration](#shell-integration)); git remotes / `aenv install` / `aenv sync` / `aenv promote` still pending.
+- **Phase 7** — Windows symlink fallback, cross-platform CI, v0.1.0 release.
 
 ## Reading order
 
