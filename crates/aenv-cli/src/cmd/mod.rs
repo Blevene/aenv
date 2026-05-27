@@ -11,6 +11,7 @@ pub mod diff;
 pub mod doctor;
 pub mod fork;
 pub mod get;
+pub mod global;
 pub mod init_shell;
 pub mod list;
 pub mod restore;

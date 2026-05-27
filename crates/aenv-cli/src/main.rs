@@ -207,6 +207,14 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// User-global activation surface (`~/.claude/`, `~/.codex/`, …).
+    /// Mirrors the project-local verbs but operates on `$HOME` instead of
+    /// the project root. One activation lives per user; activating a new
+    /// namespace deactivates the prior one in a single transaction.
+    Global {
+        #[command(subcommand)]
+        action: GlobalAction,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -279,6 +287,53 @@ enum CacheAction {
     /// Walk every namespace's [[skills]] entries, collect the
     /// (source-hash, ref) cache directories in use, delete the rest.
     Prune,
+}
+
+#[derive(Debug, Subcommand)]
+enum GlobalAction {
+    /// Activate a namespace's user-scope files into `$HOME`. Replaces any
+    /// existing global activation in a single transaction.
+    Use {
+        /// Namespace name to activate globally.
+        name: String,
+    },
+    /// Reverse `aenv global use`: restore stashed originals, delete the
+    /// global state file. Exit 0 with a note if no activation is live.
+    Deactivate,
+    /// Show the active global namespace and managed files.
+    Status {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show which global namespace manages a given user-scope path.
+    Which {
+        /// Path to query (absolute or relative to `$HOME`).
+        path: PathBuf,
+        #[arg(long)]
+        json: bool,
+    },
+    /// List namespaces that declare user-scope files.
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Evaluate policies against a namespace's user-scope candidates.
+    Doctor {
+        /// Namespace to evaluate (defaults to the active global namespace).
+        namespace: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Diff user-scope content against the active global activation or
+    /// between two namespaces' user-scope subsets.
+    Diff {
+        /// First namespace name for structural diff (omit for drift).
+        ns_a: Option<String>,
+        /// Second namespace name for structural diff.
+        ns_b: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() -> ExitCode {
@@ -507,6 +562,55 @@ fn main() -> ExitCode {
                             )
                         }
                     }
+                }
+            }
+            Command::Global { action } => {
+                let fake_home = std::env::var("HOME")
+                    .map(std::path::PathBuf::from)
+                    .map_err(|_| {
+                        aenv_core::AenvError::ManifestInvalid(
+                            "HOME not set; aenv global requires HOME".into(),
+                        )
+                    })?;
+                match action {
+                    GlobalAction::Use { name } => {
+                        let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
+                            &fs,
+                            &layout.adapters_dir(),
+                        )?;
+                        cmd::global::use_::run(&fs, &layout, &adapters, &fake_home, &name)
+                    }
+                    GlobalAction::Deactivate => {
+                        cmd::global::deactivate::run(&fs, &layout, &fake_home)
+                    }
+                    GlobalAction::Status { json } => {
+                        cmd::global::status::run(&fs, &layout, &fake_home, json)
+                    }
+                    GlobalAction::Which { path, json } => {
+                        cmd::global::which::run(&fs, &layout, &fake_home, &path, json)
+                    }
+                    GlobalAction::List { json } => cmd::global::list::run(&fs, &layout, json),
+                    GlobalAction::Doctor { namespace, json } => {
+                        let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
+                            &fs,
+                            &layout.adapters_dir(),
+                        )?;
+                        cmd::global::doctor::run(
+                            &fs,
+                            &layout,
+                            &adapters,
+                            namespace.as_deref(),
+                            json,
+                        )
+                    }
+                    GlobalAction::Diff { ns_a, ns_b, json } => cmd::global::diff::run(
+                        &fs,
+                        &layout,
+                        &fake_home,
+                        ns_a.as_deref(),
+                        ns_b.as_deref(),
+                        json,
+                    ),
                 }
             }
         }
