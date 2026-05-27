@@ -169,31 +169,33 @@ fn global_import_with_convention_file_uses_explicit_layout() {
 }
 
 #[test]
-fn global_import_rejects_git_url_in_task_5() {
+fn global_import_rejects_pin_for_local_source() {
     let tmp = tempfile::tempdir().unwrap();
     let aenv_home = canon(tmp.path()).join(".aenv");
     let fake_home = canon(tmp.path()).join("home");
     std::fs::create_dir_all(&fake_home).unwrap();
     std::fs::create_dir_all(aenv_home.join("adapters")).unwrap();
 
+    let src = canon(tmp.path()).join("src");
+    std::fs::create_dir_all(&src).unwrap();
+    std::fs::write(src.join("CLAUDE.md"), b"x").unwrap();
+
     let out = aenv()
         .env("AENV_HOME", &aenv_home)
         .env("HOME", &fake_home)
-        .args([
-            "global",
-            "import",
-            "https://github.com/example/repo",
-            "repo",
-        ])
+        .args(["global", "import"])
+        .arg(&src)
+        .arg("ns")
+        .args(["--pin", "v1"])
         .output()
         .unwrap();
     assert!(
         !out.status.success(),
-        "expected failure on git URL in Task 5"
+        "expected --pin on a local path to fail"
     );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        stderr.contains("git URL imports") || stderr.contains("Task 6"),
-        "expected stderr to mention git URL support, got: {stderr}"
+        stderr.contains("--pin only applies to git URL"),
+        "expected stderr to explain --pin scope, got: {stderr}"
     );
 }

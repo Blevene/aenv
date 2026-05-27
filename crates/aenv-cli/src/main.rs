@@ -357,22 +357,26 @@ enum GlobalAction {
         #[arg(long)]
         include: Vec<String>,
     },
-    /// Import a source directory (Task 5) or git URL (Task 6) as a new
-    /// namespace. When the source root contains `aenv-namespace.toml`, its
-    /// declared `[layout]` is authoritative; otherwise a built-in heuristic
-    /// probes well-known paths (CLAUDE.md, agents/, hooks/, install.sh, …).
+    /// Import a source directory or git URL as a new namespace. When the
+    /// source root contains `aenv-namespace.toml`, its declared `[layout]`
+    /// is authoritative; otherwise a built-in heuristic probes well-known
+    /// paths (CLAUDE.md, agents/, hooks/, install.sh, …).
     ///
     /// The resulting namespace can be activated with `aenv global activate
     /// <name>`. See `pm_docs/aenv-namespace-toml-spec.md` for the convention
     /// file format.
     Import {
-        /// Source path (file:// or absolute local path) or git URL.
+        /// Source: a local filesystem path, or a git URL
+        /// (https://, http://, git://, git@, file://, or any URL ending in
+        /// `.git`).
         source: String,
         /// Namespace name. Defaults to the last path component of `source`
-        /// for local paths, or the repo name for git URLs.
+        /// for local paths, or the repo name (with trailing `.git` stripped)
+        /// for git URLs.
         #[arg(default_value = "")]
         name: String,
-        /// (Task 6) Pin a git source to a specific tag, commit, or branch.
+        /// Pin a git source to a specific tag, commit, or branch. Only
+        /// applies to git URL sources.
         #[arg(long)]
         pin: Option<String>,
     },
