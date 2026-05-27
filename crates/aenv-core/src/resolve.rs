@@ -410,7 +410,15 @@ fn gather_candidates<F: Filesystem>(
                         })
                     });
             } else {
-                let source = ns_root.join(rel);
+                // Trim any trailing `/` the manifest author added to signal
+                // "this is a directory" — POSIX symlink() with a trailing
+                // slash on the link path returns ENOENT, and our materialized
+                // target paths must not carry the slash. The merge-override
+                // lookup tolerates the raw form so authors who keyed both
+                // their `user_files` and `user_merge` entries with a trailing
+                // slash still get a match.
+                let trimmed = rel.trim_end_matches('/');
+                let source = ns_root.join(trimmed);
                 if !fs
                     .exists(&source)
                     .map_err(|e| ResolutionError::Io(e.to_string()))?
@@ -419,11 +427,14 @@ fn gather_candidates<F: Filesystem>(
                 }
                 out.push(Candidate {
                     namespace: ns.clone(),
-                    path: PathBuf::from(rel),
+                    path: PathBuf::from(trimmed),
                     source_path: source,
                     adapter: adapter_name.clone(),
                     scope: crate::scope::Scope::Project,
-                    merge_override: entry.merge.as_ref().and_then(|m| m.get(rel).cloned()),
+                    merge_override: entry
+                        .merge
+                        .as_ref()
+                        .and_then(|m| m.get(rel).or_else(|| m.get(trimmed)).cloned()),
                     skill_provenance: None,
                 });
             }
@@ -450,13 +461,18 @@ fn gather_candidates<F: Filesystem>(
                         })
                     });
             } else {
+                // See trailing-slash note above.
+                let trimmed = rel.trim_end_matches('/');
                 out.push(Candidate {
                     namespace: ns.clone(),
-                    path: PathBuf::from(rel),
-                    source_path: user_root.join(rel),
+                    path: PathBuf::from(trimmed),
+                    source_path: user_root.join(trimmed),
                     adapter: adapter_name.clone(),
                     scope: crate::scope::Scope::User,
-                    merge_override: entry.user_merge.as_ref().and_then(|m| m.get(rel).cloned()),
+                    merge_override: entry
+                        .user_merge
+                        .as_ref()
+                        .and_then(|m| m.get(rel).or_else(|| m.get(trimmed)).cloned()),
                     skill_provenance: None,
                 });
             }
