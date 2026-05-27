@@ -74,6 +74,11 @@ enum Command {
     Deactivate {
         #[arg(long)]
         project: Option<PathBuf>,
+        /// Also remove every timestamped backup directory under
+        /// `.aenv-state/backup/`. Older runs' backups accumulate
+        /// otherwise. Project-side analog of `aenv global deactivate --prune`.
+        #[arg(long)]
+        prune: bool,
     },
     /// Recovery path when `aenv deactivate` didn't run cleanly. Copies
     /// the most recent `.aenv-state/backup/<timestamp>/` set back into
@@ -321,7 +326,9 @@ enum GlobalAction {
         #[arg(long)]
         json: bool,
     },
-    /// List namespaces that declare user-scope files.
+    /// List only namespaces that declare user-scope files (`user_files` or
+    /// `scope = "user"` skills). To see every namespace regardless of scope,
+    /// use `aenv list`.
     List {
         #[arg(long)]
         json: bool,
@@ -399,9 +406,9 @@ fn main() -> ExitCode {
                 let project_root = paths::resolve_project_root(&fs, project)?;
                 cmd::activate::run(&fs, &layout, &project_root, name.as_deref())
             }
-            Command::Deactivate { project } => {
+            Command::Deactivate { project, prune } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;
-                cmd::deactivate::run(&fs, &project_root)
+                cmd::deactivate::run(&fs, &project_root, prune)
             }
             Command::Restore { project } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;

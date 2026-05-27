@@ -137,7 +137,11 @@ fn global_diff_drift_runs_without_crashing() {
     setup_active_ns(&aenv_home, &fake_home, "ns", b"original");
 
     // Modify the materialized file in $HOME to introduce drift.
-    std::fs::write(fake_home.join(".claude/CLAUDE.md"), b"edited locally").unwrap();
+    // The activation creates a symlink, so we remove it first to avoid
+    // writing back through to the namespace source.
+    let materialized = fake_home.join(".claude/CLAUDE.md");
+    let _ = std::fs::remove_file(&materialized);
+    std::fs::write(&materialized, b"edited locally").unwrap();
 
     let out = aenv()
         .env("AENV_HOME", &aenv_home)
@@ -151,5 +155,103 @@ fn global_diff_drift_runs_without_crashing() {
         out.status.success() || out.status.code() == Some(0),
         "diff crashed: stderr={}",
         String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+#[test]
+fn global_diff_drift_reports_unchanged_when_no_edit() {
+    let tmp = tempfile::tempdir().unwrap();
+    let aenv_home = canon(tmp.path()).join(".aenv");
+    let fake_home = canon(tmp.path()).join("home");
+    std::fs::create_dir_all(&fake_home).unwrap();
+    setup_active_ns(&aenv_home, &fake_home, "ns", b"clean body");
+
+    let out = aenv()
+        .env("AENV_HOME", &aenv_home)
+        .env("HOME", &fake_home)
+        .args(["global", "diff"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.to_lowercase().contains("no drift")
+            || stdout.to_lowercase().contains("unchanged")
+            || stdout.to_lowercase().contains("clean"),
+        "expected clean-drift signal, got: {stdout}"
+    );
+}
+
+#[test]
+fn global_diff_drift_flags_modified_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    let aenv_home = canon(tmp.path()).join(".aenv");
+    let fake_home = canon(tmp.path()).join("home");
+    std::fs::create_dir_all(&fake_home).unwrap();
+    setup_active_ns(&aenv_home, &fake_home, "ns", b"original");
+
+    // Modify the materialized file in $HOME to introduce drift.
+    // The activation creates a symlink, so we remove it first to avoid
+    // writing back through to the namespace source.
+    let materialized = fake_home.join(".claude/CLAUDE.md");
+    let _ = std::fs::remove_file(&materialized);
+    std::fs::write(&materialized, b"edited locally").unwrap();
+
+    let out = aenv()
+        .env("AENV_HOME", &aenv_home)
+        .env("HOME", &fake_home)
+        .args(["global", "diff"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.to_lowercase().contains("modified") || stdout.to_lowercase().contains("drift"),
+        "expected drift signal, got: {stdout}"
+    );
+    assert!(
+        stdout.contains("~/.claude/CLAUDE.md") || stdout.contains(".claude/CLAUDE.md"),
+        "expected path mentioned: {stdout}"
+    );
+}
+
+#[test]
+fn global_diff_drift_json_shape() {
+    let tmp = tempfile::tempdir().unwrap();
+    let aenv_home = canon(tmp.path()).join(".aenv");
+    let fake_home = canon(tmp.path()).join("home");
+    std::fs::create_dir_all(&fake_home).unwrap();
+    setup_active_ns(&aenv_home, &fake_home, "ns", b"original");
+    let materialized = fake_home.join(".claude/CLAUDE.md");
+    let _ = std::fs::remove_file(&materialized);
+    std::fs::write(&materialized, b"edited locally").unwrap();
+
+    let out = aenv()
+        .env("AENV_HOME", &aenv_home)
+        .env("HOME", &fake_home)
+        .args(["global", "diff", "--json"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout)
+        .unwrap_or_else(|_| panic!("not JSON: {}", String::from_utf8_lossy(&out.stdout)));
+    assert_eq!(json["scope"], "user");
+    assert_eq!(json["status"], "drift");
+    let files = json["files"].as_array().expect("files array");
+    assert!(
+        files.iter().any(|f| f["state"] == "modified"),
+        "no modified file reported: {json}"
     );
 }
