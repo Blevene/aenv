@@ -157,6 +157,68 @@ pub fn activate_namespace_in_scope<F: Filesystem>(
     Ok(state)
 }
 
+/// User-scope "activate, replacing any prior global activation" flow.
+///
+/// 1. If `<aenv_home>/global-state.json` exists, deactivate first
+///    (capturing the prior namespace name).
+/// 2. Activate `leaf` under [`Scope::User`](crate::scope::Scope::User).
+/// 3. On step-2 failure, attempt to re-activate the prior namespace as
+///    rollback (best-effort). The original error from step 2 is returned
+///    regardless of rollback outcome.
+///
+/// This enforces the "one global activation per user" invariant — the
+/// caller doesn't have to deactivate before activating a new namespace.
+pub fn swap_or_activate_user<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    adapters: &AdapterRegistry,
+    target_root: &Path,
+    leaf: &NamespaceId,
+) -> Result<ActivationState> {
+    let state_path = layout.global_state_path();
+    let prior: Option<String> = if fs.exists(&state_path)? {
+        let bytes = fs.read(&state_path)?;
+        let text = std::str::from_utf8(&bytes)
+            .map_err(|e| AenvError::ManifestInvalid(format!("global-state.json: {e}")))?;
+        let state = ActivationState::from_json(text)?;
+        crate::deactivate::deactivate_namespace_in_scope(
+            fs,
+            layout,
+            target_root,
+            crate::scope::Scope::User,
+        )?;
+        Some(state.active_namespace)
+    } else {
+        None
+    };
+
+    match activate_namespace_in_scope(
+        fs,
+        layout,
+        adapters,
+        target_root,
+        crate::scope::Scope::User,
+        leaf,
+    ) {
+        Ok(s) => Ok(s),
+        Err(e) => {
+            if let Some(prior_name) = prior {
+                if let Ok(prior_id) = NamespaceId::new(prior_name.as_str()) {
+                    let _ = activate_namespace_in_scope(
+                        fs,
+                        layout,
+                        adapters,
+                        target_root,
+                        crate::scope::Scope::User,
+                        &prior_id,
+                    );
+                }
+            }
+            Err(e)
+        }
+    }
+}
+
 // --------------------------------------------------------------------------
 // UndoStep + undo log
 // --------------------------------------------------------------------------

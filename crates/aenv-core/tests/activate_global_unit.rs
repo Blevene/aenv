@@ -153,3 +153,141 @@ user_files = [".claude/CLAUDE.md"]
         b"new user CLAUDE.md"
     );
 }
+
+#[test]
+fn user_scope_swap_transactional() {
+    let tmp = tempfile::tempdir().unwrap();
+    let aenv_home = tmp.path().join(".aenv");
+    let fake_home = tmp.path().join("home");
+    let registry = aenv_core::home::RegistryLayout::new(aenv_home.clone());
+    let fs = aenv_core::fs::RealFilesystem;
+
+    std::fs::create_dir_all(fake_home.join(".claude")).unwrap();
+    std::fs::write(fake_home.join(".claude/CLAUDE.md"), b"original").unwrap();
+
+    let adapters_dir = registry.adapters_dir();
+    std::fs::create_dir_all(&adapters_dir).unwrap();
+    std::fs::write(
+        adapters_dir.join("claude-code.toml"),
+        r#"
+name = "claude-code"
+user_files = ["~/.claude/CLAUDE.md"]
+"#,
+    )
+    .unwrap();
+    let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(&fs, &adapters_dir).unwrap();
+
+    for (name, body) in [("foo", b"foo body" as &[u8]), ("bar", b"bar body")] {
+        let ns_dir = registry.namespace_dir(name);
+        std::fs::create_dir_all(ns_dir.join("user/.claude")).unwrap();
+        std::fs::write(ns_dir.join("user/.claude/CLAUDE.md"), body).unwrap();
+        std::fs::write(
+            ns_dir.join("aenv.toml"),
+            format!(
+                r#"
+name = "{name}"
+[adapters.claude-code]
+user_files = [".claude/CLAUDE.md"]
+"#
+            ),
+        )
+        .unwrap();
+    }
+
+    let foo = aenv_core::identity::NamespaceId::new("foo").unwrap();
+    let bar = aenv_core::identity::NamespaceId::new("bar").unwrap();
+
+    aenv_core::activate::swap_or_activate_user(&fs, &registry, &adapters, &fake_home, &foo)
+        .unwrap();
+    assert_eq!(
+        std::fs::read(fake_home.join(".claude/CLAUDE.md")).unwrap(),
+        b"foo body"
+    );
+
+    aenv_core::activate::swap_or_activate_user(&fs, &registry, &adapters, &fake_home, &bar)
+        .unwrap();
+    assert_eq!(
+        std::fs::read(fake_home.join(".claude/CLAUDE.md")).unwrap(),
+        b"bar body"
+    );
+
+    aenv_core::deactivate::deactivate_namespace_in_scope(
+        &fs,
+        &registry,
+        &fake_home,
+        aenv_core::scope::Scope::User,
+    )
+    .unwrap();
+    // The deepest restored layer is the original, not foo's body — only one
+    // level of stash matters because the foo→bar deactivate restored the
+    // pre-foo original, then bar's activate stashed THAT, and bar's deactivate
+    // restored it. End state: original.
+    assert_eq!(
+        std::fs::read(fake_home.join(".claude/CLAUDE.md")).unwrap(),
+        b"original"
+    );
+}
+
+#[test]
+fn user_scope_swap_rolls_back_when_new_namespace_fails() {
+    let tmp = tempfile::tempdir().unwrap();
+    let aenv_home = tmp.path().join(".aenv");
+    let fake_home = tmp.path().join("home");
+    let registry = aenv_core::home::RegistryLayout::new(aenv_home.clone());
+    let fs = aenv_core::fs::RealFilesystem;
+
+    let adapters_dir = registry.adapters_dir();
+    std::fs::create_dir_all(&adapters_dir).unwrap();
+    std::fs::write(
+        adapters_dir.join("claude-code.toml"),
+        r#"
+name = "claude-code"
+user_files = ["~/.claude/CLAUDE.md"]
+"#,
+    )
+    .unwrap();
+    let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(&fs, &adapters_dir).unwrap();
+
+    // Working namespace foo.
+    {
+        let ns_dir = registry.namespace_dir("foo");
+        std::fs::create_dir_all(ns_dir.join("user/.claude")).unwrap();
+        std::fs::write(ns_dir.join("user/.claude/CLAUDE.md"), b"foo body").unwrap();
+        std::fs::write(
+            ns_dir.join("aenv.toml"),
+            r#"
+name = "foo"
+[adapters.claude-code]
+user_files = [".claude/CLAUDE.md"]
+"#,
+        )
+        .unwrap();
+    }
+    // Broken namespace bar — references a missing adapter.
+    {
+        let ns_dir = registry.namespace_dir("bar");
+        std::fs::create_dir_all(&ns_dir).unwrap();
+        std::fs::write(
+            ns_dir.join("aenv.toml"),
+            r#"
+name = "bar"
+[adapters.does-not-exist]
+user_files = [".claude/foo.md"]
+"#,
+        )
+        .unwrap();
+    }
+
+    let foo = aenv_core::identity::NamespaceId::new("foo").unwrap();
+    let bar = aenv_core::identity::NamespaceId::new("bar").unwrap();
+    aenv_core::activate::swap_or_activate_user(&fs, &registry, &adapters, &fake_home, &foo)
+        .unwrap();
+    let _err =
+        aenv_core::activate::swap_or_activate_user(&fs, &registry, &adapters, &fake_home, &bar)
+            .unwrap_err();
+    let body = std::fs::read(fake_home.join(".claude/CLAUDE.md")).unwrap();
+    assert_eq!(
+        body, b"foo body",
+        "foo must be reactivated after bar failed"
+    );
+}
