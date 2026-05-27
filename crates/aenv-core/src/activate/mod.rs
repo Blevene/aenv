@@ -62,11 +62,17 @@ pub fn activate_namespace<F: Filesystem>(
     let resolved_policies = resolution.policies.clone();
     let resolution_warnings = std::mem::take(&mut resolution.warnings);
 
+    // Project-scope only. User-scope candidates are materialized by
+    // `aenv global use` (Milestone C); this function targets the project root.
     // Group candidates by project-relative path, preserving chain order within
     // each group. BTreeMap gives us lexicographic iteration order (deterministic
     // activation and rollback).
     let mut by_path: BTreeMap<PathBuf, Vec<crate::resolve::Candidate>> = Default::default();
-    for c in resolution.candidates {
+    for c in resolution
+        .candidates
+        .into_iter()
+        .filter(|c| c.scope == crate::scope::Scope::Project)
+    {
         by_path.entry(c.path.clone()).or_default().push(c);
     }
 

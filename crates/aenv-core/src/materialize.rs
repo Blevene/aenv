@@ -83,8 +83,16 @@ pub fn compute_material_set<F: Filesystem>(
 ) -> Result<MaterialSet> {
     let resolution = resolve_namespace(fs, layout, adapters, leaf)?;
 
+    // Project-scope only. User-scope candidates are part of the user-scope
+    // material set (and the user-scope hash, Task 23); they are not included
+    // here so the project-scope hash stays stable for namespaces that also
+    // declare `user_files`.
     let mut by_path: BTreeMap<PathBuf, Vec<Candidate>> = BTreeMap::new();
-    for c in resolution.candidates {
+    for c in resolution
+        .candidates
+        .into_iter()
+        .filter(|c| c.scope == crate::scope::Scope::Project)
+    {
         by_path.entry(c.path.clone()).or_default().push(c);
     }
 
