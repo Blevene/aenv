@@ -199,3 +199,56 @@ impl ActivationState {
         Ok(state)
     }
 }
+
+/// Return the absolute paths of every orphan stash directory: subdirs of
+/// `<layout.global_stash_root()>/` that no active `global-state.json`
+/// references in its `backed_up[*].backup_path`. A missing stash root returns
+/// an empty vector. When no active state file is present, every subdirectory
+/// of the stash root is orphan.
+pub fn list_orphan_stashes(
+    layout: &crate::home::RegistryLayout,
+) -> Result<Vec<std::path::PathBuf>> {
+    let stash_root = layout.global_stash_root();
+    if !stash_root.exists() {
+        return Ok(Vec::new());
+    }
+    // Collect every "live" per-run stash directory referenced by the active
+    // state, if any. A backup_path is `<stash_root>/<run-dir>/<file...>`; we
+    // walk parents until we hit the stash root and capture the immediate
+    // child (the per-run dir).
+    let referenced: std::collections::BTreeSet<std::path::PathBuf> = {
+        let state_path = layout.global_state_path();
+        if state_path.exists() {
+            let bytes = std::fs::read(&state_path)?;
+            let text = std::str::from_utf8(&bytes)
+                .map_err(|e| AenvError::ManifestInvalid(format!("global-state.json: {e}")))?;
+            let state = ActivationState::from_json(text)?;
+            state
+                .backed_up
+                .iter()
+                .filter_map(|b| {
+                    let mut cur = b.backup_path.as_path();
+                    while let Some(parent) = cur.parent() {
+                        if parent == stash_root {
+                            return Some(cur.to_path_buf());
+                        }
+                        cur = parent;
+                    }
+                    None
+                })
+                .collect()
+        } else {
+            std::collections::BTreeSet::new()
+        }
+    };
+    let mut orphans: Vec<std::path::PathBuf> = Vec::new();
+    for entry in std::fs::read_dir(&stash_root)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() && !referenced.contains(&path) {
+            orphans.push(path);
+        }
+    }
+    orphans.sort();
+    Ok(orphans)
+}

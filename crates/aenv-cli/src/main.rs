@@ -303,7 +303,12 @@ enum GlobalAction {
     },
     /// Reverse `aenv global use`: restore stashed originals, delete the
     /// global state file. Exit 0 with a note if no activation is live.
-    Deactivate,
+    Deactivate {
+        /// Also remove orphan stash directories (timestamped subdirs of
+        /// `<aenv_home>/global-stash/` not referenced by any active state).
+        #[arg(long)]
+        prune: bool,
+    },
     /// Show the active global namespace and managed files.
     Status {
         #[arg(long)]
@@ -603,8 +608,8 @@ fn main() -> ExitCode {
                         )?;
                         cmd::global::use_::run(&fs, &layout, &adapters, &fake_home, &name)
                     }
-                    GlobalAction::Deactivate => {
-                        cmd::global::deactivate::run(&fs, &layout, &fake_home)
+                    GlobalAction::Deactivate { prune } => {
+                        cmd::global::deactivate::run(&fs, &layout, &fake_home, prune)
                     }
                     GlobalAction::Status { json } => {
                         cmd::global::status::run(&fs, &layout, &fake_home, json)
