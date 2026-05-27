@@ -22,7 +22,7 @@ use crate::error::{AenvError, Result};
 use crate::fs::{FileKind, Filesystem};
 use crate::home::RegistryLayout;
 use crate::identity::NamespaceId;
-use crate::manifest::{AdapterEntry, AenvManifest};
+use crate::manifest::{AdapterEntry, AenvManifest, LifecycleHooks};
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -173,6 +173,7 @@ pub fn snapshot_global<F: Filesystem>(
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
         skills: Vec::new(),
+        lifecycle: LifecycleHooks::default(),
     };
     let body =
         toml::to_string_pretty(&manifest).map_err(|e| AenvError::ManifestInvalid(e.to_string()))?;
@@ -212,9 +213,10 @@ pub struct NamespaceImportSpec {
 
 /// Lifecycle hooks block parsed from an `aenv-namespace.toml`.
 ///
-/// The Rust `AenvManifest` struct doesn't yet have a `lifecycle` field
-/// (Milestone K), but `from_toml` tolerates the unknown section so the
-/// importer can round-trip these values verbatim into the generated manifest.
+/// Mirrors the shape of `AenvManifest::lifecycle` so the importer can copy
+/// values straight across — kept as a distinct type so future spec-only
+/// fields (`pre_activate`, environment hooks, etc.) can land here without
+/// affecting the manifest contract.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct ImportLifecycleSpec {
     /// Script (path relative to the namespace dir) to run on activate.
@@ -252,9 +254,8 @@ pub struct ImportSummary {
 /// - declares each captured target path under the adapter whose prefix it
 ///   matches (`.claude/...` -> `claude-code`, `.codex/...` -> `codex`, else
 ///   `claude-code` as a fallback)
-/// - appends a `[lifecycle]` section as raw TOML when on_activate /
-///   on_deactivate scripts were detected. `AenvManifest::from_toml` tolerates
-///   the unknown section so the manifest round-trips loss-free.
+/// - declares a `[lifecycle]` block when `on_activate` / `on_deactivate`
+///   scripts were detected (via convention file or heuristic).
 pub fn import_global<F: Filesystem>(
     fs: &F,
     layout: &RegistryLayout,
@@ -410,25 +411,13 @@ pub fn import_global<F: Filesystem>(
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
         skills: Vec::new(),
+        lifecycle: LifecycleHooks {
+            on_activate: lifecycle.on_activate.clone(),
+            on_deactivate: lifecycle.on_deactivate.clone(),
+        },
     };
-    let mut body =
+    let body =
         toml::to_string_pretty(&manifest).map_err(|e| AenvError::ManifestInvalid(e.to_string()))?;
-
-    // 8. Append [lifecycle] section as raw TOML (AenvManifest struct doesn't
-    //    have a Rust field for it yet — Milestone K — but from_toml tolerates
-    //    unknown sections so the on-disk form round-trips loss-free).
-    if lifecycle.on_activate.is_some() || lifecycle.on_deactivate.is_some() {
-        if !body.ends_with('\n') {
-            body.push('\n');
-        }
-        body.push_str("\n[lifecycle]\n");
-        if let Some(s) = lifecycle.on_activate.as_deref() {
-            body.push_str(&format!("on_activate = {}\n", toml_string_literal(s)));
-        }
-        if let Some(s) = lifecycle.on_deactivate.as_deref() {
-            body.push_str(&format!("on_deactivate = {}\n", toml_string_literal(s)));
-        }
-    }
 
     fs.write(&layout.manifest_path(name), body.as_bytes())?;
 
@@ -538,26 +527,6 @@ fn heuristic_entries<F: Filesystem>(
     }
 
     Ok((entries, lifecycle))
-}
-
-/// Render a string as a quoted TOML literal. Uses the basic-string form with
-/// minimal escaping — sufficient for the path-shaped values lifecycle scripts
-/// produce.
-fn toml_string_literal(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 2);
-    out.push('"');
-    for ch in s.chars() {
-        match ch {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-    out
 }
 
 /// Recursively copy `src` into `dst`, returning the count of regular files

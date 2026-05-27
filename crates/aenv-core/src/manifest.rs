@@ -39,6 +39,36 @@ pub struct AenvManifest {
     /// Skill declarations from `[[skills]]` entries.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub skills: Vec<SkillDecl>,
+
+    /// Lifecycle scripts (on_activate / on_deactivate). Empty by default.
+    #[serde(default, skip_serializing_if = "LifecycleHooks::is_empty")]
+    pub lifecycle: LifecycleHooks,
+}
+
+/// Namespace lifecycle scripts. Paths are namespace-relative — `aenv`
+/// resolves them against the namespace directory (e.g. `install.sh`
+/// here means `<aenv_home>/envs/<ns>/install.sh`). Scripts run at the
+/// boundaries defined in `pm_docs/lifecycle-hooks.md` (Task 11).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LifecycleHooks {
+    /// Script to run AFTER files are materialized but BEFORE the state
+    /// file is written. Non-zero exit rolls back the materialization.
+    /// Path is namespace-relative.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_activate: Option<String>,
+    /// Script to run BEFORE files are undone during deactivation. Non-zero
+    /// exit logs a warning but does not block deactivation (the user is
+    /// likely recovering from a broken state). Path is namespace-relative.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_deactivate: Option<String>,
+}
+
+impl LifecycleHooks {
+    /// Returns true if both hooks are unset — used by `skip_serializing_if`
+    /// so the default form emits no `[lifecycle]` block.
+    pub fn is_empty(&self) -> bool {
+        self.on_activate.is_none() && self.on_deactivate.is_none()
+    }
 }
 
 /// Per-adapter manifest entry.
@@ -111,6 +141,8 @@ impl AenvManifest {
             policies: BTreeMap<String, toml::Value>,
             #[serde(default)]
             skills: Vec<SkillDecl>,
+            #[serde(default)]
+            lifecycle: LifecycleHooks,
         }
         let raw: Raw =
             toml::from_str(input).map_err(|e| AenvError::ManifestInvalid(format!("{e}")))?;
@@ -170,6 +202,15 @@ impl AenvManifest {
         // Stage 5: validate skills (duplicates, mode/source coherence).
         validate_skills(&raw.skills)?;
 
+        // Stage 6: validate lifecycle script paths — same rules as
+        // `[[skills]].path` (no absolute, no `..`, no `~/` prefix).
+        if let Some(p) = raw.lifecycle.on_activate.as_deref() {
+            validate_relative_path("lifecycle.on_activate", p)?;
+        }
+        if let Some(p) = raw.lifecycle.on_deactivate.as_deref() {
+            validate_relative_path("lifecycle.on_deactivate", p)?;
+        }
+
         Ok(AenvManifest {
             name: raw.name,
             extends: raw.extends,
@@ -177,6 +218,7 @@ impl AenvManifest {
             parameters,
             policies,
             skills: raw.skills,
+            lifecycle: raw.lifecycle,
         })
     }
 
@@ -194,6 +236,7 @@ impl AenvManifest {
             parameters: BTreeMap::new(),
             policies: BTreeMap::new(),
             skills: Vec::new(),
+            lifecycle: LifecycleHooks::default(),
         }
     }
 }
@@ -232,7 +275,7 @@ fn validate_skills(skills: &[crate::skills::SkillDecl]) -> crate::error::Result<
                     )));
                 }
                 if let Some(path) = s.path.as_deref() {
-                    validate_skill_path(&s.name, path)?;
+                    validate_relative_path(&format!("skill '{}'", s.name), path)?;
                 }
             }
         }
@@ -240,21 +283,30 @@ fn validate_skills(skills: &[crate::skills::SkillDecl]) -> crate::error::Result<
     Ok(())
 }
 
-/// Reject path traversal and absolute paths in `[[skills]].path`. The path
-/// is rooted at the resolved source (cache dir for git, source dir for
-/// local); escaping it would either pull in unrelated files or, worse, read
-/// outside the registry.
-fn validate_skill_path(skill_name: &str, path: &str) -> crate::error::Result<()> {
+/// Reject path traversal, absolute paths, and `~/` prefixes for any manifest
+/// field that names a file/dir under a fixed root (skills, lifecycle scripts).
+///
+/// `field_label` names the offending field in the error message (e.g.
+/// `"skill 'foo'"` or `"lifecycle.on_activate"`).
+fn validate_relative_path(field_label: &str, path: &str) -> crate::error::Result<()> {
     use std::path::Component;
     if path.is_empty() {
         return Err(crate::error::AenvError::ManifestInvalid(format!(
-            "skill '{skill_name}' has empty path; omit the field or set a sub-directory"
+            "{field_label} has empty path; omit the field or set a sub-directory"
+        )));
+    }
+    // Reject `~/` (the shell does tilde expansion; manifests don't get that
+    // luxury, and silently failing to expand would be worse than rejecting).
+    if path.starts_with("~/") || path == "~" {
+        return Err(crate::error::AenvError::ManifestInvalid(format!(
+            "{field_label} path '{path}' may not start with '~'; \
+             paths are relative to the namespace dir"
         )));
     }
     let parsed = std::path::Path::new(path);
     if parsed.is_absolute() {
         return Err(crate::error::AenvError::ManifestInvalid(format!(
-            "skill '{skill_name}' path '{path}' must be relative"
+            "{field_label} path '{path}' must be relative"
         )));
     }
     for component in parsed.components() {
@@ -262,7 +314,7 @@ fn validate_skill_path(skill_name: &str, path: &str) -> crate::error::Result<()>
             Component::Normal(_) => {}
             _ => {
                 return Err(crate::error::AenvError::ManifestInvalid(format!(
-                    "skill '{skill_name}' path '{path}' may not contain '..' or other \
+                    "{field_label} path '{path}' may not contain '..' or other \
                      non-normal components"
                 )));
             }

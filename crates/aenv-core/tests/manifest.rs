@@ -240,3 +240,93 @@ user_merge = "deep"
         Some("deep")
     );
 }
+
+// ---- [lifecycle] (Milestone K, Task 7) ----
+
+#[test]
+fn manifest_lifecycle_roundtrip() {
+    let toml = r#"
+name = "ns"
+
+[lifecycle]
+on_activate = "install.sh"
+on_deactivate = "uninstall.sh"
+"#;
+    let m = aenv_core::manifest::AenvManifest::from_toml(toml).unwrap();
+    assert_eq!(m.lifecycle.on_activate.as_deref(), Some("install.sh"));
+    assert_eq!(m.lifecycle.on_deactivate.as_deref(), Some("uninstall.sh"));
+}
+
+#[test]
+fn manifest_lifecycle_optional() {
+    let m = aenv_core::manifest::AenvManifest::from_toml(r#"name = "ns""#).unwrap();
+    assert!(m.lifecycle.is_empty());
+}
+
+#[test]
+fn manifest_lifecycle_partial() {
+    let toml = r#"
+name = "ns"
+
+[lifecycle]
+on_activate = "install.sh"
+"#;
+    let m = aenv_core::manifest::AenvManifest::from_toml(toml).unwrap();
+    assert_eq!(m.lifecycle.on_activate.as_deref(), Some("install.sh"));
+    assert!(m.lifecycle.on_deactivate.is_none());
+}
+
+#[test]
+fn manifest_lifecycle_rejects_absolute_path() {
+    let toml = r#"
+name = "ns"
+[lifecycle]
+on_activate = "/usr/bin/install"
+"#;
+    let err = aenv_core::manifest::AenvManifest::from_toml(toml).unwrap_err();
+    assert!(
+        matches!(err, aenv_core::AenvError::ManifestInvalid(_)),
+        "expected ManifestInvalid, got {err:?}"
+    );
+}
+
+#[test]
+fn manifest_lifecycle_rejects_parent_segment() {
+    let toml = r#"
+name = "ns"
+[lifecycle]
+on_activate = "../escape.sh"
+"#;
+    let err = aenv_core::manifest::AenvManifest::from_toml(toml).unwrap_err();
+    assert!(matches!(err, aenv_core::AenvError::ManifestInvalid(_)));
+}
+
+#[test]
+fn manifest_lifecycle_rejects_tilde_prefix() {
+    let toml = r#"
+name = "ns"
+[lifecycle]
+on_activate = "~/install.sh"
+"#;
+    let err = aenv_core::manifest::AenvManifest::from_toml(toml).unwrap_err();
+    assert!(matches!(err, aenv_core::AenvError::ManifestInvalid(_)));
+}
+
+#[test]
+fn manifest_lifecycle_roundtrips_through_to_toml() {
+    let original = aenv_core::manifest::AenvManifest {
+        name: "ns".into(),
+        extends: vec![],
+        adapters: std::collections::BTreeMap::new(),
+        parameters: std::collections::BTreeMap::new(),
+        policies: std::collections::BTreeMap::new(),
+        skills: vec![],
+        lifecycle: aenv_core::manifest::LifecycleHooks {
+            on_activate: Some("install.sh".into()),
+            on_deactivate: None,
+        },
+    };
+    let toml = original.to_toml();
+    let parsed = aenv_core::manifest::AenvManifest::from_toml(&toml).unwrap();
+    assert_eq!(parsed.lifecycle, original.lifecycle);
+}
