@@ -340,6 +340,23 @@ enum GlobalAction {
         #[arg(long)]
         json: bool,
     },
+    /// Snapshot the current `$HOME` user-scope surface (`~/.claude/`,
+    /// `~/.codex/`, etc.) into a new namespace. The set of captured paths
+    /// is determined by every installed adapter's `user_files` plus any
+    /// `--include` extras.
+    ///
+    /// The resulting namespace is byte-identical when re-activated: the
+    /// strategy on the next `aenv global activate <name>` is `Identical`
+    /// (no backup needed).
+    Snapshot {
+        /// Name of the new namespace. Must be a valid `NamespaceId` and not
+        /// already exist.
+        name: String,
+        /// Extra paths (relative to `$HOME`) to include beyond adapter
+        /// defaults. Repeatable: `--include .claude/runtime --include .claude/bin`.
+        #[arg(long)]
+        include: Vec<String>,
+    },
     /// Diff user-scope content against the active global activation or
     /// between two namespaces' user-scope subsets.
     Diff {
@@ -641,6 +658,15 @@ fn main() -> ExitCode {
                             &adapters,
                             namespace.as_deref(),
                             json,
+                        )
+                    }
+                    GlobalAction::Snapshot { name, include } => {
+                        let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
+                            &fs,
+                            &layout.adapters_dir(),
+                        )?;
+                        cmd::global::snapshot::run(
+                            &fs, &layout, &adapters, &fake_home, &name, &include,
                         )
                     }
                     GlobalAction::Diff { ns_a, ns_b, json } => cmd::global::diff::run(

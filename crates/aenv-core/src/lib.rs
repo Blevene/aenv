@@ -18,6 +18,7 @@ pub mod doctor;
 pub mod error;
 pub mod fs;
 pub mod global_lock;
+pub mod global_snapshot;
 pub mod hash;
 pub mod home;
 pub mod identity;

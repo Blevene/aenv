@@ -5,5 +5,6 @@ pub mod deactivate;
 pub mod diff;
 pub mod doctor;
 pub mod list;
+pub mod snapshot;
 pub mod status;
 pub mod which;
