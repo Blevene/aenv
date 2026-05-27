@@ -79,3 +79,78 @@ fn global_use_activates_user_files_under_home_override() {
         "stdout missing running-session caveat: {stdout}"
     );
 }
+
+#[test]
+fn global_deactivate_restores_stash() {
+    let tmp = tempdir().unwrap();
+    let aenv_home = std::fs::canonicalize(tmp.path()).unwrap().join(".aenv");
+    let fake_home = std::fs::canonicalize(tmp.path()).unwrap().join("home");
+    std::fs::create_dir_all(&aenv_home).unwrap();
+    std::fs::create_dir_all(fake_home.join(".claude")).unwrap();
+    std::fs::write(fake_home.join(".claude/CLAUDE.md"), b"original").unwrap();
+    seed_minimal_user_scope(&aenv_home);
+
+    let out = aenv(&aenv_home, &fake_home)
+        .args(["global", "use", "ns"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "global use failed: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let out = aenv(&aenv_home, &fake_home)
+        .args(["global", "deactivate"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "global deactivate failed: status={:?}, stdout={}, stderr={}",
+        out.status,
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    assert_eq!(
+        std::fs::read(fake_home.join(".claude/CLAUDE.md")).unwrap(),
+        b"original",
+        "original CLAUDE.md not restored after deactivate"
+    );
+    assert!(
+        !aenv_home.join("global-state.json").exists(),
+        "global-state.json should be removed after deactivate"
+    );
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("ns"),
+        "deactivate stdout should mention namespace name: {stdout}"
+    );
+}
+
+#[test]
+fn global_deactivate_with_nothing_active_is_ok() {
+    let tmp = tempdir().unwrap();
+    let aenv_home = std::fs::canonicalize(tmp.path()).unwrap().join(".aenv");
+    let fake_home = std::fs::canonicalize(tmp.path()).unwrap().join("home");
+    std::fs::create_dir_all(&aenv_home).unwrap();
+    std::fs::create_dir_all(&fake_home).unwrap();
+    std::fs::create_dir_all(aenv_home.join("adapters")).unwrap();
+
+    let out = aenv(&aenv_home, &fake_home)
+        .args(["global", "deactivate"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "global deactivate with no activation should succeed: status={:?}, stderr={}",
+        out.status,
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("no global activation"),
+        "expected no-op message, got: {stdout}"
+    );
+}
