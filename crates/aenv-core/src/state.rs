@@ -9,7 +9,7 @@ use crate::error::{AenvError, Result};
 use std::path::PathBuf;
 
 /// Current schema version. Bump when changing the on-disk shape.
-pub const SCHEMA_VERSION: u32 = 4;
+pub const SCHEMA_VERSION: u32 = 5;
 
 /// Materialization strategy — re-exported from `crate::resolve` so callers
 /// only need one import path.
@@ -104,6 +104,11 @@ pub struct ActivationState {
     pub schema_version: u32,
     /// Name of the active namespace.
     pub active_namespace: String,
+    /// Activation scope this state file describes. Defaults to `Project`
+    /// for files written by aenv before Milestone C (no `scope` field on
+    /// disk).
+    #[serde(default)]
+    pub scope: crate::scope::Scope,
     /// Absolute path to the project root.
     pub project_root: PathBuf,
     /// Files this activation materialized.
@@ -132,6 +137,8 @@ impl<'de> serde::Deserialize<'de> for ActivationState {
         struct Raw {
             schema_version: u32,
             active_namespace: String,
+            #[serde(default)]
+            scope: crate::scope::Scope,
             project_root: PathBuf,
             #[serde(default)]
             managed_files: Vec<ManagedFile>,
@@ -161,6 +168,7 @@ impl<'de> serde::Deserialize<'de> for ActivationState {
         Ok(ActivationState {
             schema_version: raw.schema_version,
             active_namespace: raw.active_namespace,
+            scope: raw.scope,
             project_root: raw.project_root,
             managed_files: raw.managed_files,
             backed_up: raw.backed_up,

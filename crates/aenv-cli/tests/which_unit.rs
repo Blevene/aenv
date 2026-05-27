@@ -20,6 +20,7 @@ fn state_with(mf: ManagedFile) -> ActivationState {
     ActivationState {
         schema_version: 2,
         active_namespace: "leaf".into(),
+        scope: aenv_core::scope::Scope::Project,
         project_root: PathBuf::from("/p"),
         managed_files: vec![mf],
         backed_up: vec![],
@@ -75,6 +76,7 @@ fn which_for_unmanaged_path_reports_error() {
     let state = ActivationState {
         schema_version: 2,
         active_namespace: "leaf".into(),
+        scope: aenv_core::scope::Scope::Project,
         project_root: PathBuf::from("/p"),
         managed_files: vec![],
         backed_up: vec![],

@@ -14,30 +14,29 @@ use crate::error::{AenvError, Result};
 use crate::fs::Filesystem;
 use std::path::Path;
 
-/// Run the probe. Creates `<project>/.aenv/` if it doesn't exist. Leaves
-/// no probe files behind on success.
-pub fn probe_rename_atomicity<F: Filesystem>(fs: &F, project_root: &Path) -> Result<()> {
-    let aenv_dir = project_root.join(".aenv-state");
-    fs.create_dir_all(&aenv_dir)?;
-
-    let a = aenv_dir.join(".probe.a");
-    let b = aenv_dir.join(".probe.b");
-
+/// Probe rename atomicity at an arbitrary directory. The directory will be
+/// created if needed; probe files are cleaned up on success.
+pub fn probe_rename_atomicity_at<F: Filesystem>(fs: &F, dir: &Path) -> Result<()> {
+    fs.create_dir_all(dir)?;
+    let a = dir.join(".probe.a");
+    let b = dir.join(".probe.b");
     // Cleanup any stale probe files from a previous interrupted run.
     let _ = fs.remove_file(&a);
     let _ = fs.remove_file(&b);
-
     fs.write(&a, b"probe").map_err(|e| {
         AenvError::ActivationConflict(format!("atomicity probe: write failed: {e}"))
     })?;
     fs.rename(&a, &b).map_err(|e| {
-        // Clean up the source before bailing.
         let _ = fs.remove_file(&a);
         AenvError::ActivationConflict(format!("atomicity probe: rename failed: {e}"))
     })?;
     fs.remove_file(&b).map_err(|e| {
         AenvError::ActivationConflict(format!("atomicity probe: cleanup failed: {e}"))
     })?;
-
     Ok(())
+}
+
+/// Backward-compatible wrapper: probes `<project_root>/.aenv-state/`.
+pub fn probe_rename_atomicity<F: Filesystem>(fs: &F, project_root: &Path) -> Result<()> {
+    probe_rename_atomicity_at(fs, &project_root.join(".aenv-state"))
 }

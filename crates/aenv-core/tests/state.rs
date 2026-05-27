@@ -18,6 +18,7 @@ fn sample_state() -> ActivationState {
     ActivationState {
         schema_version: 2,
         active_namespace: "experiments".to_string(),
+        scope: aenv_core::scope::Scope::Project,
         project_root: PathBuf::from("/projects/p"),
         managed_files: vec![ManagedFile {
             path: PathBuf::from("CLAUDE.md"),
@@ -93,6 +94,7 @@ fn schema_version_is_2_for_new_states() {
     let s = ActivationState {
         schema_version: 2,
         active_namespace: "leaf".into(),
+        scope: aenv_core::scope::Scope::Project,
         project_root: PathBuf::from("/p"),
         managed_files: vec![],
         backed_up: vec![],

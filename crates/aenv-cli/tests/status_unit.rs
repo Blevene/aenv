@@ -19,6 +19,7 @@ fn status_prints_resolution_chain_and_managed_provenance() {
     let state = ActivationState {
         schema_version: 2,
         active_namespace: "leaf".into(),
+        scope: aenv_core::scope::Scope::Project,
         project_root: PathBuf::from("/p"),
         managed_files: vec![
             ManagedFile {
@@ -71,6 +72,7 @@ fn status_no_active_namespace() {
     let state = ActivationState {
         schema_version: 2,
         active_namespace: "alone".into(),
+        scope: aenv_core::scope::Scope::Project,
         project_root: PathBuf::from("/p"),
         managed_files: vec![],
         backed_up: vec![],

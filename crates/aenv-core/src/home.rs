@@ -60,4 +60,20 @@ impl RegistryLayout {
     pub fn skills_cache_dir(&self) -> PathBuf {
         self.cache_dir().join("skills")
     }
+
+    /// Path to the user-scope activation state file.
+    pub fn global_state_path(&self) -> PathBuf {
+        self.root.join("global-state.json")
+    }
+
+    /// Root of the user-scope stash directory; per-run stashes go under
+    /// `<this>/<timestamp>/`.
+    pub fn global_stash_root(&self) -> PathBuf {
+        self.root.join("global-stash")
+    }
+
+    /// Path to the user-scope activation lock file.
+    pub fn global_lock_path(&self) -> PathBuf {
+        self.root.join("global.lock")
+    }
 }

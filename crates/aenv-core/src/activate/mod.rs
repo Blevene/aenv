@@ -15,7 +15,6 @@
 mod phase1;
 
 use crate::adapter::AdapterRegistry;
-use crate::atomicity::probe_rename_atomicity;
 use crate::error::{AenvError, Result};
 use crate::fs::Filesystem;
 use crate::home::RegistryLayout;
@@ -28,6 +27,8 @@ use std::path::{Path, PathBuf};
 /// Activate `leaf` namespace into `project_root`. Resolves the full
 /// `extends` chain, merges or symlinks each managed file, and writes
 /// `.aenv-state/state.json` on success.
+///
+/// Thin wrapper for `Scope::Project` over `activate_namespace_in_scope`.
 pub fn activate_namespace<F: Filesystem>(
     fs: &F,
     layout: &RegistryLayout,
@@ -35,7 +36,36 @@ pub fn activate_namespace<F: Filesystem>(
     project_root: &Path,
     leaf: &NamespaceId,
 ) -> Result<ActivationState> {
-    probe_rename_atomicity(fs, project_root)?;
+    activate_namespace_in_scope(
+        fs,
+        layout,
+        adapters,
+        project_root,
+        crate::scope::Scope::Project,
+        leaf,
+    )
+}
+
+/// Activate `leaf` namespace into `target_root` under `scope`.
+///
+/// For `Scope::Project`, `target_root` is the project root and state is
+/// written to `<target_root>/.aenv-state/state.json`. For `Scope::User`,
+/// `target_root` is `$HOME` and state is written to
+/// `<layout.root()>/global-state.json`. Resolves the full `extends` chain,
+/// filters candidates to `scope`, then materializes.
+pub fn activate_namespace_in_scope<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    adapters: &AdapterRegistry,
+    target_root: &Path,
+    scope: crate::scope::Scope,
+    leaf: &NamespaceId,
+) -> Result<ActivationState> {
+    let probe_dir = match scope {
+        crate::scope::Scope::Project => target_root.join(".aenv-state"),
+        crate::scope::Scope::User => layout.global_stash_root(),
+    };
+    crate::atomicity::probe_rename_atomicity_at(fs, &probe_dir)?;
 
     let mut resolution = crate::resolve::resolve_namespace(fs, layout, adapters, leaf)?;
 
@@ -62,16 +92,14 @@ pub fn activate_namespace<F: Filesystem>(
     let resolved_policies = resolution.policies.clone();
     let resolution_warnings = std::mem::take(&mut resolution.warnings);
 
-    // Project-scope only. User-scope candidates are materialized by
-    // `aenv global use` (Milestone C); this function targets the project root.
-    // Group candidates by project-relative path, preserving chain order within
-    // each group. BTreeMap gives us lexicographic iteration order (deterministic
-    // activation and rollback).
+    // Filter candidates to the requested scope, then group by target-relative
+    // path, preserving chain order within each group. BTreeMap gives us
+    // lexicographic iteration order (deterministic activation and rollback).
     let mut by_path: BTreeMap<PathBuf, Vec<crate::resolve::Candidate>> = Default::default();
     for c in resolution
         .candidates
         .into_iter()
-        .filter(|c| c.scope == crate::scope::Scope::Project)
+        .filter(|c| c.scope == scope)
     {
         by_path.entry(c.path.clone()).or_default().push(c);
     }
@@ -79,7 +107,8 @@ pub fn activate_namespace<F: Filesystem>(
     let mut undo_log: Vec<UndoStep> = Vec::new();
     let mut managed: Vec<ManagedFile> = Vec::new();
     let mut backed_up: Vec<BackedUpFile> = Vec::new();
-    let backup_root = backup_dir_for_this_run(project_root);
+    // FIXME(Task 8): user-scope backup root
+    let backup_root = backup_dir_for_this_run(target_root);
 
     let result: Result<()> = (|| {
         for (path, candidates) in &by_path {
@@ -87,7 +116,7 @@ pub fn activate_namespace<F: Filesystem>(
             materialize_one(
                 fs,
                 adapters,
-                project_root,
+                target_root,
                 &backup_root,
                 path,
                 candidates,
@@ -108,14 +137,18 @@ pub fn activate_namespace<F: Filesystem>(
     let state = ActivationState {
         schema_version: SCHEMA_VERSION,
         active_namespace: leaf.as_str().to_owned(),
-        project_root: project_root.to_path_buf(),
+        scope,
+        project_root: target_root.to_path_buf(),
         managed_files: managed,
         backed_up,
         parameters: resolved_parameters,
         policies: resolved_policies,
         warnings: resolution_warnings,
     };
-    let state_path = project_root.join(".aenv-state/state.json");
+    let state_path = match scope {
+        crate::scope::Scope::Project => target_root.join(".aenv-state/state.json"),
+        crate::scope::Scope::User => layout.global_state_path(),
+    };
     let body = serde_json::to_vec_pretty(&state)
         .map_err(|e| AenvError::ActivationConflict(format!("state serialize: {e}")))?;
     if let Err(e) = fs.write(&state_path, &body) {

@@ -5,8 +5,8 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 #[test]
-fn schema_version_is_4() {
-    assert_eq!(SCHEMA_VERSION, 4);
+fn schema_version_is_5() {
+    assert_eq!(SCHEMA_VERSION, 5);
 }
 
 #[test]
@@ -18,6 +18,7 @@ fn schema_4_roundtrips_with_skill_provenance() {
     let state = ActivationState {
         schema_version: 4,
         active_namespace: "base".into(),
+        scope: aenv_core::scope::Scope::Project,
         project_root: PathBuf::from("/p"),
         managed_files: vec![ManagedFile {
             path: PathBuf::from(".claude/skills/x/SKILL.md"),

@@ -61,11 +61,9 @@ fn activate_namespace_ignores_user_scope_candidates() {
 
     write_namespace_with_both_scopes(&registry, "foo");
     let fs = RealFilesystem;
-    let adapters =
-        AdapterRegistry::load_from_dir(&fs, &registry.adapters_dir()).unwrap();
+    let adapters = AdapterRegistry::load_from_dir(&fs, &registry.adapters_dir()).unwrap();
     let leaf = NamespaceId::new("foo").unwrap();
-    let state =
-        activate_namespace(&fs, &registry, &adapters, &project_root, &leaf).unwrap();
+    let state = activate_namespace(&fs, &registry, &adapters, &project_root, &leaf).unwrap();
 
     // Only the project CLAUDE.md should be materialized.
     let managed_paths: Vec<String> = state
@@ -105,8 +103,7 @@ files = ["CLAUDE.md"]
 "#,
     )
     .unwrap();
-    let adapters_a =
-        AdapterRegistry::load_from_dir(&fs, &reg_a.adapters_dir()).unwrap();
+    let adapters_a = AdapterRegistry::load_from_dir(&fs, &reg_a.adapters_dir()).unwrap();
     let ms_a = compute_material_set(
         &fs,
         &reg_a,
@@ -135,8 +132,7 @@ user_files = [".claude/CLAUDE.md"]
 "#,
     )
     .unwrap();
-    let adapters_b =
-        AdapterRegistry::load_from_dir(&fs, &reg_b.adapters_dir()).unwrap();
+    let adapters_b = AdapterRegistry::load_from_dir(&fs, &reg_b.adapters_dir()).unwrap();
     let ms_b = compute_material_set(
         &fs,
         &reg_b,
