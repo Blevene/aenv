@@ -53,6 +53,12 @@ pub struct AdapterEntry {
     pub merge: Option<std::collections::BTreeMap<String, String>>,
     /// User-scope analog of `files`. Paths are relative to the namespace's
     /// `user/` source subdir, and to `$HOME` at activation time.
+    ///
+    /// Namespaces MAY declare paths that the adapter's own `user_files`
+    /// doesn't list — this lets per-namespace harnesses extend the surface
+    /// (e.g. `claude-cntrl` adds `.claude/runtime/` and `.claude/bin/` even
+    /// though the builtin claude-code adapter doesn't). No containment check
+    /// is enforced.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub user_files: Vec<String>,
     /// User-scope analog of `merge`.

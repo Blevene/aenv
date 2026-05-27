@@ -338,6 +338,10 @@ Quit and relaunch the harness to pick up the new surface.
 | `aenv global doctor [<ns>] [--json]` | Run policies against user-scope candidates; flag orphan stashes (exit 19). |
 | `aenv global diff [<a> <b>] [--json]` | Drift detection (no args) or structural diff between two namespaces' user-scope subsets. |
 
+### Extending the adapter surface
+
+A namespace's `user_files` is not capped by what its adapter declares. claude-ctrl, for example, declares `.claude/runtime/` in its own manifest even though the builtin claude-code adapter doesn't — aenv materializes any user-scoped path the namespace asks for, as long as it's relative and doesn't escape with `..`.
+
 ### Sugar: project + global in one call
 
 ```bash
