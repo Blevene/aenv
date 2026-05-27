@@ -43,13 +43,27 @@ pub fn decide_strategy(
     }
 
     if let Some(adapter) = adapters.get(&latest.adapter) {
-        let path_key = path.to_string_lossy().to_string();
-        if let Some(role) = adapter.roles.get(&path_key) {
+        // User-scope candidates carry bare paths (e.g. `.claude/CLAUDE.md`) in
+        // `latest.path`, but the adapter's user_roles / user_default_merge are
+        // keyed by the `~/`-prefixed form. Reconstruct the lookup key per scope.
+        let (roles_map, default_merge_map, path_key) = match latest.scope {
+            crate::scope::Scope::Project => (
+                &adapter.roles,
+                &adapter.default_merge,
+                path.to_string_lossy().into_owned(),
+            ),
+            crate::scope::Scope::User => (
+                &adapter.user_roles,
+                &adapter.user_default_merge,
+                format!("~/{}", path.display()),
+            ),
+        };
+        if let Some(role) = roles_map.get(&path_key) {
             if role == "instructions" {
                 return Ok(MaterializeStrategy::SectionMerge);
             }
         }
-        if let Some(strat) = adapter.default_merge.get(&path_key) {
+        if let Some(strat) = default_merge_map.get(&path_key) {
             return strategy_from_name(strat, path);
         }
     }
