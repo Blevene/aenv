@@ -17,6 +17,7 @@ pub mod diff;
 pub mod doctor;
 pub mod error;
 pub mod fs;
+pub mod global_lock;
 pub mod hash;
 pub mod home;
 pub mod identity;

@@ -42,6 +42,12 @@ pub enum AenvError {
     #[error("policy violation: {0}")]
     PolicyViolation(String),
 
+    /// Global activation conflict — concurrent `aenv global` invocation, an
+    /// orphan stash with no recorded state, or a schema mismatch on
+    /// `global-state.json`. Exit 19.
+    #[error("global conflict: {0}")]
+    GlobalConflict(String),
+
     /// No `.aenv` pin and no `--project` flag. Exit 20.
     #[error("project not pinned")]
     ProjectNotPinned,
@@ -64,6 +70,7 @@ impl AenvError {
             AenvError::ExtendsCycle(_) => 15,
             AenvError::ParameterUndefined(_) => 16,
             AenvError::PolicyViolation(_) => 17,
+            AenvError::GlobalConflict(_) => 19,
             AenvError::ProjectNotPinned => 20,
         }
     }

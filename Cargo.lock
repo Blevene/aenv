@@ -19,6 +19,7 @@ name = "aenv-core"
 version = "0.0.3"
 dependencies = [
  "insta",
+ "libc",
  "proptest",
  "pulldown-cmark",
  "serde",
