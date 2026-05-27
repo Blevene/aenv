@@ -9,7 +9,15 @@ use crate::error::{AenvError, Result};
 use std::path::PathBuf;
 
 /// Current schema version. Bump when changing the on-disk shape.
-pub const SCHEMA_VERSION: u32 = 5;
+pub const SCHEMA_VERSION: u32 = 6;
+
+/// `serde(default = ...)` helper for `ManagedFile.was_present_before_activation`.
+/// On schema-1..5 state files the field doesn't exist on disk — defaulting to
+/// `true` preserves historical semantics, since every entry recorded under
+/// those schemas came from a displaced or identical pre-existing file.
+fn default_true() -> bool {
+    true
+}
 
 /// Materialization strategy — re-exported from `crate::resolve` so callers
 /// only need one import path.
@@ -49,6 +57,15 @@ pub struct ManagedFile {
     /// Skill provenance for skill SKILL.md files. `None` for regular files.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skill_provenance: Option<SkillProvenance>,
+    /// Whether the target path existed (as a file or directory, not as
+    /// our own symlink) at the moment of activation. True for the
+    /// historical `Displaced` / `ByteIdenticalRegular` / `AlreadyOurSymlink`
+    /// cases; false for `Absent`. Defaults to `true` on read for
+    /// schema-1..5 state files — preserves historical semantics, since
+    /// every entry recorded under those schemas came from a displaced or
+    /// identical pre-existing file.
+    #[serde(default = "default_true")]
+    pub was_present_before_activation: bool,
 }
 
 impl<'de> serde::Deserialize<'de> for ManagedFile {
@@ -65,6 +82,8 @@ impl<'de> serde::Deserialize<'de> for ManagedFile {
             shadows: Vec<crate::identity::QualifiedName>,
             #[serde(default)]
             skill_provenance: Option<SkillProvenance>,
+            #[serde(default = "default_true")]
+            was_present_before_activation: bool,
         }
         let raw = Raw::deserialize(d)?;
         // Absence of `qualified_name` means this is a schema-1 file. We use a
@@ -84,6 +103,7 @@ impl<'de> serde::Deserialize<'de> for ManagedFile {
             contributors: raw.contributors,
             shadows: raw.shadows,
             skill_provenance: raw.skill_provenance,
+            was_present_before_activation: raw.was_present_before_activation,
         })
     }
 }

@@ -305,7 +305,7 @@ fn materialize_one<F: Filesystem>(
         MaterializeStrategy::SectionMerge => {
             let bodies = read_all_as_strings(fs, candidates)?;
             let merged = crate::merge::section::merge_sections(&bodies);
-            write_merged_regular(
+            let existed = write_merged_regular(
                 fs,
                 project_root,
                 backup_root,
@@ -324,6 +324,7 @@ fn materialize_one<F: Filesystem>(
                     .collect::<Result<Vec<_>>>()?,
                 shadows: vec![],
                 skill_provenance: None,
+                was_present_before_activation: existed,
             });
         }
         MaterializeStrategy::DeepMerge(format) => {
@@ -339,7 +340,7 @@ fn materialize_one<F: Filesystem>(
                     crate::merge::deep_toml::merge_toml(&bodies).map_err(AenvError::from)?
                 }
             };
-            write_merged_regular(
+            let existed = write_merged_regular(
                 fs,
                 project_root,
                 backup_root,
@@ -358,6 +359,7 @@ fn materialize_one<F: Filesystem>(
                     .collect::<Result<Vec<_>>>()?,
                 shadows: vec![],
                 skill_provenance: None,
+                was_present_before_activation: existed,
             });
         }
         MaterializeStrategy::Copy => {
@@ -413,6 +415,9 @@ fn read_all_as_strings<F: Filesystem>(
         .collect()
 }
 
+/// Materialize merged bytes at `project_path`. Returns whether the target
+/// existed on disk before the write — callers use this to populate
+/// `ManagedFile.was_present_before_activation`.
 fn write_merged_regular<F: Filesystem>(
     fs: &F,
     project_root: &Path,
@@ -421,7 +426,7 @@ fn write_merged_regular<F: Filesystem>(
     contents: &[u8],
     undo_log: &mut Vec<UndoStep>,
     backed_up: &mut Vec<BackedUpFile>,
-) -> Result<()> {
+) -> Result<bool> {
     let existed = fs.exists(project_path)?;
     if existed {
         let rel = project_path
@@ -448,7 +453,7 @@ fn write_merged_regular<F: Filesystem>(
     undo_log.push(UndoStep::RemoveRegularFile {
         path: project_path.to_path_buf(),
     });
-    Ok(())
+    Ok(existed)
 }
 
 // --------------------------------------------------------------------------

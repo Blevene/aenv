@@ -27,6 +27,7 @@ fn sample_state() -> ActivationState {
             contributors: vec![],
             shadows: vec![],
             skill_provenance: None,
+            was_present_before_activation: true,
         }],
         backed_up: vec![BackedUpFile {
             original_path: PathBuf::from("CLAUDE.md"),
@@ -115,6 +116,7 @@ fn managed_file_serializes_qualified_name_and_shadows() {
         contributors: vec![],
         shadows: vec![qn("base", "CLAUDE.md")],
         skill_provenance: None,
+        was_present_before_activation: true,
     };
     let json = serde_json::to_string(&mf).unwrap();
     assert!(json.contains("\"qualified_name\""));
@@ -131,6 +133,7 @@ fn managed_file_serializes_contributors_for_merged() {
         contributors: vec![qn("base", ".mcp.json"), qn("leaf", ".mcp.json")],
         shadows: vec![],
         skill_provenance: None,
+        was_present_before_activation: true,
     };
     let json = serde_json::to_string(&mf).unwrap();
     assert!(json.contains("\"contributors\""));

@@ -39,6 +39,7 @@ fn which_for_symlinked_file_with_shadow() {
         contributors: vec![],
         shadows: vec![qn("base", "CLAUDE.md")],
         skill_provenance: None,
+        was_present_before_activation: true,
     });
     let aenv_home = Path::new(AENV_HOME);
     let out = format_which(&state, Path::new("CLAUDE.md"), aenv_home).unwrap();
@@ -59,6 +60,7 @@ fn which_for_merged_file_lists_contributors() {
         contributors: vec![qn("base", ".mcp.json"), qn("leaf", ".mcp.json")],
         shadows: vec![],
         skill_provenance: None,
+        was_present_before_activation: true,
     });
     let aenv_home = Path::new(AENV_HOME);
     let out = format_which(&state, Path::new(".mcp.json"), aenv_home).unwrap();

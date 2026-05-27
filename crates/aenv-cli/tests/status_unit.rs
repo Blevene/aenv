@@ -29,6 +29,7 @@ fn status_prints_resolution_chain_and_managed_provenance() {
                 contributors: vec![qn("base", "CLAUDE.md"), qn("leaf", "CLAUDE.md")],
                 shadows: vec![],
                 skill_provenance: None,
+                was_present_before_activation: true,
             },
             ManagedFile {
                 path: PathBuf::from(".claude/skills/write-tests/SKILL.md"),
@@ -37,6 +38,7 @@ fn status_prints_resolution_chain_and_managed_provenance() {
                 contributors: vec![],
                 shadows: vec![qn("base", ".claude/skills/write-tests/SKILL.md")],
                 skill_provenance: None,
+                was_present_before_activation: true,
             },
             ManagedFile {
                 path: PathBuf::from(".mcp.json"),
@@ -45,6 +47,7 @@ fn status_prints_resolution_chain_and_managed_provenance() {
                 contributors: vec![qn("base", ".mcp.json"), qn("leaf", ".mcp.json")],
                 shadows: vec![],
                 skill_provenance: None,
+                was_present_before_activation: true,
             },
         ],
         backed_up: vec![],

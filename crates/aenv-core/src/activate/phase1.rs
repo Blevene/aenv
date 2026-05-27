@@ -50,6 +50,7 @@ pub(super) fn materialize_symlink<F: Filesystem>(
                 contributors: vec![],
                 shadows,
                 skill_provenance: skill_provenance.clone(),
+                was_present_before_activation: false,
             });
         }
         super::ProjectPathState::AlreadyOurSymlink => {
@@ -60,6 +61,7 @@ pub(super) fn materialize_symlink<F: Filesystem>(
                 contributors: vec![],
                 shadows,
                 skill_provenance: skill_provenance.clone(),
+                was_present_before_activation: true,
             });
         }
         super::ProjectPathState::ByteIdenticalRegular => {
@@ -70,6 +72,7 @@ pub(super) fn materialize_symlink<F: Filesystem>(
                 contributors: vec![],
                 shadows,
                 skill_provenance: skill_provenance.clone(),
+                was_present_before_activation: true,
             });
         }
         super::ProjectPathState::Displaced => {
@@ -118,6 +121,7 @@ pub(super) fn materialize_symlink<F: Filesystem>(
                 contributors: vec![],
                 shadows,
                 skill_provenance,
+                was_present_before_activation: true,
             });
         }
     }

@@ -5,8 +5,8 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 #[test]
-fn schema_version_is_5() {
-    assert_eq!(SCHEMA_VERSION, 5);
+fn schema_version_is_6() {
+    assert_eq!(SCHEMA_VERSION, 6);
 }
 
 #[test]
@@ -31,6 +31,7 @@ fn schema_4_roundtrips_with_skill_provenance() {
                 resolved_ref: None,
                 resolved_hash: "sha256:abc".into(),
             }),
+            was_present_before_activation: true,
         }],
         backed_up: vec![],
         parameters: BTreeMap::new(),
