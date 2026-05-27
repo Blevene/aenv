@@ -357,6 +357,25 @@ enum GlobalAction {
         #[arg(long)]
         include: Vec<String>,
     },
+    /// Import a source directory (Task 5) or git URL (Task 6) as a new
+    /// namespace. When the source root contains `aenv-namespace.toml`, its
+    /// declared `[layout]` is authoritative; otherwise a built-in heuristic
+    /// probes well-known paths (CLAUDE.md, agents/, hooks/, install.sh, …).
+    ///
+    /// The resulting namespace can be activated with `aenv global activate
+    /// <name>`. See `pm_docs/aenv-namespace-toml-spec.md` for the convention
+    /// file format.
+    Import {
+        /// Source path (file:// or absolute local path) or git URL.
+        source: String,
+        /// Namespace name. Defaults to the last path component of `source`
+        /// for local paths, or the repo name for git URLs.
+        #[arg(default_value = "")]
+        name: String,
+        /// (Task 6) Pin a git source to a specific tag, commit, or branch.
+        #[arg(long)]
+        pin: Option<String>,
+    },
     /// Diff user-scope content against the active global activation or
     /// between two namespaces' user-scope subsets.
     Diff {
@@ -667,6 +686,20 @@ fn main() -> ExitCode {
                         )?;
                         cmd::global::snapshot::run(
                             &fs, &layout, &adapters, &fake_home, &name, &include,
+                        )
+                    }
+                    GlobalAction::Import { source, name, pin } => {
+                        let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
+                            &fs,
+                            &layout.adapters_dir(),
+                        )?;
+                        cmd::global::import::run(
+                            &fs,
+                            &layout,
+                            &adapters,
+                            &source,
+                            &name,
+                            pin.as_deref(),
                         )
                     }
                     GlobalAction::Diff { ns_a, ns_b, json } => cmd::global::diff::run(
