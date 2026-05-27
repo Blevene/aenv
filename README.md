@@ -268,6 +268,85 @@ aenv skill import git+https://github.com/Blevene/aenv \
 
 On the next `aenv activate`, the skill materializes at `.claude/skills/aenv/SKILL.md` in your project, and Claude Code's agent will load it when you ask aenv-shaped questions ("switch profile", "install a skill", "auto-activate on cd," etc.).
 
+## Global namespaces
+
+A namespace can describe two surfaces at once: the project-local one (`CLAUDE.md`, `.cursorrules`, …) and the **user-global** one under `$HOME` (`~/.claude/CLAUDE.md`, `~/.claude/agents/`, `~/.codex/`, …). `aenv global use <ns>` swaps the user surface atomically — one global activation lives per user; activating a new namespace deactivates the prior one in a single transaction.
+
+### Example: a `research` namespace that overrides `~/.claude/`
+
+```bash
+# Scaffold the namespace and author its user-scope content.
+aenv create research --adapter claude-code
+mkdir -p ~/.aenv/envs/research/user/.claude/agents
+cat > ~/.aenv/envs/research/user/.claude/CLAUDE.md <<'EOF'
+# Research mode
+Prefer exploratory analysis; cite primary sources.
+EOF
+cat > ~/.aenv/envs/research/user/.claude/agents/explorer.md <<'EOF'
+---
+name: explorer
+description: Explores datasets and surfaces patterns.
+---
+EOF
+
+# Declare which user-scope files this namespace owns. Paths are written
+# WITHOUT a leading ~/ — they live under ~/.aenv/envs/<ns>/user/ and
+# materialize under $HOME at activation time.
+$EDITOR ~/.aenv/envs/research/aenv.toml
+# Under [adapters.claude-code], add:
+#   user_files = [".claude/CLAUDE.md", ".claude/agents/explorer.md"]
+
+# Activate globally.
+aenv global use research
+# → Activated 'research' globally — 2 files materialized under /home/you.
+#   Note: running harness sessions retain their previous config until restart.
+
+# Inspect.
+aenv global status
+aenv global which ~/.claude/CLAUDE.md
+```
+
+### Reverse it
+
+```bash
+aenv global deactivate
+# → Deactivated 'research' globally.
+# Original ~/.claude/ contents are restored byte-for-byte.
+```
+
+### The running-session caveat
+
+`aenv global` swaps files on disk, but already-running harness processes
+(Claude Code, the Codex CLI, etc.) cache their config at startup. As both
+`aenv global use` and `aenv global status` print:
+
+> Note: running harness sessions retain their previous config until restart.
+
+Quit and relaunch the harness to pick up the new surface.
+
+### Verbs at a glance
+
+| Command | Purpose |
+|---|---|
+| `aenv global use <ns>` | Activate `<ns>` globally; swap out any prior activation. |
+| `aenv global deactivate [--prune]` | Restore the pre-activation `$HOME` surface. `--prune` also clears orphan stash dirs. |
+| `aenv global status [--json]` | Show the active namespace + every managed `~/<path>`. |
+| `aenv global which <path>` | "Which namespace manages `~/.claude/foo`?" |
+| `aenv global list [--json]` | List every namespace whose manifest declares `user_files`. |
+| `aenv global doctor [<ns>] [--json]` | Run policies against user-scope candidates; flag orphan stashes (exit 19). |
+| `aenv global diff [<a> <b>] [--json]` | Drift detection (no args) or structural diff between two namespaces' user-scope subsets. |
+
+### Sugar: project + global in one call
+
+```bash
+# Pin the project AND activate user-scope files in one shot.
+aenv use research --global
+```
+
+`aenv use <ns> --global` is exactly `aenv use <ns> && aenv global use <ns>` — the project gets pinned (no project-scope activation; that still requires `aenv activate`), and the namespace's user-scope files materialize under `$HOME`.
+
+See [`pm_docs/walkthrough-global-namespaces.md`](./pm_docs/walkthrough-global-namespaces.md) for a step-by-step tour including the swap-between-namespaces transaction, oversize-CLAUDE.md doctor warnings, and the orphan-stash cleanup flow with `--prune`.
+
 ## Shell integration
 
 After authoring some namespaces, you'll get tired of typing `aenv use && aenv activate` every time you `cd` into a project. The shell hook automates that — `cd` between pinned projects auto-activates the right namespace; `cd` to anywhere unpinned auto-deactivates. Full walkthrough in [`docs/walkthroughs/shell-integration.md`](./docs/walkthroughs/shell-integration.md).
