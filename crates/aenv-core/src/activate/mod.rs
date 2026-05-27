@@ -107,8 +107,7 @@ pub fn activate_namespace_in_scope<F: Filesystem>(
     let mut undo_log: Vec<UndoStep> = Vec::new();
     let mut managed: Vec<ManagedFile> = Vec::new();
     let mut backed_up: Vec<BackedUpFile> = Vec::new();
-    // FIXME(Task 8): user-scope backup root
-    let backup_root = backup_dir_for_this_run(target_root);
+    let backup_root = backup_dir_for_this_run_in_scope(layout, target_root, scope);
 
     let result: Result<()> = (|| {
         for (path, candidates) in &by_path {
@@ -473,11 +472,21 @@ fn backup_timestamp() -> String {
     format!("epoch-{nanos}")
 }
 
-/// Build the backup root for this activation run.
-pub(super) fn backup_dir_for_this_run(project_root: &Path) -> PathBuf {
-    project_root
-        .join(".aenv-state/backup")
-        .join(backup_timestamp())
+/// Build the backup root for this activation run, scoped to where the
+/// activation is writing. Project-scope stashes live under
+/// `<project_root>/.aenv-state/backup/<ts>/`; user-scope stashes live under
+/// `<aenv_home>/global-stash/<ts>/` so they are co-located with the
+/// `global-state.json` that records them.
+pub(super) fn backup_dir_for_this_run_in_scope(
+    layout: &RegistryLayout,
+    target_root: &Path,
+    scope: crate::scope::Scope,
+) -> PathBuf {
+    let parent = match scope {
+        crate::scope::Scope::Project => target_root.join(".aenv-state/backup"),
+        crate::scope::Scope::User => layout.global_stash_root(),
+    };
+    parent.join(backup_timestamp())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

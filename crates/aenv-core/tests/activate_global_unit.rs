@@ -76,3 +76,80 @@ user_files = [".claude/CLAUDE.md", ".claude/agents/explorer.md"]
         "state file missing scope field: {body}"
     );
 }
+
+#[test]
+fn user_scope_stashes_displaced_files_under_aenv_home() {
+    let tmp = tempfile::tempdir().unwrap();
+    let aenv_home = tmp.path().join(".aenv");
+    let fake_home = tmp.path().join("home");
+    let registry = aenv_core::home::RegistryLayout::new(aenv_home.clone());
+    let fs = aenv_core::fs::RealFilesystem;
+
+    // Preexisting ~/.claude/CLAUDE.md that aenv must stash.
+    std::fs::create_dir_all(fake_home.join(".claude")).unwrap();
+    std::fs::write(
+        fake_home.join(".claude/CLAUDE.md"),
+        b"original user CLAUDE.md",
+    )
+    .unwrap();
+
+    let adapters_dir = registry.adapters_dir();
+    std::fs::create_dir_all(&adapters_dir).unwrap();
+    std::fs::write(
+        adapters_dir.join("claude-code.toml"),
+        r#"
+name = "claude-code"
+user_files = ["~/.claude/CLAUDE.md"]
+"#,
+    )
+    .unwrap();
+    let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(&fs, &adapters_dir).unwrap();
+
+    let ns_dir = registry.namespace_dir("ns");
+    std::fs::create_dir_all(ns_dir.join("user/.claude")).unwrap();
+    std::fs::write(ns_dir.join("user/.claude/CLAUDE.md"), b"new user CLAUDE.md").unwrap();
+    std::fs::write(
+        ns_dir.join("aenv.toml"),
+        r#"
+name = "ns"
+[adapters.claude-code]
+user_files = [".claude/CLAUDE.md"]
+"#,
+    )
+    .unwrap();
+
+    let leaf = aenv_core::identity::NamespaceId::new("ns").unwrap();
+    let state = aenv_core::activate::activate_namespace_in_scope(
+        &fs,
+        &registry,
+        &adapters,
+        &fake_home,
+        aenv_core::scope::Scope::User,
+        &leaf,
+    )
+    .unwrap();
+
+    assert_eq!(state.backed_up.len(), 1, "expected one stashed file");
+    let stash = &state.backed_up[0].backup_path;
+    assert!(
+        stash.starts_with(&aenv_home),
+        "stash path {stash:?} must live under aenv_home {aenv_home:?}, not under fake_home"
+    );
+    assert!(
+        stash
+            .components()
+            .any(|c| c.as_os_str() == std::ffi::OsStr::new("global-stash")),
+        "stash path {stash:?} must be under <aenv_home>/global-stash/"
+    );
+    let body = std::fs::read(stash).unwrap();
+    assert_eq!(
+        body, b"original user CLAUDE.md",
+        "stash must contain the original bytes verbatim"
+    );
+
+    // And the new content landed at the target.
+    assert_eq!(
+        std::fs::read(fake_home.join(".claude/CLAUDE.md")).unwrap(),
+        b"new user CLAUDE.md"
+    );
+}
