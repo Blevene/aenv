@@ -291,3 +291,48 @@ user_files = [".claude/foo.md"]
         "foo must be reactivated after bar failed"
     );
 }
+
+#[test]
+fn concurrent_global_activation_rejects_with_exit_19() {
+    let tmp = tempfile::tempdir().unwrap();
+    let aenv_home = tmp.path().join(".aenv");
+    let fake_home = tmp.path().join("home");
+    let registry = aenv_core::home::RegistryLayout::new(aenv_home.clone());
+    let fs = aenv_core::fs::RealFilesystem;
+
+    let adapters_dir = registry.adapters_dir();
+    std::fs::create_dir_all(&adapters_dir).unwrap();
+    std::fs::write(
+        adapters_dir.join("claude-code.toml"),
+        r#"
+name = "claude-code"
+user_files = ["~/.claude/CLAUDE.md"]
+"#,
+    )
+    .unwrap();
+    let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(&fs, &adapters_dir).unwrap();
+
+    let ns_dir = registry.namespace_dir("ns");
+    std::fs::create_dir_all(ns_dir.join("user/.claude")).unwrap();
+    std::fs::write(ns_dir.join("user/.claude/CLAUDE.md"), b"x").unwrap();
+    std::fs::write(
+        ns_dir.join("aenv.toml"),
+        r#"
+name = "ns"
+[adapters.claude-code]
+user_files = [".claude/CLAUDE.md"]
+"#,
+    )
+    .unwrap();
+
+    // Simulate a held lock by acquiring one ourselves and never releasing.
+    let lock_path = registry.global_lock_path();
+    let _h = aenv_core::global_lock::acquire_global_lock(&lock_path).unwrap();
+
+    let leaf = aenv_core::identity::NamespaceId::new("ns").unwrap();
+    let err =
+        aenv_core::activate::swap_or_activate_user(&fs, &registry, &adapters, &fake_home, &leaf)
+            .unwrap_err();
+    assert_eq!(err.exit_code(), 19);
+    assert!(matches!(err, aenv_core::AenvError::GlobalConflict(_)));
+}

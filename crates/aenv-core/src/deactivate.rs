@@ -47,6 +47,29 @@ pub fn deactivate_namespace_in_scope<F: Filesystem>(
     target_root: &Path,
     scope: crate::scope::Scope,
 ) -> Result<String> {
+    let lock = if scope == crate::scope::Scope::User {
+        Some(crate::global_lock::acquire_global_lock(
+            &layout.global_lock_path(),
+        )?)
+    } else {
+        None
+    };
+    let result = deactivate_in_scope_inner(fs, layout, target_root, scope);
+    if let Some(handle) = lock {
+        let _ = crate::global_lock::release_global_lock(handle);
+    }
+    result
+}
+
+/// Inner deactivation routine — no lock acquisition. Callers that already
+/// hold the global lock (e.g. `swap_or_activate_user_inner`) call this
+/// directly to avoid double-locking.
+pub(crate) fn deactivate_in_scope_inner<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    target_root: &Path,
+    scope: crate::scope::Scope,
+) -> Result<String> {
     let state_path = match scope {
         crate::scope::Scope::Project => target_root.join(".aenv-state/state.json"),
         crate::scope::Scope::User => layout.global_state_path(),

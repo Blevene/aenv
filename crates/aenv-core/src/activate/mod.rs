@@ -175,13 +175,26 @@ pub fn swap_or_activate_user<F: Filesystem>(
     target_root: &Path,
     leaf: &NamespaceId,
 ) -> Result<ActivationState> {
+    let handle = crate::global_lock::acquire_global_lock(&layout.global_lock_path())?;
+    let result = swap_or_activate_user_inner(fs, layout, adapters, target_root, leaf);
+    let _ = crate::global_lock::release_global_lock(handle);
+    result
+}
+
+fn swap_or_activate_user_inner<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    adapters: &AdapterRegistry,
+    target_root: &Path,
+    leaf: &NamespaceId,
+) -> Result<ActivationState> {
     let state_path = layout.global_state_path();
     let prior: Option<String> = if fs.exists(&state_path)? {
         let bytes = fs.read(&state_path)?;
         let text = std::str::from_utf8(&bytes)
             .map_err(|e| AenvError::ManifestInvalid(format!("global-state.json: {e}")))?;
         let state = ActivationState::from_json(text)?;
-        crate::deactivate::deactivate_namespace_in_scope(
+        crate::deactivate::deactivate_in_scope_inner(
             fs,
             layout,
             target_root,
