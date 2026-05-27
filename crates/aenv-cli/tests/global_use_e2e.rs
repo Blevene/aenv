@@ -130,6 +130,68 @@ fn global_deactivate_restores_stash() {
 }
 
 #[test]
+fn use_with_global_flag_activates_both_scopes() {
+    let tmp = tempdir().unwrap();
+    let aenv_home = std::fs::canonicalize(tmp.path()).unwrap().join(".aenv");
+    let fake_home = std::fs::canonicalize(tmp.path()).unwrap().join("home");
+    let project = std::fs::canonicalize(tmp.path()).unwrap().join("project");
+    std::fs::create_dir_all(&fake_home).unwrap();
+    std::fs::create_dir_all(&project).unwrap();
+    std::fs::create_dir_all(aenv_home.join("adapters")).unwrap();
+    std::fs::write(
+        aenv_home.join("adapters/claude-code.toml"),
+        r#"name = "claude-code"
+files = ["CLAUDE.md"]
+user_files = ["~/.claude/CLAUDE.md"]
+"#,
+    )
+    .unwrap();
+    let ns_dir = aenv_home.join("envs/both");
+    std::fs::create_dir_all(ns_dir.join("user/.claude")).unwrap();
+    std::fs::write(ns_dir.join("CLAUDE.md"), b"project body").unwrap();
+    std::fs::write(ns_dir.join("user/.claude/CLAUDE.md"), b"user body").unwrap();
+    std::fs::write(
+        ns_dir.join("aenv.toml"),
+        r#"name = "both"
+[adapters.claude-code]
+files = ["CLAUDE.md"]
+user_files = [".claude/CLAUDE.md"]
+"#,
+    )
+    .unwrap();
+
+    let out = aenv(&aenv_home, &fake_home)
+        .args([
+            "use",
+            "both",
+            "--global",
+            "--project",
+            project.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    // `aenv use` pins the project to a namespace but does not materialize
+    // project files — that's a separate `aenv activate` step. So we just
+    // verify the pin file landed.
+    assert!(project.join(".aenv").exists(), "project not pinned");
+
+    // The --global flag should have activated user-scope files under $HOME.
+    let user_claude = fake_home.join(".claude/CLAUDE.md");
+    assert!(
+        user_claude.exists(),
+        "user CLAUDE.md not materialized: {user_claude:?}"
+    );
+    assert_eq!(std::fs::read(&user_claude).unwrap(), b"user body");
+    assert!(aenv_home.join("global-state.json").exists());
+}
+
+#[test]
 fn global_deactivate_with_nothing_active_is_ok() {
     let tmp = tempdir().unwrap();
     let aenv_home = std::fs::canonicalize(tmp.path()).unwrap().join(".aenv");

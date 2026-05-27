@@ -51,6 +51,10 @@ enum Command {
         /// Project root override (defaults to ancestor walk from cwd).
         #[arg(long)]
         project: Option<PathBuf>,
+        /// Also activate the namespace's user-scope files. Sugar for
+        /// `aenv use <ns> && aenv global use <ns>`.
+        #[arg(long)]
+        global: bool,
     },
     /// Materialize the active namespace's content into the project as
     /// symlinks (or merged files where strategy demands). Reads the
@@ -358,9 +362,28 @@ fn main() -> ExitCode {
             }
             Command::List { json } => cmd::list::run(&fs, &layout, json),
             Command::Delete { name } => cmd::delete::run(&fs, &layout, &name),
-            Command::Use { name, project } => {
+            Command::Use {
+                name,
+                project,
+                global,
+            } => {
                 let project_root = paths::resolve_project_root_for_pin(&fs, project)?;
-                cmd::use_::run(&fs, &layout, &project_root, &name)
+                cmd::use_::run(&fs, &layout, &project_root, &name)?;
+                if global {
+                    let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
+                        &fs,
+                        &layout.adapters_dir(),
+                    )?;
+                    let fake_home = std::env::var("HOME")
+                        .map(std::path::PathBuf::from)
+                        .map_err(|_| {
+                            aenv_core::AenvError::ManifestInvalid(
+                                "HOME not set; --global requires HOME".into(),
+                            )
+                        })?;
+                    cmd::global::use_::run(&fs, &layout, &adapters, &fake_home, &name)?;
+                }
+                Ok(())
             }
             Command::Activate { name, project } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;
