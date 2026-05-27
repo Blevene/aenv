@@ -54,6 +54,7 @@ fn status_prints_resolution_chain_and_managed_provenance() {
         parameters: std::collections::BTreeMap::new(),
         policies: std::collections::BTreeMap::new(),
         warnings: Vec::new(),
+        lifecycle_ran: false,
     };
     let chain = vec![
         NamespaceId::new("base").unwrap(),
@@ -82,6 +83,7 @@ fn status_no_active_namespace() {
         parameters: std::collections::BTreeMap::new(),
         policies: std::collections::BTreeMap::new(),
         warnings: Vec::new(),
+        lifecycle_ran: false,
     };
     let chain = vec![NamespaceId::new("alone").unwrap()];
     let out = format_status(&state, &chain);

@@ -27,6 +27,7 @@ fn state_with(mf: ManagedFile) -> ActivationState {
         parameters: std::collections::BTreeMap::new(),
         policies: std::collections::BTreeMap::new(),
         warnings: Vec::new(),
+        lifecycle_ran: false,
     }
 }
 
@@ -85,6 +86,7 @@ fn which_for_unmanaged_path_reports_error() {
         parameters: std::collections::BTreeMap::new(),
         policies: std::collections::BTreeMap::new(),
         warnings: Vec::new(),
+        lifecycle_ran: false,
     };
     let aenv_home = Path::new(AENV_HOME);
     let err = format_which(&state, Path::new("unmanaged.txt"), aenv_home).unwrap_err();

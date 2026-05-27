@@ -52,6 +52,7 @@ fn schema_3_roundtrip_with_params_and_policies() {
         parameters,
         policies,
         warnings: Vec::new(),
+        lifecycle_ran: false,
     };
     let s = state.to_json().unwrap();
     let parsed = ActivationState::from_json(&s).unwrap();

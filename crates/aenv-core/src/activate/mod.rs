@@ -12,6 +12,7 @@
 //! in reverse (best-effort) before the error bubbles, leaving the project as
 //! we found it (R-63).
 
+mod lifecycle;
 mod phase1;
 
 use crate::adapter::AdapterRegistry;
@@ -19,6 +20,7 @@ use crate::error::{AenvError, Result};
 use crate::fs::Filesystem;
 use crate::home::RegistryLayout;
 use crate::identity::{NamespaceId, QualifiedName, ShortName};
+use crate::manifest::AenvManifest;
 use crate::resolve::MaterializeStrategy;
 use crate::state::{ActivationState, BackedUpFile, ManagedFile, SCHEMA_VERSION};
 use std::collections::BTreeMap;
@@ -133,6 +135,41 @@ pub fn activate_namespace_in_scope<F: Filesystem>(
         return Err(e);
     }
 
+    // Run `[lifecycle].on_activate` (if any). Failure here rolls back the
+    // materialization via the undo log — the script is the namespace's last
+    // chance to validate that materialization actually produced a working
+    // configuration, and we want the project to look untouched if it doesn't.
+    let leaf_manifest = load_leaf_manifest(fs, layout, leaf)?;
+    let lifecycle_ran = if let Some(script_rel) = leaf_manifest.lifecycle.on_activate.as_deref() {
+        let script_path = layout.namespace_dir(leaf.as_str()).join(script_rel);
+        if !fs.exists(&script_path)? {
+            undo(fs, std::mem::take(&mut undo_log));
+            return Err(AenvError::ManifestInvalid(format!(
+                "on_activate script '{script_rel}' does not exist in namespace '{}'",
+                leaf.as_str()
+            )));
+        }
+        match lifecycle::run_lifecycle_script(
+            &script_path,
+            target_root,
+            layout,
+            leaf,
+            scope,
+            lifecycle::LifecycleEvent::Activate,
+            false,
+        ) {
+            Ok(()) => true,
+            Err(e) => {
+                undo(fs, std::mem::take(&mut undo_log));
+                return Err(AenvError::GlobalConflict(format!(
+                    "on_activate failed: {e}; activation rolled back"
+                )));
+            }
+        }
+    } else {
+        false
+    };
+
     let state = ActivationState {
         schema_version: SCHEMA_VERSION,
         active_namespace: leaf.as_str().to_owned(),
@@ -143,6 +180,7 @@ pub fn activate_namespace_in_scope<F: Filesystem>(
         parameters: resolved_parameters,
         policies: resolved_policies,
         warnings: resolution_warnings,
+        lifecycle_ran,
     };
     let state_path = match scope {
         crate::scope::Scope::Project => target_root.join(".aenv-state/state.json"),
@@ -379,6 +417,23 @@ fn materialize_one<F: Filesystem>(
 // --------------------------------------------------------------------------
 // Helpers
 // --------------------------------------------------------------------------
+
+/// Re-read the leaf namespace's manifest from disk. The resolver already
+/// loaded + validated it during `resolve_namespace`, so a second read here
+/// is redundant on the happy path but keeps the lifecycle hook decoupled
+/// from resolver internals (and lets us consult fields the resolver doesn't
+/// expose, like `[lifecycle]`).
+pub(crate) fn load_leaf_manifest<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    leaf: &NamespaceId,
+) -> Result<AenvManifest> {
+    let path = layout.manifest_path(leaf.as_str());
+    let bytes = fs.read(&path)?;
+    let text = std::str::from_utf8(&bytes)
+        .map_err(|e| AenvError::ManifestInvalid(format!("manifest not utf-8: {e}")))?;
+    AenvManifest::from_toml(text)
+}
 
 /// Synthesize a `(merged)::path` qualified name for a merged artifact.
 pub(crate) fn synthesize_merged_qn(path: &Path) -> Result<QualifiedName> {

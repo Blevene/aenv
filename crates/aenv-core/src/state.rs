@@ -148,6 +148,12 @@ pub struct ActivationState {
     /// (printed to stderr) and not survive across activations.
     #[serde(skip)]
     pub warnings: Vec<String>,
+    /// Whether the namespace's `on_activate` lifecycle script ran during
+    /// this activation. False if the namespace declared no script OR if
+    /// activation completed without invoking lifecycle. Used by
+    /// deactivation to decide whether to run `on_deactivate`.
+    #[serde(default)]
+    pub lifecycle_ran: bool,
 }
 
 impl<'de> serde::Deserialize<'de> for ActivationState {
@@ -168,6 +174,8 @@ impl<'de> serde::Deserialize<'de> for ActivationState {
             parameters: BTreeMap<String, crate::parameters::ResolvedParameter>,
             #[serde(default)]
             policies: BTreeMap<String, crate::policies::ResolvedPolicy>,
+            #[serde(default)]
+            lifecycle_ran: bool,
         }
         let mut raw = Raw::deserialize(d)?;
         // For schema-1 files the ManagedFile deserializer used a sentinel
@@ -195,6 +203,7 @@ impl<'de> serde::Deserialize<'de> for ActivationState {
             parameters: raw.parameters,
             policies: raw.policies,
             warnings: Vec::new(),
+            lifecycle_ran: raw.lifecycle_ran,
         })
     }
 }
