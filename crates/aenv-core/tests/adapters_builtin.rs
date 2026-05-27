@@ -102,6 +102,54 @@ fn ensure_written_creates_all_eight_files() {
 }
 
 #[test]
+fn claude_code_declares_user_files() {
+    let toml = include_str!("../src/adapters_builtin/claude_code.toml");
+    let a = aenv_core::adapter::Adapter::from_toml(toml).unwrap();
+    assert!(a.user_files.contains(&"~/.claude/CLAUDE.md".to_string()));
+    assert!(a.user_files.contains(&"~/.claude/agents/".to_string()));
+    assert!(a
+        .user_files
+        .contains(&"~/.claude/settings.json".to_string()));
+    assert_eq!(a.user_skills_dir.as_deref(), Some("~/.claude/skills"));
+    assert_eq!(
+        a.user_roles.get("~/.claude/CLAUDE.md").map(String::as_str),
+        Some("instructions")
+    );
+    assert_eq!(a.user_soft_limits.get("instructions").copied(), Some(5000));
+    assert_eq!(
+        a.user_default_merge
+            .get("~/.claude/settings.json")
+            .map(String::as_str),
+        Some("deep")
+    );
+}
+
+#[test]
+fn codex_declares_user_files() {
+    let toml = include_str!("../src/adapters_builtin/codex.toml");
+    let a = aenv_core::adapter::Adapter::from_toml(toml).unwrap();
+    assert!(a.user_files.contains(&"~/.codex/AGENTS.md".to_string()));
+    assert!(a.user_files.contains(&"~/.codex/config.toml".to_string()));
+    assert_eq!(
+        a.user_roles.get("~/.codex/AGENTS.md").map(String::as_str),
+        Some("instructions")
+    );
+    assert_eq!(
+        a.user_default_merge
+            .get("~/.codex/config.toml")
+            .map(String::as_str),
+        Some("deep")
+    );
+}
+
+#[test]
+fn cursor_declares_user_files() {
+    let toml = include_str!("../src/adapters_builtin/cursor.toml");
+    let a = aenv_core::adapter::Adapter::from_toml(toml).unwrap();
+    assert!(a.user_files.iter().any(|s| s.starts_with("~/.cursor/")));
+}
+
+#[test]
 fn ensure_written_leaves_existing_files_untouched() {
     let fs = MockFilesystem::new();
     let dir = Path::new("/aenv/adapters");

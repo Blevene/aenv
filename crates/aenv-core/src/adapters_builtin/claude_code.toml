@@ -2,11 +2,29 @@ name = "claude-code"
 files = ["CLAUDE.md", ".claude/"]
 skills_dir = ".claude/skills"
 
+user_files = [
+    "~/.claude/CLAUDE.md",
+    "~/.claude/agents/",
+    "~/.claude/commands/",
+    "~/.claude/hooks/",
+    "~/.claude/settings.json",
+]
+user_skills_dir = "~/.claude/skills"
+
 [roles]
 "CLAUDE.md" = "instructions"
 
+[user_roles]
+"~/.claude/CLAUDE.md" = "instructions"
+
 [soft_limits]
 instructions = 5000
+
+[user_soft_limits]
+instructions = 5000
+
+[user_default_merge]
+"~/.claude/settings.json" = "deep"
 
 [[parameters]]
 name = "instructions_budget"

@@ -1,11 +1,25 @@
 name = "codex"
 files = ["AGENTS.md"]
 
+user_files = [
+    "~/.codex/AGENTS.md",
+    "~/.codex/config.toml",
+]
+
 [roles]
 "AGENTS.md" = "instructions"
 
+[user_roles]
+"~/.codex/AGENTS.md" = "instructions"
+
 [soft_limits]
 instructions = 5000
+
+[user_soft_limits]
+instructions = 5000
+
+[user_default_merge]
+"~/.codex/config.toml" = "deep"
 
 [[parameters]]
 name = "instructions_budget"

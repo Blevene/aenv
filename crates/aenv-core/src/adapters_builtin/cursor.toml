@@ -1,6 +1,8 @@
 name = "cursor"
 files = [".cursorrules", ".cursor/**/*"]
 
+user_files = ["~/.cursor/rules/"]
+
 [roles]
 ".cursorrules" = "instructions"
 
