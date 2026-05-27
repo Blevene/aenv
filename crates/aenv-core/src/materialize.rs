@@ -20,6 +20,7 @@ use crate::home::RegistryLayout;
 use crate::identity::NamespaceId;
 use crate::parameters::ResolvedParameter;
 use crate::resolve::{resolve_namespace, Candidate, DeepMergeFormat, MaterializeStrategy};
+use crate::scope::Scope;
 use crate::strategy::decide_strategy;
 use crate::AenvError;
 
@@ -74,24 +75,51 @@ impl MaterialSet {
     }
 }
 
-/// Compute the material set for `leaf` without writing anything.
+/// Compute the project-scope material set for `leaf` without writing anything.
+///
+/// User-scope candidates are not included here — see [`compute_material_set_user`]
+/// for the symmetric variant. Keeping the two scopes apart guarantees the
+/// project-scope hash stays stable for namespaces that also declare `user_files`
+/// (R-84 + Issue #4 Milestone G invariant).
 pub fn compute_material_set<F: Filesystem>(
     fs: &F,
     layout: &RegistryLayout,
     adapters: &AdapterRegistry,
     leaf: &NamespaceId,
 ) -> Result<MaterialSet> {
+    compute_material_set_for_scope(fs, layout, adapters, leaf, Scope::Project)
+}
+
+/// Compute the user-scope material set for `leaf` without writing anything.
+///
+/// Symmetric to [`compute_material_set`], but filters candidates to
+/// [`Scope::User`] so the returned set covers only what `aenv global use` would
+/// materialize. Returns an empty entry list (with the resolved-parameter map
+/// still populated) when the namespace has no user-scope candidates — that is
+/// not an error.
+pub fn compute_material_set_user<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    adapters: &AdapterRegistry,
+    leaf: &NamespaceId,
+) -> Result<MaterialSet> {
+    compute_material_set_for_scope(fs, layout, adapters, leaf, Scope::User)
+}
+
+fn compute_material_set_for_scope<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    adapters: &AdapterRegistry,
+    leaf: &NamespaceId,
+    scope: Scope,
+) -> Result<MaterialSet> {
     let resolution = resolve_namespace(fs, layout, adapters, leaf)?;
 
-    // Project-scope only. User-scope candidates are part of the user-scope
-    // material set (and the user-scope hash, Task 23); they are not included
-    // here so the project-scope hash stays stable for namespaces that also
-    // declare `user_files`.
     let mut by_path: BTreeMap<PathBuf, Vec<Candidate>> = BTreeMap::new();
     for c in resolution
         .candidates
         .into_iter()
-        .filter(|c| c.scope == crate::scope::Scope::Project)
+        .filter(|c| c.scope == scope)
     {
         by_path.entry(c.path.clone()).or_default().push(c);
     }
