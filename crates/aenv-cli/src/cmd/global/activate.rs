@@ -1,4 +1,4 @@
-//! `aenv global use <ns>` — activate a namespace globally.
+//! `aenv global activate <ns>` — activate a namespace globally.
 
 use aenv_core::adapter::AdapterRegistry;
 use aenv_core::error::{AenvError, Result};
@@ -19,13 +19,24 @@ pub fn run<F: Filesystem>(
     for w in &state.warnings {
         eprintln!("[aenv] warning: {w}");
     }
-    let count = state.managed_files.len();
     println!(
-        "Activated '{}' globally — {count} file{} materialized under {}.",
+        "Activated '{}' globally in {}",
         state.active_namespace,
-        if count == 1 { "" } else { "s" },
         fake_home.display()
     );
+    for file in &state.managed_files {
+        println!("  + {} ({:?})", file.path.display(), file.strategy);
+    }
+    if !state.backed_up.is_empty() {
+        println!("Backed up {} file(s):", state.backed_up.len());
+        for backup in &state.backed_up {
+            println!(
+                "  - {} -> {}",
+                backup.original_path.display(),
+                backup.backup_path.display()
+            );
+        }
+    }
     println!("Note: running harness sessions retain their previous config until restart.");
     Ok(())
 }

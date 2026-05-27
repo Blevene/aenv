@@ -1,4 +1,4 @@
-//! End-to-end tests for `aenv global use` and `aenv global deactivate`.
+//! End-to-end tests for `aenv global activate` and `aenv global deactivate`.
 //!
 //! Drives the built `aenv` binary as a subprocess with `AENV_HOME` and
 //! `HOME` pointed at a `tempfile::tempdir`. Exercises the user-scope
@@ -44,7 +44,7 @@ user_files = [".claude/CLAUDE.md"]
 }
 
 #[test]
-fn global_use_activates_user_files_under_home_override() {
+fn global_activate_materializes_user_files_under_home_override() {
     let tmp = tempdir().unwrap();
     let aenv_home = std::fs::canonicalize(tmp.path()).unwrap().join(".aenv");
     let fake_home = std::fs::canonicalize(tmp.path()).unwrap().join("home");
@@ -53,12 +53,12 @@ fn global_use_activates_user_files_under_home_override() {
     seed_minimal_user_scope(&aenv_home);
 
     let out = aenv(&aenv_home, &fake_home)
-        .args(["global", "use", "ns"])
+        .args(["global", "activate", "ns"])
         .output()
         .unwrap();
     assert!(
         out.status.success(),
-        "global use failed: status={:?}, stdout={}, stderr={}",
+        "global activate failed: status={:?}, stdout={}, stderr={}",
         out.status,
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
@@ -91,12 +91,12 @@ fn global_deactivate_restores_stash() {
     seed_minimal_user_scope(&aenv_home);
 
     let out = aenv(&aenv_home, &fake_home)
-        .args(["global", "use", "ns"])
+        .args(["global", "activate", "ns"])
         .output()
         .unwrap();
     assert!(
         out.status.success(),
-        "global use failed: stderr={}",
+        "global activate failed: stderr={}",
         String::from_utf8_lossy(&out.stderr)
     );
 
@@ -176,12 +176,20 @@ user_files = [".claude/CLAUDE.md"]
         String::from_utf8_lossy(&out.stderr)
     );
 
-    // `aenv use` pins the project to a namespace but does not materialize
-    // project files — that's a separate `aenv activate` step. So we just
-    // verify the pin file landed.
+    // `aenv use --global` is sugar for: pin the project, activate it,
+    // and activate globally. All three side effects must land.
     assert!(project.join(".aenv").exists(), "project not pinned");
 
-    // The --global flag should have activated user-scope files under $HOME.
+    // Project-scope materialization: CLAUDE.md should exist under the
+    // project root (this is the activate step that previously was missing).
+    let project_claude = project.join("CLAUDE.md");
+    assert!(
+        project_claude.exists(),
+        "project CLAUDE.md not materialized by --global sugar: {project_claude:?}"
+    );
+    assert_eq!(std::fs::read(&project_claude).unwrap(), b"project body");
+
+    // User-scope materialization: $HOME/.claude/CLAUDE.md.
     let user_claude = fake_home.join(".claude/CLAUDE.md");
     assert!(
         user_claude.exists(),

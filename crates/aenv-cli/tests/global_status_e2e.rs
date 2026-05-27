@@ -72,7 +72,7 @@ user_files = [".claude/CLAUDE.md"]
     aenv()
         .env("AENV_HOME", &aenv_home)
         .env("HOME", &fake_home)
-        .args(["global", "use", "ns"])
+        .args(["global", "activate", "ns"])
         .status()
         .unwrap();
     let out = aenv()

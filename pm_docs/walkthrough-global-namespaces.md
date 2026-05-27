@@ -3,7 +3,7 @@
 **Tested against:** `main` (commit `3100d80`), `aenv 0.0.3`.
 **Goal:** activate one namespace's user-scope surface under `$HOME`, swap to another in a single transaction, catch a too-large user CLAUDE.md with `aenv global doctor`, and clean up an orphan stash with `aenv global deactivate --prune`.
 
-A project-scope namespace owns files under the project root (`./CLAUDE.md`, `./.claude/skills/…`, `./.mcp.json`, …). A **global** namespace owns files under the user's `$HOME` — `~/.claude/CLAUDE.md`, `~/.claude/agents/`, `~/.codex/AGENTS.md`, etc. The two surfaces can be expressed by the same namespace: the project files come from `~/.aenv/envs/<ns>/`, the user files from `~/.aenv/envs/<ns>/user/`. `aenv activate` swaps the first; `aenv global use` swaps the second.
+A project-scope namespace owns files under the project root (`./CLAUDE.md`, `./.claude/skills/…`, `./.mcp.json`, …). A **global** namespace owns files under the user's `$HOME` — `~/.claude/CLAUDE.md`, `~/.claude/agents/`, `~/.codex/AGENTS.md`, etc. The two surfaces can be expressed by the same namespace: the project files come from `~/.aenv/envs/<ns>/`, the user files from `~/.aenv/envs/<ns>/user/`. `aenv activate` swaps the first; `aenv global activate` swaps the second.
 
 This walkthrough exercises every `aenv global` verb end-to-end against an isolated `$HOME` so nothing touches your real `~/.claude/`.
 
@@ -33,7 +33,7 @@ $BIN --version
 
 Two paths to keep in your head:
 
-- **`$HOME`** — the surface global activations materialize into. `aenv global use <ns>` writes (symlinks) files under here.
+- **`$HOME`** — the surface global activations materialize into. `aenv global activate <ns>` writes (symlinks) files under here.
 - **`$AENV_HOME`** — where the namespace registry lives, and also where the per-user **global activation state** is stored: `$AENV_HOME/global-state.json` (schema v5), backups under `$AENV_HOME/global-stash/<timestamp>/`, the cross-process lock at `$AENV_HOME/global.lock`.
 
 Confirm the starting state:
@@ -122,11 +122,14 @@ research
 ## Step 2 — activate it globally
 
 ```bash
-$BIN global use research
+$BIN global activate research
 ```
 
 ```
-Activated 'research' globally — 3 files materialized under /tmp/aenv-home-XXXXXX.
+Activated 'research' globally in /tmp/aenv-home-XXXXXX
+  + .claude/CLAUDE.md (Replace)
+  + .claude/agents/explorer.md (Replace)
+  + .claude/settings.json (Replace)
 Note: running harness sessions retain their previous config until restart.
 ```
 
@@ -200,11 +203,12 @@ EOF
 Now activate `default` directly — there's no need to deactivate `research` first:
 
 ```bash
-$BIN global use default
+$BIN global activate default
 ```
 
 ```
-Activated 'default' globally — 1 file materialized under /tmp/aenv-home-XXXXXX.
+Activated 'default' globally in /tmp/aenv-home-XXXXXX
+  + .claude/CLAUDE.md (Replace)
 Note: running harness sessions retain their previous config until restart.
 ```
 
@@ -312,7 +316,7 @@ The `~/` prefix on the qualified-name target (`chatty::~/.claude/CLAUDE.md`) is 
 instructions_max_chars = { value = 5000, enforce = true }
 ```
 
-…and the next `aenv global use chatty` will refuse (exit 17) before materializing anything.
+…and the next `aenv global activate chatty` will refuse (exit 17) before materializing anything.
 
 ---
 
@@ -326,7 +330,7 @@ Simulate an abandoned stash and a live activation:
 mkdir -p $AENV_HOME/global-stash/epoch-99
 echo 'stash junk' > $AENV_HOME/global-stash/epoch-99/orphaned
 
-$BIN global use research >/dev/null
+$BIN global activate research >/dev/null
 ```
 
 Now ask the doctor about global state as a whole (no namespace argument — defaults to the active one):
@@ -390,11 +394,16 @@ $BIN use research --global
 
 ```
 Pinned /tmp/aenv-walk-proj to namespace 'research'
-Activated 'research' globally — 3 files materialized under /tmp/aenv-home-XXXXXX.
+Activated 'research' in /tmp/aenv-walk-proj
+  + CLAUDE.md (Replace)
+Activated 'research' globally in /tmp/aenv-home-XXXXXX
+  + .claude/CLAUDE.md (Replace)
+  + .claude/agents/explorer.md (Replace)
+  + .claude/settings.json (Replace)
 Note: running harness sessions retain their previous config until restart.
 ```
 
-`aenv use <ns> --global` is exactly `aenv use <ns> && aenv global use <ns>` — it writes the `.aenv` pin **and** activates the user surface. Project-scope materialization still requires a separate `aenv activate` (the two-step `use` / `activate` model holds in both scopes).
+`aenv use <ns> --global` is exactly `aenv use <ns> && aenv activate && aenv global activate <ns>` — it writes the `.aenv` pin **and** materializes both surfaces. The whole namespace lands in one command.
 
 Tear it down:
 
@@ -433,7 +442,7 @@ Everything aenv reads or writes for the global scope lives under one of two root
 
 - **State.** `$AENV_HOME/global-state.json` — JSON schema v5. Records the active namespace name, the target root (`$HOME`), every managed `<rel-path>`, the original location of every backed-up file. One per user; exists only while a global activation is live.
 - **Stash.** `$AENV_HOME/global-stash/<timestamp>/<rel-path>` — pre-activation originals, moved here by `mv` so the restore is byte-perfect. `<timestamp>` is nanoseconds-since-epoch, so concurrent activations don't collide. Each activation has its own subdir; a clean deactivate consumes its own stash directory.
-- **Lock.** `$AENV_HOME/global.lock` — advisory file lock acquired around any state-mutating global op. Concurrent `aenv global use` invocations serialize cleanly; in-flight reads (`global status`, `global which`, `global list`) don't take the lock.
+- **Lock.** `$AENV_HOME/global.lock` — advisory file lock acquired around any state-mutating global op. Concurrent `aenv global activate` invocations serialize cleanly; in-flight reads (`global status`, `global which`, `global list`) don't take the lock.
 - **Materialized files.** `$HOME/<rel-path>` — what the agent harness sees. Symlinks back into the namespace source for single-contributor files (the common case at user scope).
 - **Source layout.** `$AENV_HOME/envs/<ns>/user/<rel-path>` — what you hand-author. The `user/` subdir mirrors the materialization target one-to-one: a file at `~/.aenv/envs/research/user/.claude/CLAUDE.md` materializes at `$HOME/.claude/CLAUDE.md`.
 

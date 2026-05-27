@@ -25,7 +25,10 @@ pub fn run<F: Filesystem>(
             fake_home,
             aenv_core::scope::Scope::User,
         )?;
-        println!("Deactivated '{active}' globally.");
+        println!(
+            "Deactivated namespace '{active}' globally in {}",
+            fake_home.display()
+        );
     }
 
     if prune {

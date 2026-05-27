@@ -51,8 +51,8 @@ enum Command {
         /// Project root override (defaults to ancestor walk from cwd).
         #[arg(long)]
         project: Option<PathBuf>,
-        /// Also activate the namespace's user-scope files. Sugar for
-        /// `aenv use <ns> && aenv global use <ns>`.
+        /// Also activate the namespace fully on both surfaces. Sugar for
+        /// `aenv use <ns> && aenv activate && aenv global activate <ns>`.
         #[arg(long)]
         global: bool,
     },
@@ -297,11 +297,11 @@ enum CacheAction {
 enum GlobalAction {
     /// Activate a namespace's user-scope files into `$HOME`. Replaces any
     /// existing global activation in a single transaction.
-    Use {
+    Activate {
         /// Namespace name to activate globally.
         name: String,
     },
-    /// Reverse `aenv global use`: restore stashed originals, delete the
+    /// Reverse `aenv global activate`: restore stashed originals, delete the
     /// global state file. Exit 0 with a note if no activation is live.
     Deactivate {
         /// Also remove orphan stash directories (timestamped subdirs of
@@ -375,6 +375,11 @@ fn main() -> ExitCode {
                 let project_root = paths::resolve_project_root_for_pin(&fs, project)?;
                 cmd::use_::run(&fs, &layout, &project_root, &name)?;
                 if global {
+                    // --global expands to: pin (above), then activate the
+                    // project, then activate globally. Order matches
+                    // reversibility — pin is cheapest to undo, global is
+                    // the most observable side effect.
+                    cmd::activate::run(&fs, &layout, &project_root, Some(name.as_str()))?;
                     let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
                         &fs,
                         &layout.adapters_dir(),
@@ -386,7 +391,7 @@ fn main() -> ExitCode {
                                 "HOME not set; --global requires HOME".into(),
                             )
                         })?;
-                    cmd::global::use_::run(&fs, &layout, &adapters, &fake_home, &name)?;
+                    cmd::global::activate::run(&fs, &layout, &adapters, &fake_home, &name)?;
                 }
                 Ok(())
             }
@@ -601,12 +606,12 @@ fn main() -> ExitCode {
                         )
                     })?;
                 match action {
-                    GlobalAction::Use { name } => {
+                    GlobalAction::Activate { name } => {
                         let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
                             &fs,
                             &layout.adapters_dir(),
                         )?;
-                        cmd::global::use_::run(&fs, &layout, &adapters, &fake_home, &name)
+                        cmd::global::activate::run(&fs, &layout, &adapters, &fake_home, &name)
                     }
                     GlobalAction::Deactivate { prune } => {
                         cmd::global::deactivate::run(&fs, &layout, &fake_home, prune)

@@ -65,16 +65,16 @@ fn full_cycle_activate_swap_deactivate_prune() {
     );
     write_ns(&aenv_home, "default", b"# Default mode", b"default agent");
 
-    // 1. global use research.
+    // 1. global activate research.
     let out = aenv()
         .env("AENV_HOME", &aenv_home)
         .env("HOME", &fake_home)
-        .args(["global", "use", "research"])
+        .args(["global", "activate", "research"])
         .output()
         .unwrap();
     assert!(
         out.status.success(),
-        "global use research failed: status={:?}, stdout={}, stderr={}",
+        "global activate research failed: status={:?}, stdout={}, stderr={}",
         out.status,
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
@@ -91,7 +91,7 @@ fn full_cycle_activate_swap_deactivate_prune() {
     let out = aenv()
         .env("AENV_HOME", &aenv_home)
         .env("HOME", &fake_home)
-        .args(["global", "use", "default"])
+        .args(["global", "activate", "default"])
         .output()
         .unwrap();
     assert!(

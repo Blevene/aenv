@@ -93,7 +93,7 @@ pub fn compute_material_set<F: Filesystem>(
 /// Compute the user-scope material set for `leaf` without writing anything.
 ///
 /// Symmetric to [`compute_material_set`], but filters candidates to
-/// [`Scope::User`] so the returned set covers only what `aenv global use` would
+/// [`Scope::User`] so the returned set covers only what `aenv global activate` would
 /// materialize. Returns an empty entry list (with the resolved-parameter map
 /// still populated) when the namespace has no user-scope candidates — that is
 /// not an error.

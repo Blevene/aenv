@@ -270,7 +270,7 @@ On the next `aenv activate`, the skill materializes at `.claude/skills/aenv/SKIL
 
 ## Global namespaces
 
-A namespace can describe two surfaces at once: the project-local one (`CLAUDE.md`, `.cursorrules`, …) and the **user-global** one under `$HOME` (`~/.claude/CLAUDE.md`, `~/.claude/agents/`, `~/.codex/`, …). `aenv global use <ns>` swaps the user surface atomically — one global activation lives per user; activating a new namespace deactivates the prior one in a single transaction.
+A namespace can describe two surfaces at once: the project-local one (`CLAUDE.md`, `.cursorrules`, …) and the **user-global** one under `$HOME` (`~/.claude/CLAUDE.md`, `~/.claude/agents/`, `~/.codex/`, …). `aenv global activate <ns>` swaps the user surface atomically — one global activation lives per user; activating a new namespace deactivates the prior one in a single transaction.
 
 ### Example: a `research` namespace that overrides `~/.claude/`
 
@@ -297,8 +297,10 @@ $EDITOR ~/.aenv/envs/research/aenv.toml
 #   user_files = [".claude/CLAUDE.md", ".claude/agents/explorer.md"]
 
 # Activate globally.
-aenv global use research
-# → Activated 'research' globally — 2 files materialized under /home/you.
+aenv global activate research
+# → Activated 'research' globally in /home/you
+#     + .claude/CLAUDE.md (Replace)
+#     + .claude/agents/explorer.md (Replace)
 #   Note: running harness sessions retain their previous config until restart.
 
 # Inspect.
@@ -310,7 +312,7 @@ aenv global which ~/.claude/CLAUDE.md
 
 ```bash
 aenv global deactivate
-# → Deactivated 'research' globally.
+# → Deactivated namespace 'research' globally in /home/you
 # Original ~/.claude/ contents are restored byte-for-byte.
 ```
 
@@ -318,7 +320,7 @@ aenv global deactivate
 
 `aenv global` swaps files on disk, but already-running harness processes
 (Claude Code, the Codex CLI, etc.) cache their config at startup. As both
-`aenv global use` and `aenv global status` print:
+`aenv global activate` and `aenv global status` print:
 
 > Note: running harness sessions retain their previous config until restart.
 
@@ -328,7 +330,7 @@ Quit and relaunch the harness to pick up the new surface.
 
 | Command | Purpose |
 |---|---|
-| `aenv global use <ns>` | Activate `<ns>` globally; swap out any prior activation. |
+| `aenv global activate <ns>` | Activate `<ns>` globally; swap out any prior activation. |
 | `aenv global deactivate [--prune]` | Restore the pre-activation `$HOME` surface. `--prune` also clears orphan stash dirs. |
 | `aenv global status [--json]` | Show the active namespace + every managed `~/<path>`. |
 | `aenv global which <path>` | "Which namespace manages `~/.claude/foo`?" |
@@ -343,7 +345,7 @@ Quit and relaunch the harness to pick up the new surface.
 aenv use research --global
 ```
 
-`aenv use <ns> --global` is exactly `aenv use <ns> && aenv global use <ns>` — the project gets pinned (no project-scope activation; that still requires `aenv activate`), and the namespace's user-scope files materialize under `$HOME`.
+`aenv use <ns> --global` is exactly `aenv use <ns> && aenv activate && aenv global activate <ns>` — the project gets pinned, project-scope files materialize under the project root, and the namespace's user-scope files materialize under `$HOME`. Both surfaces are fully applied in one command.
 
 See [`pm_docs/walkthrough-global-namespaces.md`](./pm_docs/walkthrough-global-namespaces.md) for a step-by-step tour including the swap-between-namespaces transaction, oversize-CLAUDE.md doctor warnings, and the orphan-stash cleanup flow with `--prune`.
 
