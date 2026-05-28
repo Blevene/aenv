@@ -24,9 +24,21 @@ use std::path::Path;
 ///
 /// Thin wrapper for `Scope::Project`. For user-scope deactivation, call
 /// [`deactivate_namespace_in_scope`] directly with a `RegistryLayout`.
+///
+/// This entry point intentionally skips `[lifecycle].on_deactivate` because
+/// it doesn't take a `RegistryLayout` (and so can't resolve the namespace's
+/// manifest). Project-scope callers that need lifecycle hooks should route
+/// through [`deactivate_namespace_in_scope`] instead.
 pub fn deactivate_namespace<F: Filesystem>(fs: &F, project_root: &Path) -> Result<String> {
     let state_path = project_root.join(".aenv-state/state.json");
-    deactivate_with_state_path(fs, &state_path, project_root, crate::scope::Scope::Project)
+    deactivate_with_state_path(
+        fs,
+        None,
+        &state_path,
+        project_root,
+        crate::scope::Scope::Project,
+        false,
+    )
 }
 
 /// Scope-aware deactivation. For [`Scope::Project`](crate::scope::Scope::Project),
@@ -41,11 +53,33 @@ pub fn deactivate_namespace<F: Filesystem>(fs: &F, project_root: &Path) -> Resul
 /// `<target_root>/.aenv-state/backup/<ts>/` and user-scope backups live
 /// under `<aenv_home>/global-stash/<ts>/`. The rename logic does not need
 /// to distinguish the two: it operates on absolute paths as recorded.
+///
+/// Thin wrapper that omits the `--force` argument; equivalent to
+/// `deactivate_namespace_in_scope_with_force(fs, layout, target_root, scope, false)`.
 pub fn deactivate_namespace_in_scope<F: Filesystem>(
     fs: &F,
     layout: &RegistryLayout,
     target_root: &Path,
     scope: crate::scope::Scope,
+) -> Result<String> {
+    deactivate_namespace_in_scope_with_force(fs, layout, target_root, scope, false)
+}
+
+/// Scope-aware deactivation with explicit `--force` plumbing.
+///
+/// When `force == true` the `[lifecycle].on_deactivate` hook is skipped
+/// entirely (with a one-line note printed if a hook is declared). When
+/// `force == false`, an `on_deactivate` declared in the namespace's
+/// manifest runs best-effort — a non-zero exit logs a warning to stderr
+/// and deactivation continues with file restoration. This keeps the user
+/// recoverable even if their hook script has broken or its dependencies
+/// have gone away.
+pub fn deactivate_namespace_in_scope_with_force<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    target_root: &Path,
+    scope: crate::scope::Scope,
+    force: bool,
 ) -> Result<String> {
     let lock = if scope == crate::scope::Scope::User {
         Some(crate::global_lock::acquire_global_lock(
@@ -54,7 +88,7 @@ pub fn deactivate_namespace_in_scope<F: Filesystem>(
     } else {
         None
     };
-    let result = deactivate_in_scope_inner(fs, layout, target_root, scope);
+    let result = deactivate_in_scope_inner(fs, layout, target_root, scope, force);
     if let Some(handle) = lock {
         let _ = crate::global_lock::release_global_lock(handle);
     }
@@ -69,22 +103,30 @@ pub(crate) fn deactivate_in_scope_inner<F: Filesystem>(
     layout: &RegistryLayout,
     target_root: &Path,
     scope: crate::scope::Scope,
+    force: bool,
 ) -> Result<String> {
     let state_path = match scope {
         crate::scope::Scope::Project => target_root.join(".aenv-state/state.json"),
         crate::scope::Scope::User => layout.global_state_path(),
     };
-    deactivate_with_state_path(fs, &state_path, target_root, scope)
+    deactivate_with_state_path(fs, Some(layout), &state_path, target_root, scope, force)
 }
 
 /// Core deactivation routine: same logic for both scopes, parameterized by
 /// where the state file lives, where managed files are anchored, and which
 /// scope-specific cleanup to do at the end.
+///
+/// `layout` is `Some` for callers that can resolve namespace manifests (the
+/// in-scope wrappers) and `None` for the legacy project-scope
+/// [`deactivate_namespace`] entry point. `None` => skip `on_deactivate` —
+/// without a layout there's no way to find the script anyway.
 fn deactivate_with_state_path<F: Filesystem>(
     fs: &F,
+    layout: Option<&RegistryLayout>,
     state_path: &Path,
     target_root: &Path,
     scope: crate::scope::Scope,
+    force: bool,
 ) -> Result<String> {
     if !fs.exists(state_path)? {
         return Err(AenvError::ActivationConflict(format!(
@@ -97,6 +139,53 @@ fn deactivate_with_state_path<F: Filesystem>(
         .map_err(|e| AenvError::ManifestInvalid(format!("state.json: not utf-8: {e}")))?;
     let state = ActivationState::from_json(text)?;
     let active_namespace = state.active_namespace.clone();
+
+    // Lifecycle: on_deactivate runs best-effort, BEFORE we remove anything
+    // from the project, so the script sees the materialized layout it was
+    // designed to tear down. Only fires when activation actually ran a
+    // lifecycle script (`lifecycle_ran == true`) — if there was no
+    // on_activate to set things up, there's nothing for on_deactivate to
+    // undo. `--force` skips the entire block: when the user is wedged and
+    // just needs the files gone, the hook is the one thing standing in the
+    // way that we can safely bypass.
+    if let (true, Some(layout)) = (state.lifecycle_ran, layout) {
+        if let Ok(leaf_id) = crate::identity::NamespaceId::new(state.active_namespace.as_str()) {
+            if let Ok(manifest) = crate::activate::load_leaf_manifest(fs, layout, &leaf_id) {
+                if let Some(script_rel) = manifest.lifecycle.on_deactivate.as_deref() {
+                    if force {
+                        eprintln!("--force: skipping on_deactivate.");
+                    } else {
+                        let script_path = layout.namespace_dir(leaf_id.as_str()).join(script_rel);
+                        if fs.exists(&script_path).unwrap_or(false) {
+                            if let Err(e) = crate::activate::run_lifecycle_script_external(
+                                &script_path,
+                                target_root,
+                                layout,
+                                &leaf_id,
+                                scope,
+                                crate::activate::LifecycleEventExt::Deactivate,
+                                false,
+                            ) {
+                                eprintln!(
+                                    "warning: on_deactivate failed for '{}': {e}; continuing with file restoration",
+                                    state.active_namespace
+                                );
+                            }
+                        } else {
+                            eprintln!(
+                                "warning: on_deactivate script '{script_rel}' missing for '{}'; skipping",
+                                state.active_namespace
+                            );
+                        }
+                    }
+                }
+            }
+            // If the manifest can't be loaded (e.g. namespace was deleted
+            // while active), proceed to file restoration without running
+            // on_deactivate — leaving the user stuck with materialized files
+            // would be worse than skipping a hook that's already orphaned.
+        }
+    }
 
     // Remove materialized files first.
     for file in &state.managed_files {

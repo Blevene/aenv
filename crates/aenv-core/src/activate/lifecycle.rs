@@ -21,12 +21,9 @@ use std::path::Path;
 use std::process::Command;
 
 /// Which lifecycle boundary is running. Affects the `AENV_LIFECYCLE_EVENT`
-/// env var the script sees; callers handle exit-status semantics.
-///
-/// `Deactivate` is reserved for Task 11 (deactivate hook); declared now so
-/// the env-var contract is stable across both directions.
+/// env var the script sees; callers handle exit-status semantics
+/// (activate rolls back on failure; deactivate warns and continues).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
 pub(crate) enum LifecycleEvent {
     Activate,
     Deactivate,

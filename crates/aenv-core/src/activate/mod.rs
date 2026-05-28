@@ -12,8 +12,11 @@
 //! in reverse (best-effort) before the error bubbles, leaving the project as
 //! we found it (R-63).
 
-mod lifecycle;
+pub(crate) mod lifecycle;
 mod phase1;
+
+pub(crate) use lifecycle::run_lifecycle_script as run_lifecycle_script_external;
+pub(crate) use lifecycle::LifecycleEvent as LifecycleEventExt;
 
 use crate::adapter::AdapterRegistry;
 use crate::error::{AenvError, Result};
@@ -237,6 +240,7 @@ fn swap_or_activate_user_inner<F: Filesystem>(
             layout,
             target_root,
             crate::scope::Scope::User,
+            false,
         )?;
         Some(state.active_namespace)
     } else {
