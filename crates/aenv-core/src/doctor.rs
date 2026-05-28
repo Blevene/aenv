@@ -119,6 +119,19 @@ pub fn evaluate<F: Filesystem>(
     // activation — the F5 lockout class.
     outcomes.extend(synthesize_preflight_outcomes(fs, target_root, resolved));
 
+    // Synthetic policy: `copy_mode_local_edits`. Compares each Copy-strategy
+    // managed file's current on-disk bytes against the resolved expected
+    // bytes; warns when the user has edited the target since the last
+    // activation. Advisory only (no Fail status); requires that the active
+    // global state describes the namespace being doctored.
+    outcomes.extend(synthesize_copy_drift_outcomes(
+        fs,
+        layout,
+        adapters,
+        target_root,
+        resolved,
+    ));
+
     DoctorReport {
         chain: resolved.chain.clone(),
         policies: effective_policies,
@@ -178,6 +191,106 @@ fn synthesize_preflight_outcomes<F: Filesystem>(
         ));
     }
     out
+}
+
+/// Build `copy_mode_local_edits` outcomes by comparing each Copy-strategy
+/// managed file's current on-disk bytes to the resolved expected bytes.
+///
+/// Returns no outcomes if there is no active global state file, if the
+/// active state describes a different namespace than the one being doctored,
+/// or if the resolved namespace has no Copy-strategy managed files. Each
+/// divergent file produces one `Warn` outcome.
+///
+/// The synthesized target is `<leaf-namespace>::~/<path>` so the global
+/// doctor's existing `::~/` user-scope filter (Task 17) admits these
+/// outcomes without special-casing.
+fn synthesize_copy_drift_outcomes<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    adapters: &AdapterRegistry,
+    target_root: &Path,
+    resolved: &ResolutionResult,
+) -> Vec<PolicyOutcome> {
+    use crate::resolve::MaterializeStrategy;
+
+    // 1. Load active state, if any. The drift class only exists for an
+    //    already-activated namespace; with no state file there's nothing
+    //    to compare against.
+    let state_path = layout.global_state_path();
+    if !fs.exists(&state_path).unwrap_or(false) {
+        return Vec::new();
+    }
+    let body = match fs.read(&state_path) {
+        Ok(b) => b,
+        Err(_) => return Vec::new(),
+    };
+    let text = match std::str::from_utf8(&body) {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
+    let state = match crate::state::ActivationState::from_json(text) {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
+
+    // 2. Only fire when the active namespace matches the namespace being
+    //    doctored. Doctor on a non-active namespace is a different question.
+    let leaf = match resolved.chain.last() {
+        Some(l) => l.clone(),
+        None => return Vec::new(),
+    };
+    if state.active_namespace != leaf.as_str() {
+        return Vec::new();
+    }
+
+    // 3. Collect Copy-strategy managed files. Symlink targets don't have
+    //    this drift class (edits flow back to the namespace source).
+    let copy_files: Vec<&crate::state::ManagedFile> = state
+        .managed_files
+        .iter()
+        .filter(|m| matches!(m.strategy, MaterializeStrategy::Copy))
+        .collect();
+    if copy_files.is_empty() {
+        return Vec::new();
+    }
+
+    // 4. Compute expected bytes via the resolved user-scope material set.
+    //    Best-effort: any failure here means we can't tell whether the
+    //    on-disk bytes drifted, so we stay silent rather than guess.
+    let mat = match crate::materialize::compute_material_set_user(fs, layout, adapters, &leaf) {
+        Ok(m) => m,
+        Err(_) => return Vec::new(),
+    };
+
+    // 5. Compare each Copy managed file's on-disk bytes to expected. A
+    //    missing file is a different problem (handled elsewhere); skip it.
+    let mut outcomes = Vec::new();
+    for m in copy_files {
+        let on_disk = target_root.join(&m.path);
+        let actual = match fs.read(&on_disk) {
+            Ok(b) => b,
+            Err(_) => continue,
+        };
+        let expected = match mat.entries().iter().find(|(p, _)| p == &m.path) {
+            Some((_, bytes)) => bytes,
+            None => continue,
+        };
+        if &actual != expected {
+            let label = format!("~/{}", m.path.display());
+            let short = ShortName::new(label.clone())
+                .unwrap_or_else(|_| ShortName::new("copy-target").unwrap());
+            let qn = QualifiedName::new(leaf.clone(), short);
+            outcomes.push(PolicyOutcome::warn(
+                "copy_mode_local_edits",
+                Some(qn),
+                format!(
+                    "{label} has been edited locally since activation; next activation \
+                     will overwrite your edits. Run `aenv global snapshot <name>` first to capture."
+                ),
+            ));
+        }
+    }
+    outcomes
 }
 
 /// Render an absolute settings.json path relative to `target_root` as
