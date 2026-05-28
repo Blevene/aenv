@@ -57,7 +57,7 @@ fn auto_fires_when_manifest_silent_and_oversized() {
         warnings: Vec::new(),
     };
 
-    let report = evaluate(&fs, &layout, &adapters, &resolved);
+    let report = evaluate(&fs, &layout, &adapters, &resolved, &PathBuf::from("/h"));
     // Expect a Warn outcome from the synthesized policy.
     let warns: Vec<_> = report
         .outcomes
@@ -130,7 +130,7 @@ fn does_not_fire_when_manifest_declares_explicitly() {
         warnings: Vec::new(),
     };
 
-    let report = evaluate(&fs, &layout, &adapters, &resolved);
+    let report = evaluate(&fs, &layout, &adapters, &resolved, &PathBuf::from("/h"));
     // The manifest-declared 10_000 limit means 8000 is fine.
     let warns: Vec<_> = report
         .outcomes
@@ -156,7 +156,7 @@ fn does_not_fire_when_no_instructions_role_present() {
         policies: BTreeMap::new(),
         warnings: Vec::new(),
     };
-    let report = evaluate(&fs, &layout, &adapters, &resolved);
+    let report = evaluate(&fs, &layout, &adapters, &resolved, &PathBuf::from("/h"));
     assert!(
         !report.policies.contains_key("instructions_max_chars"),
         "no instructions files → no auto-fire"

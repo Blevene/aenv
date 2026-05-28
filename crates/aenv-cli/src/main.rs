@@ -698,6 +698,7 @@ fn main() -> ExitCode {
                             &fs,
                             &layout,
                             &adapters,
+                            &fake_home,
                             namespace.as_deref(),
                             json,
                         )

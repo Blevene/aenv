@@ -12,11 +12,12 @@
 use crate::adapter::AdapterRegistry;
 use crate::fs::Filesystem;
 use crate::home::RegistryLayout;
-use crate::identity::NamespaceId;
+use crate::identity::{NamespaceId, QualifiedName, ShortName};
 use crate::policies::builtin::{dispatch, OutcomeStatus, PolicyContext, PolicyOutcome};
 use crate::policies::ResolvedPolicy;
 use crate::resolve::ResolutionResult;
 use std::collections::BTreeMap;
+use std::path::Path;
 
 /// The product of evaluating every policy against a resolved namespace.
 #[derive(Debug, Clone)]
@@ -78,11 +79,20 @@ impl DoctorReport {
 }
 
 /// Evaluate every policy in `resolved.policies` against `resolved.candidates`.
+///
+/// `target_root` is the activation root that the synthetic `hook_paths_resolvable`
+/// pre-flight check uses to resolve `$HOME` / `$AENV_TARGET_ROOT` references in
+/// settings.json command strings. Project-side doctor passes the project root;
+/// global doctor passes `$HOME`; the activator passes whatever scope it's
+/// activating into. Callers who don't care about the pre-flight check (mostly
+/// older test fixtures) may pass any path — settings.json without
+/// command-shaped paths simply produces no `hook_paths_resolvable` outcomes.
 pub fn evaluate<F: Filesystem>(
     fs: &F,
     layout: &RegistryLayout,
     adapters: &AdapterRegistry,
     resolved: &ResolutionResult,
+    target_root: &Path,
 ) -> DoctorReport {
     let mut effective_policies = resolved.policies.clone();
     if !effective_policies.contains_key("instructions_max_chars") {
@@ -101,10 +111,82 @@ pub fn evaluate<F: Filesystem>(
     for (key, policy) in &effective_policies {
         outcomes.extend(dispatch(key, policy, &ctx));
     }
+
+    // Synthetic policy: `hook_paths_resolvable`. Auto-fires for every
+    // settings.json candidate; never declared by manifests; advisory only
+    // (no Fail status, never blocks activation). Surfaces hook / MCP /
+    // statusLine command paths that wouldn't resolve on disk after
+    // activation — the F5 lockout class.
+    outcomes.extend(synthesize_preflight_outcomes(fs, target_root, resolved));
+
     DoctorReport {
         chain: resolved.chain.clone(),
         policies: effective_policies,
         outcomes,
+    }
+}
+
+/// Build `hook_paths_resolvable` outcomes from a pre-flight scan.
+///
+/// One `Warn` per missing path. `target` carries a synthesized qualified name
+/// of the form `<leaf-ns>::<rendered-settings-path>` so it renders in the
+/// existing doctor outputs without special cases. Returns an empty vec if the
+/// scanner finds nothing (or hits a filesystem error — pre-flight is best-effort).
+fn synthesize_preflight_outcomes<F: Filesystem>(
+    fs: &F,
+    target_root: &Path,
+    resolved: &ResolutionResult,
+) -> Vec<PolicyOutcome> {
+    let findings = match crate::preflight::preflight_settings_commands(
+        fs,
+        target_root,
+        &resolved.candidates,
+    ) {
+        Ok(v) => v,
+        Err(_) => return Vec::new(),
+    };
+    if findings.is_empty() {
+        return Vec::new();
+    }
+    let leaf = resolved
+        .chain
+        .last()
+        .cloned()
+        .unwrap_or_else(|| NamespaceId::new("(synthesized)").unwrap());
+    let mut out = Vec::with_capacity(findings.len());
+    for f in findings {
+        // Render the settings path as `~/path` for user-scope target roots
+        // (matches the existing `target_label` convention). Anything else
+        // renders as the absolute display.
+        let target_label = render_target_under_root(&f.settings_path, target_root);
+        // Construct a `QualifiedName`. If `target_label` is rejected by the
+        // ShortName validator (contains "::") fall back to an opaque label;
+        // shouldn't happen for filesystem paths in practice.
+        let short = ShortName::new(target_label.clone())
+            .unwrap_or_else(|_| ShortName::new("settings.json").unwrap());
+        let qn = QualifiedName::new(leaf.clone(), short);
+        out.push(PolicyOutcome::warn(
+            "hook_paths_resolvable",
+            Some(qn),
+            format!(
+                "{} hook in {} references {} (missing). Hint: run the namespace's install \
+                 procedure (e.g. on_activate) or declare the runtime path in user_files.",
+                f.kind.as_label(),
+                target_label,
+                f.missing_path.display(),
+            ),
+        ));
+    }
+    out
+}
+
+/// Render an absolute settings.json path relative to `target_root` as
+/// `~/<rest>` when target_root is a prefix; otherwise return its display.
+fn render_target_under_root(settings_path: &Path, target_root: &Path) -> String {
+    if let Ok(rel) = settings_path.strip_prefix(target_root) {
+        format!("~/{}", rel.display())
+    } else {
+        settings_path.display().to_string()
     }
 }
 

@@ -16,6 +16,7 @@ pub fn run<F: Filesystem>(
     fs: &F,
     layout: &RegistryLayout,
     adapters: &AdapterRegistry,
+    fake_home: &std::path::Path,
     namespace: Option<&str>,
     json: bool,
 ) -> Result<()> {
@@ -82,7 +83,10 @@ pub fn run<F: Filesystem>(
     let leaf = NamespaceId::new(ns_name.as_str())
         .map_err(|e| AenvError::ManifestInvalid(e.to_string()))?;
     let resolution = aenv_core::resolve::resolve_namespace(fs, layout, adapters, &leaf)?;
-    let report = aenv_core::doctor::evaluate(fs, layout, adapters, &resolution);
+    // Pre-flight resolves $HOME / $AENV_TARGET_ROOT against `$HOME` for the
+    // global-scope doctor invocation. `fake_home` is the test-overridable
+    // alias for $HOME used throughout the global surface.
+    let report = aenv_core::doctor::evaluate(fs, layout, adapters, &resolution, fake_home);
 
     // Filter to user-scope outcomes. The QualifiedName display form is
     // `<ns>::<short>`; user-scope ShortNames carry the `~/` prefix per the

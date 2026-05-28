@@ -41,7 +41,10 @@ pub fn run<F: Filesystem>(
 
     let leaf = NamespaceId::new(&leaf_name)?;
     let resolved = resolve_namespace(fs, layout, adapters, &leaf)?;
-    let report = aenv_core::doctor::evaluate(fs, layout, adapters, &resolved);
+    // Project-side: pre-flight resolves $HOME / $AENV_TARGET_ROOT against the
+    // project root. Project-scope settings.json files (rare) tend to use
+    // project-relative paths, so this is the right anchor.
+    let report = aenv_core::doctor::evaluate(fs, layout, adapters, &resolved, project_root);
 
     if json {
         let report_json = aenv_core::json::DoctorReportJson::from_report(&leaf_name, &report);

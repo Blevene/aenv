@@ -74,7 +74,7 @@ fn instructions_budget_narrows_effective_limit() {
         warnings: Vec::new(),
     };
 
-    let report = evaluate(&fs, &layout, &adapters, &resolved);
+    let report = evaluate(&fs, &layout, &adapters, &resolved, &PathBuf::from("/h"));
     // 4000 chars > 3000 effective limit (budget narrows from 5000 to 3000).
     let fails: Vec<_> = report
         .outcomes

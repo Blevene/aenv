@@ -76,8 +76,9 @@ pub fn activate_namespace_in_scope<F: Filesystem>(
 
     // PRD R-74 / R-82: run doctor before materializing anything. If any enforced
     // policy is violated, abort with PolicyViolation (exit 17) so the project
-    // stays exactly as we found it (R-63).
-    let report = crate::doctor::evaluate(fs, layout, adapters, &resolution);
+    // stays exactly as we found it (R-63). The pre-flight check inside doctor
+    // resolves env vars against the activation target_root.
+    let report = crate::doctor::evaluate(fs, layout, adapters, &resolution, target_root);
     if report.has_enforce_violations() {
         let mut details: Vec<String> = Vec::new();
         for o in &report.outcomes {

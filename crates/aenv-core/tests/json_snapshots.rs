@@ -442,7 +442,8 @@ fn doctor_report_via_builder() {
     let rr = aenv_core::resolve::resolve_namespace(&fs, &layout, &adapters, &leaf)
         .map_err(aenv_core::AenvError::from)
         .unwrap();
-    let report = aenv_core::doctor::evaluate(&fs, &layout, &adapters, &rr);
+    let target_root = std::path::PathBuf::from("/tmp/json-snapshots-doctor");
+    let report = aenv_core::doctor::evaluate(&fs, &layout, &adapters, &rr, &target_root);
     let report_json = DoctorReportJson::from_report("leaf", &report);
     insta::assert_json_snapshot!(report_json);
 }

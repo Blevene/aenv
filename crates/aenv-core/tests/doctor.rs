@@ -69,7 +69,7 @@ fn clean_report_when_all_pass() {
         warnings: Vec::new(),
     };
 
-    let report = evaluate(&fs, &layout, &adapters, &resolved);
+    let report = evaluate(&fs, &layout, &adapters, &resolved, &PathBuf::from("/h"));
     assert!(!report.has_enforce_violations());
     assert_eq!(report.fail_count(), 0);
     assert!(report
@@ -113,7 +113,7 @@ fn enforce_violation_is_flagged() {
         warnings: Vec::new(),
     };
 
-    let report = evaluate(&fs, &layout, &adapters, &resolved);
+    let report = evaluate(&fs, &layout, &adapters, &resolved, &PathBuf::from("/h"));
     assert!(report.has_enforce_violations());
     assert_eq!(report.fail_count(), 1);
     let summary = report.summary_line();
@@ -133,7 +133,7 @@ fn empty_policies_means_pass() {
         warnings: Vec::new(),
     };
 
-    let report = evaluate(&fs, &layout, &adapters, &resolved);
+    let report = evaluate(&fs, &layout, &adapters, &resolved, &PathBuf::from("/h"));
     assert!(!report.has_enforce_violations());
     assert!(report.outcomes.is_empty());
 }
@@ -150,7 +150,7 @@ fn report_records_chain_and_namespace_count() {
         policies: BTreeMap::new(),
         warnings: Vec::new(),
     };
-    let report: DoctorReport = evaluate(&fs, &layout, &adapters, &resolved);
+    let report: DoctorReport = evaluate(&fs, &layout, &adapters, &resolved, &PathBuf::from("/h"));
     assert_eq!(report.chain.len(), 2);
     assert_eq!(report.chain[1].as_str(), "leaf");
 }
