@@ -122,17 +122,27 @@ pub fn snapshot_global<F: Filesystem>(
         if !fs.exists(&src)? {
             continue;
         }
-        let kind = fs.symlink_metadata(&src)?.kind;
+        let raw_kind = fs.symlink_metadata(&src)?.kind;
+        // A symlink could point at a file or a directory. Resolve to the
+        // target's kind so we don't try `read()` on a symlinked dir
+        // (kernel returns EISDIR). Broken symlinks are skipped with a warn.
+        let kind = match raw_kind {
+            FileKind::Symlink => match fs.metadata(&src) {
+                Ok(m) => Some(m.kind),
+                Err(_) => None,
+            },
+            other => Some(other),
+        };
         let dst = user_root.join(lookup_rel);
         match kind {
-            FileKind::File | FileKind::Symlink => {
-                // Symlinks: capture resolved content as a regular file.
+            Some(FileKind::File) | Some(FileKind::Symlink) => {
+                // File (or symlink-of-symlink edge case): capture bytes.
                 let bytes = fs.read(&src)?;
                 fs.write(&dst, &bytes)?;
                 summary.files_copied += 1;
                 captured.push(lookup_rel.to_string());
             }
-            FileKind::Directory => {
+            Some(FileKind::Directory) => {
                 // Recursive copy is bounded by the contents — we don't fold
                 // its individual files into `files_copied`; the directory
                 // itself counts as one "directory captured" unit.
@@ -143,6 +153,12 @@ pub fn snapshot_global<F: Filesystem>(
                 // accepts both for trailing-slash-trimmed entries.
                 let suffix = if cand.ends_with('/') { "/" } else { "" };
                 captured.push(format!("{lookup_rel}{suffix}"));
+            }
+            None => {
+                eprintln!(
+                    "warning: skipping broken symlink at {} during snapshot",
+                    src.display()
+                );
             }
         }
     }
@@ -547,17 +563,31 @@ fn copy_dir_all<F: Filesystem>(fs: &F, src: &Path, dst: &Path) -> Result<usize> 
             None => continue,
         };
         let dst_path = dst.join(PathBuf::from(&file_name));
-        // Use symlink_metadata so a symlinked child shows up as Symlink,
-        // letting us deref via `read` (which follows symlinks).
-        let meta = fs.symlink_metadata(&entry)?;
-        match meta.kind {
-            FileKind::Directory => {
+        // symlink_metadata so we can detect Symlink first; then resolve
+        // the target's kind so a symlink → directory recurses correctly
+        // instead of hitting EISDIR on read.
+        let raw = fs.symlink_metadata(&entry)?;
+        let kind = match raw.kind {
+            FileKind::Symlink => match fs.metadata(&entry) {
+                Ok(m) => Some(m.kind),
+                Err(_) => None,
+            },
+            other => Some(other),
+        };
+        match kind {
+            Some(FileKind::Directory) => {
                 count += copy_dir_all(fs, &entry, &dst_path)?;
             }
-            FileKind::File | FileKind::Symlink => {
+            Some(FileKind::File) | Some(FileKind::Symlink) => {
                 let bytes = fs.read(&entry)?;
                 fs.write(&dst_path, &bytes)?;
                 count += 1;
+            }
+            None => {
+                eprintln!(
+                    "warning: skipping broken symlink at {} during snapshot",
+                    entry.display()
+                );
             }
         }
     }
