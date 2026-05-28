@@ -38,6 +38,7 @@ fn ad(name: &str, params: Vec<(&str, AdapterParameterType)>) -> Adapter {
         user_merge_strategies: BTreeMap::new(),
         user_soft_limits: BTreeMap::new(),
         user_skills_dir: None,
+        materialize: None,
     }
 }
 

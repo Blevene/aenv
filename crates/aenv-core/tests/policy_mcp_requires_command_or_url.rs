@@ -31,6 +31,7 @@ fn make_adapters() -> AdapterRegistry {
         user_merge_strategies: BTreeMap::new(),
         user_soft_limits: BTreeMap::new(),
         user_skills_dir: None,
+        materialize: None,
     });
     adapters
 }
@@ -46,6 +47,7 @@ fn make_resolved(ns_name: &str, source: PathBuf) -> ResolutionResult {
             merge_override: None,
             skill_provenance: None,
             scope: aenv_core::scope::Scope::Project,
+            adapter_materialize_override: None,
         }],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
@@ -189,6 +191,7 @@ fn skips_non_mcp_files() {
         user_merge_strategies: BTreeMap::new(),
         user_soft_limits: BTreeMap::new(),
         user_skills_dir: None,
+        materialize: None,
     });
     let resolved = ResolutionResult {
         chain: vec![ns("base")],
@@ -200,6 +203,7 @@ fn skips_non_mcp_files() {
             merge_override: None,
             skill_provenance: None,
             scope: aenv_core::scope::Scope::Project,
+            adapter_materialize_override: None,
         }],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),

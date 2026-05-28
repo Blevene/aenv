@@ -2,7 +2,8 @@
 //! the materialization strategy.
 //!
 //! Priority order:
-//!   1. Single candidate     -> Symlink (Identical decided at activation time)
+//!   1. Single candidate     -> namespace `materialize` override > adapter
+//!      `materialize` > Symlink (Identical decided at activation time)
 //!   2. Manifest override    -> the named strategy on the latest candidate wins
 //!   3. Adapter role         -> "instructions" => SectionMerge
 //!   4. Adapter default_merge -> "deep" => DeepMerge(format-from-extension)
@@ -17,7 +18,8 @@ use crate::AenvError;
 /// Decide the materialization strategy for a set of candidates for a single path.
 ///
 /// The decision tree follows a priority order:
-/// 1. Single candidate → `Symlink`
+/// 1. Single candidate → namespace `materialize` override (if any), then
+///    adapter `materialize` (if any), then `Symlink`
 /// 2. Manifest override on the latest candidate → use the specified strategy
 /// 3. Adapter role ("instructions") → `SectionMerge`
 /// 4. Adapter default_merge ("deep") → `DeepMerge(format-from-extension)`
@@ -32,6 +34,18 @@ pub fn decide_strategy(
         ));
     }
     if candidates.len() == 1 {
+        let candidate = &candidates[0];
+        // Precedence: namespace materialize_override > adapter materialize >
+        // Symlink default. (Per-file `merge` overrides apply only to the
+        // multi-candidate branch, where merging is meaningful.)
+        if let Some(override_str) = &candidate.adapter_materialize_override {
+            return resolve_materialize_string(override_str);
+        }
+        if let Some(adapter) = adapters.get(&candidate.adapter) {
+            if let Some(materialize) = adapter.materialize.as_deref() {
+                return resolve_materialize_string(materialize);
+            }
+        }
         return Ok(MaterializeStrategy::Symlink);
     }
 
@@ -69,6 +83,20 @@ pub fn decide_strategy(
     }
 
     Ok(MaterializeStrategy::Symlink)
+}
+
+/// Resolve a `materialize = "..."` adapter / namespace setting into a
+/// `MaterializeStrategy`. Unknown values surface as `ManifestInvalid` (exit 12)
+/// so manifest authors see the failure rather than silently falling through to
+/// symlink semantics.
+fn resolve_materialize_string(s: &str) -> Result<MaterializeStrategy, AenvError> {
+    match s {
+        "symlink" => Ok(MaterializeStrategy::Symlink),
+        "copy" => Ok(MaterializeStrategy::Copy),
+        other => Err(AenvError::ManifestInvalid(format!(
+            "unknown materialize strategy '{other}'; expected 'symlink' or 'copy'"
+        ))),
+    }
 }
 
 fn strategy_from_name(name: &str, path: &Path) -> Result<MaterializeStrategy, AenvError> {

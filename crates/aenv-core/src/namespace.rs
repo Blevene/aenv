@@ -165,6 +165,7 @@ pub fn create_namespace_from_project<F: Filesystem>(
                     merge: None,
                     user_files: Vec::new(),
                     user_merge: None,
+                    materialize: None,
                 },
             );
         }

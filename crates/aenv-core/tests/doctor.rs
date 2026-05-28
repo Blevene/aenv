@@ -31,6 +31,7 @@ fn claude_adapter() -> Adapter {
         user_merge_strategies: BTreeMap::new(),
         user_soft_limits: BTreeMap::new(),
         user_skills_dir: None,
+        materialize: None,
     }
 }
 
@@ -56,6 +57,7 @@ fn clean_report_when_all_pass() {
             scope: aenv_core::scope::Scope::Project,
             merge_override: None,
             skill_provenance: None,
+            adapter_materialize_override: None,
         }],
         parameters: BTreeMap::new(),
         policies: BTreeMap::from([(
@@ -100,6 +102,7 @@ fn enforce_violation_is_flagged() {
             scope: aenv_core::scope::Scope::Project,
             merge_override: None,
             skill_provenance: None,
+            adapter_materialize_override: None,
         }],
         parameters: BTreeMap::new(),
         policies: BTreeMap::from([(

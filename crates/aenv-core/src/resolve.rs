@@ -122,6 +122,10 @@ pub struct Candidate {
     pub merge_override: Option<String>,
     /// Skill provenance for skill SKILL.md files. `None` for regular files.
     pub skill_provenance: Option<SkillProvenance>,
+    /// Per-namespace override of the adapter's `materialize` setting.
+    /// Pulled from `[adapters.<name>] materialize = "copy"` in the namespace
+    /// manifest. `None` means "use the adapter default" (or symlink).
+    pub adapter_materialize_override: Option<String>,
 }
 
 /// Output of `resolve_namespace`.
@@ -407,6 +411,7 @@ fn gather_candidates<F: Filesystem>(
                                 .as_ref()
                                 .and_then(|m| m.get(&literal).cloned()),
                             skill_provenance: None,
+                            adapter_materialize_override: entry.materialize.clone(),
                         })
                     });
             } else {
@@ -436,6 +441,7 @@ fn gather_candidates<F: Filesystem>(
                         .as_ref()
                         .and_then(|m| m.get(rel).or_else(|| m.get(trimmed)).cloned()),
                     skill_provenance: None,
+                    adapter_materialize_override: entry.materialize.clone(),
                 });
             }
         }
@@ -458,6 +464,7 @@ fn gather_candidates<F: Filesystem>(
                                 .as_ref()
                                 .and_then(|m| m.get(&literal).cloned()),
                             skill_provenance: None,
+                            adapter_materialize_override: entry.materialize.clone(),
                         })
                     });
             } else {
@@ -474,6 +481,7 @@ fn gather_candidates<F: Filesystem>(
                         .as_ref()
                         .and_then(|m| m.get(rel).or_else(|| m.get(trimmed)).cloned()),
                     skill_provenance: None,
+                    adapter_materialize_override: entry.materialize.clone(),
                 });
             }
         }
@@ -593,6 +601,7 @@ fn gather_skill_candidates<F: Filesystem>(
                         scope: crate::scope::Scope::Project,
                         merge_override: None,
                         skill_provenance,
+                        adapter_materialize_override: None,
                     });
                 }
             }
@@ -631,6 +640,7 @@ fn gather_skill_candidates<F: Filesystem>(
                                 scope: crate::scope::Scope::Project,
                                 merge_override: None,
                                 skill_provenance,
+                                adapter_materialize_override: None,
                             });
                         }
                     }

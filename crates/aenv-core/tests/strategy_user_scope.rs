@@ -56,6 +56,7 @@ fn user_candidate(ns_name: &str, path: &str) -> Candidate {
         merge_override: None,
         skill_provenance: None,
         scope: Scope::User,
+        adapter_materialize_override: None,
     }
 }
 
@@ -109,6 +110,7 @@ fn project_scope_strategy_unchanged_by_user_branch() {
             merge_override: None,
             skill_provenance: None,
             scope: Scope::Project,
+            adapter_materialize_override: None,
         },
         Candidate {
             namespace: ns("leaf"),
@@ -118,6 +120,7 @@ fn project_scope_strategy_unchanged_by_user_branch() {
             merge_override: None,
             skill_provenance: None,
             scope: Scope::Project,
+            adapter_materialize_override: None,
         },
     ];
     let strategy = decide_strategy(&candidates, &adapters).unwrap();

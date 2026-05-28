@@ -14,6 +14,25 @@ fn cand(ns: &str, path: &str, adapter: &str, override_: Option<&str>) -> Candida
         scope: aenv_core::scope::Scope::Project,
         merge_override: override_.map(std::string::ToString::to_string),
         skill_provenance: None,
+        adapter_materialize_override: None,
+    }
+}
+
+fn cand_with_materialize(
+    ns: &str,
+    path: &str,
+    adapter: &str,
+    materialize: Option<&str>,
+) -> Candidate {
+    Candidate {
+        namespace: NamespaceId::new(ns).unwrap(),
+        path: PathBuf::from(path),
+        source_path: PathBuf::from(format!("/aenv/envs/{ns}/{path}")),
+        adapter: adapter.to_string(),
+        scope: aenv_core::scope::Scope::Project,
+        merge_override: None,
+        skill_provenance: None,
+        adapter_materialize_override: materialize.map(std::string::ToString::to_string),
     }
 }
 
@@ -131,6 +150,108 @@ fn unknown_extension_with_deep_override_errors() {
     reg.insert(toml::from_str(r#"name = "x""#).unwrap());
     let err = decide_strategy(&candidates, &reg).unwrap_err();
     assert!(err.to_string().contains("deep-merge requires"));
+}
+
+#[test]
+fn adapter_materialize_copy_single_candidate_returns_copy() {
+    // An adapter with `materialize = "copy"` and a single candidate must
+    // yield Copy rather than Symlink.
+    let mut reg = AdapterRegistry::default();
+    reg.insert(
+        toml::from_str(
+            r#"
+name = "claude-code"
+files = ["CLAUDE.md"]
+materialize = "copy"
+"#,
+        )
+        .unwrap(),
+    );
+    let strat = decide_strategy(&[cand("base", "CLAUDE.md", "claude-code", None)], &reg).unwrap();
+    assert!(matches!(strat, MaterializeStrategy::Copy));
+}
+
+#[test]
+fn adapter_materialize_unset_single_candidate_returns_symlink() {
+    // Default behaviour unchanged when the adapter doesn't opt in.
+    let strat = decide_strategy(
+        &[cand("base", "CLAUDE.md", "claude-code", None)],
+        &registry(),
+    )
+    .unwrap();
+    assert!(matches!(strat, MaterializeStrategy::Symlink));
+}
+
+#[test]
+fn namespace_materialize_override_takes_precedence_over_adapter() {
+    // Adapter explicitly says "symlink", namespace says "copy" — namespace wins.
+    let mut reg = AdapterRegistry::default();
+    reg.insert(
+        toml::from_str(
+            r#"
+name = "claude-code"
+files = ["CLAUDE.md"]
+materialize = "symlink"
+"#,
+        )
+        .unwrap(),
+    );
+    let strat = decide_strategy(
+        &[cand_with_materialize(
+            "base",
+            "CLAUDE.md",
+            "claude-code",
+            Some("copy"),
+        )],
+        &reg,
+    )
+    .unwrap();
+    assert!(matches!(strat, MaterializeStrategy::Copy));
+}
+
+#[test]
+fn namespace_materialize_unset_falls_through_to_adapter_copy() {
+    // Adapter says "copy", namespace doesn't override — Copy wins.
+    let mut reg = AdapterRegistry::default();
+    reg.insert(
+        toml::from_str(
+            r#"
+name = "claude-code"
+files = ["CLAUDE.md"]
+materialize = "copy"
+"#,
+        )
+        .unwrap(),
+    );
+    let strat = decide_strategy(
+        &[cand_with_materialize(
+            "base",
+            "CLAUDE.md",
+            "claude-code",
+            None,
+        )],
+        &reg,
+    )
+    .unwrap();
+    assert!(matches!(strat, MaterializeStrategy::Copy));
+}
+
+#[test]
+fn unknown_materialize_value_returns_manifest_invalid() {
+    let mut reg = AdapterRegistry::default();
+    reg.insert(
+        toml::from_str(
+            r#"
+name = "claude-code"
+files = ["CLAUDE.md"]
+materialize = "telepathy"
+"#,
+        )
+        .unwrap(),
+    );
+    let err = decide_strategy(&[cand("base", "CLAUDE.md", "claude-code", None)], &reg).unwrap_err();
+    assert!(matches!(err, aenv_core::AenvError::ManifestInvalid(_)));
+    assert!(err.to_string().contains("unknown materialize strategy"));
 }
 
 #[test]

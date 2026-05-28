@@ -28,6 +28,7 @@ fn dummy_adapter() -> Adapter {
         user_merge_strategies: BTreeMap::new(),
         user_soft_limits: BTreeMap::new(),
         user_skills_dir: None,
+        materialize: None,
     }
 }
 
@@ -40,6 +41,7 @@ fn candidate(rel: &str) -> Candidate {
         scope: aenv_core::scope::Scope::Project,
         merge_override: None,
         skill_provenance: None,
+        adapter_materialize_override: None,
     }
 }
 

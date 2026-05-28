@@ -59,6 +59,7 @@ fn registry_insert_then_lookup() {
         user_merge_strategies: Default::default(),
         user_soft_limits: Default::default(),
         user_skills_dir: None,
+        materialize: None,
     };
     reg.insert(a.clone());
     assert_eq!(reg.get("claude-code"), Some(&a));
@@ -208,6 +209,27 @@ instructions = 5000
             .map(String::as_str),
         Some("deep")
     );
+}
+
+#[test]
+fn adapter_materialize_field_parses() {
+    let toml = r#"
+name = "cc"
+files = ["CLAUDE.md"]
+materialize = "copy"
+"#;
+    let a = Adapter::from_toml(toml).unwrap();
+    assert_eq!(a.materialize.as_deref(), Some("copy"));
+}
+
+#[test]
+fn adapter_materialize_default_is_none() {
+    let toml = r#"
+name = "cc"
+files = ["CLAUDE.md"]
+"#;
+    let a = Adapter::from_toml(toml).unwrap();
+    assert!(a.materialize.is_none());
 }
 
 #[test]

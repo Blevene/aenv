@@ -30,6 +30,7 @@ fn registry_with_claude() -> AdapterRegistry {
         user_merge_strategies: Default::default(),
         user_soft_limits: Default::default(),
         user_skills_dir: None,
+        materialize: None,
     });
     r
 }
@@ -197,6 +198,7 @@ fn deactivate_removes_empty_state_directory() {
         user_merge_strategies: Default::default(),
         user_soft_limits: Default::default(),
         user_skills_dir: None,
+        materialize: None,
     });
 
     activate_namespace(
@@ -265,6 +267,7 @@ fn deactivate_prunes_empty_parent_directories() {
         user_merge_strategies: Default::default(),
         user_soft_limits: Default::default(),
         user_skills_dir: None,
+        materialize: None,
     });
 
     // A USER file sitting next to the managed tree must survive deactivate.

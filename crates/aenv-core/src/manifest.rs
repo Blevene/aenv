@@ -94,6 +94,11 @@ pub struct AdapterEntry {
     /// User-scope analog of `merge`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub user_merge: Option<std::collections::BTreeMap<String, String>>,
+    /// Override the adapter's default materialize strategy for this
+    /// namespace. Same values as `Adapter::materialize` (`"symlink"` or
+    /// `"copy"`). Per-file `merge` overrides still take precedence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub materialize: Option<String>,
 }
 
 impl AenvManifest {
@@ -124,6 +129,8 @@ impl AenvManifest {
             user_files: Vec<String>,
             #[serde(default)]
             user_merge: Option<MergeRaw>,
+            #[serde(default)]
+            materialize: Option<String>,
         }
 
         // Stage 1: structural parse into a raw shape that holds parameters as
@@ -157,6 +164,7 @@ impl AenvManifest {
                     merge: merge_raw,
                     user_files,
                     user_merge: user_merge_raw,
+                    materialize,
                 } = raw_entry;
                 let merge = merge_raw.map(|m| match m {
                     MergeRaw::PerFile(map) => map,
@@ -179,6 +187,7 @@ impl AenvManifest {
                         merge,
                         user_files,
                         user_merge,
+                        materialize,
                     },
                 )
             })

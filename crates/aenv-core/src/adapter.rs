@@ -98,6 +98,15 @@ pub struct Adapter {
     /// User-scope analog of `skills_dir`. For claude-code this is `~/.claude/skills`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub user_skills_dir: Option<String>,
+    /// Default materialization strategy for single-candidate decisions.
+    /// `Some("symlink")` (or missing) → symlink to the source.
+    /// `Some("copy")` → write a copy of the source bytes to the target.
+    /// Copy mode trades the silent-edit-through-symlink gotcha for losing
+    /// in-place edits on the next activation. Per-namespace override is
+    /// available via `[adapters.<name>] materialize = "copy"` in the
+    /// namespace manifest (see `AdapterEntry::materialize`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub materialize: Option<String>,
 }
 
 impl Adapter {

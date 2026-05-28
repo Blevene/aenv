@@ -14,6 +14,7 @@ fn cand(ns: &str, path: &str, adapter: &str) -> Candidate {
         scope: aenv_core::scope::Scope::Project,
         merge_override: None,
         skill_provenance: None,
+        adapter_materialize_override: None,
     }
 }
 

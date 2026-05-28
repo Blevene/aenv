@@ -29,6 +29,7 @@ fn make_registry() -> AdapterRegistry {
         user_merge_strategies: BTreeMap::new(),
         user_soft_limits: BTreeMap::new(),
         user_skills_dir: None,
+        materialize: None,
     });
     adapters
 }
@@ -46,6 +47,7 @@ fn skill_candidate(ns_name: &str, skill: &str, source: PathBuf) -> Candidate {
         scope: aenv_core::scope::Scope::Project,
         merge_override: None,
         skill_provenance: None,
+        adapter_materialize_override: None,
     }
 }
 
@@ -255,6 +257,7 @@ fn skips_non_skill_files() {
             merge_override: None,
             skill_provenance: None,
             scope: aenv_core::scope::Scope::Project,
+            adapter_materialize_override: None,
         }],
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),

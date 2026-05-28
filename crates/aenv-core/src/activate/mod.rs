@@ -406,9 +406,26 @@ fn materialize_one<F: Filesystem>(
             });
         }
         MaterializeStrategy::Copy => {
-            return Err(AenvError::ActivationConflict(
-                "Copy strategy is Phase 7 (Windows fallback); not supported in Phase 2".into(),
-            ));
+            let latest = candidates.last().expect("non-empty");
+            let shadows = crate::shadow::compute_shadows(candidates, strategy, adapters)?;
+            let qn = crate::shadow::qualified_from_candidate(latest)?;
+            let short = ShortName::new(path.to_string_lossy().to_string())
+                .map_err(|e| AenvError::ManifestInvalid(format!("short name: {e}")))?;
+            phase1::materialize_copy(
+                fs,
+                project_root,
+                backup_root,
+                &project_path,
+                &latest.source_path,
+                qn.namespace(),
+                &short,
+                path,
+                shadows,
+                latest.skill_provenance.clone(),
+                undo_log,
+                managed,
+                backed_up,
+            )?;
         }
         MaterializeStrategy::Merged => {
             return Err(AenvError::ActivationConflict(

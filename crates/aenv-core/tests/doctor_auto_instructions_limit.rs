@@ -37,6 +37,7 @@ fn auto_fires_when_manifest_silent_and_oversized() {
         user_merge_strategies: BTreeMap::new(),
         user_soft_limits: BTreeMap::new(),
         user_skills_dir: None,
+        materialize: None,
     });
     let layout = RegistryLayout::new(PathBuf::from("/h"));
 
@@ -50,6 +51,7 @@ fn auto_fires_when_manifest_silent_and_oversized() {
             scope: aenv_core::scope::Scope::Project,
             merge_override: None,
             skill_provenance: None,
+            adapter_materialize_override: None,
         }],
         parameters: BTreeMap::new(),
         // CRITICAL: no policy declared. R-24 says we should still warn.
@@ -102,6 +104,7 @@ fn does_not_fire_when_manifest_declares_explicitly() {
         user_merge_strategies: BTreeMap::new(),
         user_soft_limits: BTreeMap::new(),
         user_skills_dir: None,
+        materialize: None,
     });
     let layout = RegistryLayout::new(PathBuf::from("/h"));
 
@@ -124,6 +127,7 @@ fn does_not_fire_when_manifest_declares_explicitly() {
             scope: aenv_core::scope::Scope::Project,
             merge_override: None,
             skill_provenance: None,
+            adapter_materialize_override: None,
         }],
         parameters: BTreeMap::new(),
         policies,

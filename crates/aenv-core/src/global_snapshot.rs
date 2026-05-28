@@ -163,6 +163,7 @@ pub fn snapshot_global<F: Filesystem>(
                 merge: None,
                 user_files: captured.clone(),
                 user_merge: None,
+                materialize: None,
             },
         );
     }
@@ -390,6 +391,7 @@ pub fn import_global<F: Filesystem>(
                 merge: None,
                 user_files: claude_files,
                 user_merge: None,
+                materialize: None,
             },
         );
     }
@@ -401,6 +403,7 @@ pub fn import_global<F: Filesystem>(
                 merge: None,
                 user_files: codex_files,
                 user_merge: None,
+                materialize: None,
             },
         );
     }

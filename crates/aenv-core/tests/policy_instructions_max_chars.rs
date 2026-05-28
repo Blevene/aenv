@@ -31,6 +31,7 @@ fn make_registry_with_claude() -> AdapterRegistry {
         user_merge_strategies: BTreeMap::new(),
         user_soft_limits: BTreeMap::new(),
         user_skills_dir: None,
+        materialize: None,
     });
     adapters
 }
@@ -50,6 +51,7 @@ fn make_resolution(ns_name: &str, source_path: PathBuf) -> ResolutionResult {
             scope: aenv_core::scope::Scope::Project,
             merge_override: None,
             skill_provenance: None,
+            adapter_materialize_override: None,
         }],
         parameters: std::collections::BTreeMap::new(),
         policies: std::collections::BTreeMap::new(),
@@ -195,6 +197,7 @@ fn skips_non_instructions_files() {
             scope: aenv_core::scope::Scope::Project,
             merge_override: None,
             skill_provenance: None,
+            adapter_materialize_override: None,
         }],
         parameters: std::collections::BTreeMap::new(),
         policies: std::collections::BTreeMap::new(),

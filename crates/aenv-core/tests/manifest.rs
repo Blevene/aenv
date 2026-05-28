@@ -125,6 +125,7 @@ fn adapter_entry_fields_are_publicly_constructible() {
         merge: None,
         user_files: vec![],
         user_merge: None,
+        materialize: None,
     };
     assert_eq!(entry.files.len(), 1);
 }

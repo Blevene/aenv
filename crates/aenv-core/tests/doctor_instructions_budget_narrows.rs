@@ -39,6 +39,7 @@ fn instructions_budget_narrows_effective_limit() {
         user_merge_strategies: BTreeMap::new(),
         user_soft_limits: BTreeMap::new(),
         user_skills_dir: None,
+        materialize: None,
     });
     let layout = RegistryLayout::new(PathBuf::from("/h"));
 
@@ -61,6 +62,7 @@ fn instructions_budget_narrows_effective_limit() {
             scope: aenv_core::scope::Scope::Project,
             merge_override: None,
             skill_provenance: None,
+            adapter_materialize_override: None,
         }],
         parameters,
         policies: BTreeMap::from([(

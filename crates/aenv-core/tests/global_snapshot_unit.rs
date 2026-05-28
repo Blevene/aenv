@@ -36,6 +36,7 @@ fn claude_adapter_with_user_files(user_files: &[&str]) -> Adapter {
         user_merge_strategies: Default::default(),
         user_soft_limits: Default::default(),
         user_skills_dir: None,
+        materialize: None,
     }
 }
 

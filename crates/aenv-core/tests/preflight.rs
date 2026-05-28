@@ -32,6 +32,7 @@ fn settings_candidate(source_path: &Path, target_rel: &str, bytes: &[u8]) -> Can
         scope: Scope::User,
         merge_override: None,
         skill_provenance: None,
+        adapter_materialize_override: None,
     }
 }
 
@@ -187,6 +188,7 @@ fn preflight_skips_paths_being_materialized_this_run() {
         scope: Scope::User,
         merge_override: None,
         skill_provenance: None,
+        adapter_materialize_override: None,
     };
 
     let findings = preflight_settings_commands(
