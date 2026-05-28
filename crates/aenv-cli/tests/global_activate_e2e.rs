@@ -454,3 +454,81 @@ fn activate_without_yes_no_stdin_returns_aborted() {
     // And nothing was activated.
     assert!(!aenv_home.join("global-state.json").exists());
 }
+
+#[test]
+fn global_deactivate_force_skips_failing_on_deactivate() {
+    let tmp = tempdir().unwrap();
+    let aenv_home = std::fs::canonicalize(tmp.path()).unwrap().join(".aenv");
+    let fake_home = std::fs::canonicalize(tmp.path()).unwrap().join("home");
+    std::fs::create_dir_all(&fake_home).unwrap();
+    std::fs::create_dir_all(aenv_home.join("adapters")).unwrap();
+    std::fs::write(
+        aenv_home.join("adapters/claude-code.toml"),
+        r#"name = "claude-code"
+user_files = ["~/.claude/CLAUDE.md"]
+"#,
+    )
+    .unwrap();
+
+    let ns_dir = aenv_home.join("envs/lifecycle-bad");
+    std::fs::create_dir_all(ns_dir.join("user/.claude")).unwrap();
+    std::fs::write(ns_dir.join("user/.claude/CLAUDE.md"), b"x").unwrap();
+    let ok = ns_dir.join("ok.sh");
+    let fail = ns_dir.join("fail.sh");
+    std::fs::write(&ok, "#!/bin/sh\nexit 0\n").unwrap();
+    std::fs::write(
+        &fail,
+        "#!/bin/sh\ntouch \"$AENV_TARGET_ROOT/.deactivate-ran\"\nexit 1\n",
+    )
+    .unwrap();
+    make_executable(&ok);
+    make_executable(&fail);
+    std::fs::write(
+        ns_dir.join("aenv.toml"),
+        r#"name = "lifecycle-bad"
+[adapters.claude-code]
+user_files = [".claude/CLAUDE.md"]
+
+[lifecycle]
+on_activate = "ok.sh"
+on_deactivate = "fail.sh"
+"#,
+    )
+    .unwrap();
+
+    let act = aenv(&aenv_home, &fake_home)
+        .args(["global", "activate", "lifecycle-bad", "--yes"])
+        .output()
+        .unwrap();
+    assert!(
+        act.status.success(),
+        "activate failed: {}",
+        String::from_utf8_lossy(&act.stderr)
+    );
+
+    // With --force, on_deactivate must be skipped, so the sentinel is not
+    // touched. File restoration still completes.
+    let out = aenv(&aenv_home, &fake_home)
+        .args(["global", "deactivate", "--force"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "deactivate --force failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("--force: skipped on_deactivate"),
+        "expected --force note in stdout, got: {stdout}"
+    );
+
+    assert!(
+        !fake_home.join(".deactivate-ran").exists(),
+        "on_deactivate ran despite --force"
+    );
+    assert!(
+        !aenv_home.join("global-state.json").exists(),
+        "state file should be gone after deactivate"
+    );
+}

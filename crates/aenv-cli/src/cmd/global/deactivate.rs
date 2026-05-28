@@ -4,6 +4,10 @@
 //! `prune = true`, also removes orphan stash directories (subdirs of
 //! `<aenv_home>/global-stash/` not referenced by any active state) after
 //! the deactivation. Calling `--prune` against a clean home is a no-op.
+//!
+//! `force = true` skips the namespace's `on_deactivate` lifecycle hook —
+//! useful when the hook itself is broken (e.g. a missing interpreter).
+//! File restoration proceeds either way.
 
 use aenv_core::error::Result;
 use aenv_core::fs::Filesystem;
@@ -14,21 +18,30 @@ pub fn run<F: Filesystem>(
     fs: &F,
     layout: &RegistryLayout,
     fake_home: &Path,
+    force: bool,
     prune: bool,
 ) -> Result<()> {
     if !fs.exists(&layout.global_state_path())? {
         println!("no global activation to deactivate");
     } else {
-        let active = aenv_core::deactivate::deactivate_namespace_in_scope(
+        let active = aenv_core::deactivate::deactivate_namespace_in_scope_with_force(
             fs,
             layout,
             fake_home,
             aenv_core::scope::Scope::User,
+            force,
         )?;
-        println!(
-            "Deactivated namespace '{active}' globally in {}",
-            fake_home.display()
-        );
+        if force {
+            println!(
+                "Deactivated namespace '{active}' globally in {}. (--force: skipped on_deactivate.)",
+                fake_home.display()
+            );
+        } else {
+            println!(
+                "Deactivated namespace '{active}' globally in {}",
+                fake_home.display()
+            );
+        }
     }
 
     if prune {
