@@ -4,14 +4,22 @@
 //! approve the script before it runs. The approval is namespace-scoped
 //! and SHA-pinned: editing the script invalidates the prior approval and
 //! triggers a re-prompt. `--yes` records approval without prompting.
+//!
+//! Before the lifecycle step, a pre-flight scan walks every settings.json
+//! candidate and reports hook / MCP / statusLine command paths that point
+//! at files that don't exist on disk and aren't being materialized by
+//! this activation. If any findings, the user is prompted to continue.
+//! `--yes` answers yes; `--skip-preflight` skips the scan entirely.
 
 use aenv_core::adapter::AdapterRegistry;
 use aenv_core::error::{AenvError, Result};
 use aenv_core::fs::Filesystem;
 use aenv_core::home::RegistryLayout;
 use aenv_core::identity::NamespaceId;
+use std::io::{BufRead, Write};
 use std::path::Path;
 
+#[allow(clippy::fn_params_excessive_bools)]
 pub fn run<F: Filesystem>(
     fs: &F,
     layout: &RegistryLayout,
@@ -19,8 +27,53 @@ pub fn run<F: Filesystem>(
     fake_home: &Path,
     name: &str,
     yes: bool,
+    skip_preflight: bool,
 ) -> Result<()> {
     let leaf = NamespaceId::new(name).map_err(|e| AenvError::ManifestInvalid(e.to_string()))?;
+
+    // Pre-flight: scan settings.json candidates BEFORE prompting for the
+    // lifecycle script. A missing hook target is the F5 lockout class
+    // — surfacing it up front is cheaper than discovering it after the
+    // activation succeeds and hooks deny every subsequent shell call.
+    if !skip_preflight {
+        let resolution = aenv_core::resolve::resolve_namespace(fs, layout, adapters, &leaf)?;
+        let findings = aenv_core::preflight::preflight_settings_commands(
+            fs,
+            fake_home,
+            &resolution.candidates,
+        )?;
+        if !findings.is_empty() {
+            let n = findings.len();
+            eprintln!(
+                "Pre-flight found {n} potential issue{}:",
+                if n == 1 { "" } else { "s" }
+            );
+            for f in &findings {
+                eprintln!(
+                    "  - {} in {}: command '{}' references {} (missing)",
+                    f.kind.as_label(),
+                    f.settings_path.display(),
+                    f.command,
+                    f.missing_path.display(),
+                );
+            }
+            if yes {
+                eprintln!("Continuing because --yes was passed.");
+            } else {
+                eprintln!();
+                eprint!("Continue activation despite missing paths? [y/N]: ");
+                std::io::stderr().flush().map_err(AenvError::Io)?;
+                let stdin = std::io::stdin();
+                let mut line = String::new();
+                stdin.lock().read_line(&mut line).map_err(AenvError::Io)?;
+                let answer = line.trim();
+                if !answer.eq_ignore_ascii_case("y") && !answer.eq_ignore_ascii_case("yes") {
+                    println!("Aborted: pre-flight not approved.");
+                    return Ok(());
+                }
+            }
+        }
+    }
 
     // Inspect the manifest for an `on_activate` hook before doing any work
     // so we can prompt up front. A namespace-scoped, sha-pinned `.approved`

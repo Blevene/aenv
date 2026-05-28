@@ -532,3 +532,134 @@ on_deactivate = "fail.sh"
         "state file should be gone after deactivate"
     );
 }
+
+// --------------------------------------------------------------------------
+// Pre-flight scan (Task 18: --skip-preflight, --yes interaction, decline)
+// --------------------------------------------------------------------------
+
+/// Seed a namespace whose settings.json references a hook command at a
+/// path that doesn't exist anywhere on disk and isn't being materialized.
+/// Use this to drive the pre-flight prompt.
+fn seed_namespace_with_broken_hook(aenv_home: &Path) {
+    std::fs::create_dir_all(aenv_home.join("adapters")).unwrap();
+    std::fs::write(
+        aenv_home.join("adapters/claude-code.toml"),
+        r#"name = "claude-code"
+user_files = ["~/.claude/settings.json"]
+"#,
+    )
+    .unwrap();
+    let ns_dir = aenv_home.join("envs/brokens");
+    std::fs::create_dir_all(ns_dir.join("user/.claude")).unwrap();
+    std::fs::write(
+        ns_dir.join("user/.claude/settings.json"),
+        br#"{
+            "hooks": {
+                "PreToolUse": [
+                    { "hooks": [ { "type": "command",
+                        "command": "/definitely/not/here/policy.sh" } ] }
+                ]
+            }
+        }"#,
+    )
+    .unwrap();
+    std::fs::write(
+        ns_dir.join("aenv.toml"),
+        r#"name = "brokens"
+[adapters.claude-code]
+user_files = [".claude/settings.json"]
+"#,
+    )
+    .unwrap();
+}
+
+#[test]
+fn activate_skip_preflight_succeeds_even_with_missing_hooks() {
+    let tmp = tempdir().unwrap();
+    let aenv_home = std::fs::canonicalize(tmp.path()).unwrap().join(".aenv");
+    let fake_home = std::fs::canonicalize(tmp.path()).unwrap().join("home");
+    std::fs::create_dir_all(&aenv_home).unwrap();
+    std::fs::create_dir_all(&fake_home).unwrap();
+    seed_namespace_with_broken_hook(&aenv_home);
+
+    let out = aenv(&aenv_home, &fake_home)
+        .args(["global", "activate", "brokens", "--yes", "--skip-preflight"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "activate --skip-preflight failed: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    // The pre-flight banner should not appear in stderr when we skip.
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        !stderr.contains("Pre-flight"),
+        "--skip-preflight should suppress the banner: {stderr}"
+    );
+    assert!(aenv_home.join("global-state.json").exists());
+}
+
+#[test]
+fn activate_with_yes_proceeds_silently_through_preflight() {
+    let tmp = tempdir().unwrap();
+    let aenv_home = std::fs::canonicalize(tmp.path()).unwrap().join(".aenv");
+    let fake_home = std::fs::canonicalize(tmp.path()).unwrap().join("home");
+    std::fs::create_dir_all(&aenv_home).unwrap();
+    std::fs::create_dir_all(&fake_home).unwrap();
+    seed_namespace_with_broken_hook(&aenv_home);
+
+    let out = aenv(&aenv_home, &fake_home)
+        .args(["global", "activate", "brokens", "--yes"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "activate --yes (with pre-flight findings) failed: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    // The pre-flight banner SHOULD appear (we want users to see what they
+    // approved with --yes) but the activation succeeds without prompting.
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("Pre-flight found"),
+        "pre-flight banner missing under --yes: {stderr}"
+    );
+    assert!(
+        stderr.contains("/definitely/not/here/policy.sh"),
+        "missing path not surfaced: {stderr}"
+    );
+    assert!(aenv_home.join("global-state.json").exists());
+}
+
+#[test]
+fn activate_without_yes_no_stdin_aborts_on_preflight_findings() {
+    let tmp = tempdir().unwrap();
+    let aenv_home = std::fs::canonicalize(tmp.path()).unwrap().join(".aenv");
+    let fake_home = std::fs::canonicalize(tmp.path()).unwrap().join("home");
+    std::fs::create_dir_all(&aenv_home).unwrap();
+    std::fs::create_dir_all(&fake_home).unwrap();
+    seed_namespace_with_broken_hook(&aenv_home);
+
+    let mut child = aenv(&aenv_home, &fake_home)
+        .args(["global", "activate", "brokens"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    drop(child.stdin.take());
+    let out = child.wait_with_output().unwrap();
+    assert!(
+        out.status.success(),
+        "declining pre-flight is not an error: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("Aborted: pre-flight not approved"),
+        "expected pre-flight abort message, got: {stdout}"
+    );
+    // No activation landed.
+    assert!(!aenv_home.join("global-state.json").exists());
+}

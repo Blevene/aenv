@@ -311,13 +311,21 @@ enum GlobalAction {
     Activate {
         /// Namespace name to activate globally.
         name: String,
-        /// Approve any `[lifecycle].on_activate` script without prompting.
-        /// The approval is recorded as if you had answered "yes" — future
-        /// activations of the same namespace with an unchanged script
-        /// proceed silently. Use with caution: lifecycle scripts run with
-        /// your user privileges.
+        /// Approve any `[lifecycle].on_activate` script without prompting,
+        /// and answer "yes" to the pre-flight prompt. The approval is
+        /// recorded as if you had answered "yes" — future activations of
+        /// the same namespace with an unchanged script proceed silently.
+        /// Use with caution: lifecycle scripts run with your user
+        /// privileges.
         #[arg(long)]
         yes: bool,
+        /// Skip the pre-flight scan that checks settings.json hook / MCP /
+        /// statusLine command paths for files that don't exist on disk.
+        /// Use only when you trust the namespace and know the missing
+        /// paths will be provided some other way (e.g. an on_activate
+        /// script). Without this flag, missing paths trigger a prompt.
+        #[arg(long)]
+        skip_preflight: bool,
     },
     /// Reverse `aenv global activate`: restore stashed originals, delete the
     /// global state file. Exit 0 with a note if no activation is live.
@@ -457,7 +465,15 @@ fn main() -> ExitCode {
                                 "HOME not set; --global requires HOME".into(),
                             )
                         })?;
-                    cmd::global::activate::run(&fs, &layout, &adapters, &fake_home, &name, yes)?;
+                    // `aenv use --global` skips the pre-flight prompt by
+                    // design: the sugar is a single command that pins,
+                    // activates project, and activates global; pausing for
+                    // a prompt in the middle would be surprising. Run the
+                    // explicit `aenv global activate` form if you want the
+                    // pre-flight gate.
+                    cmd::global::activate::run(
+                        &fs, &layout, &adapters, &fake_home, &name, yes, true,
+                    )?;
                 }
                 Ok(())
             }
@@ -672,12 +688,24 @@ fn main() -> ExitCode {
                         )
                     })?;
                 match action {
-                    GlobalAction::Activate { name, yes } => {
+                    GlobalAction::Activate {
+                        name,
+                        yes,
+                        skip_preflight,
+                    } => {
                         let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
                             &fs,
                             &layout.adapters_dir(),
                         )?;
-                        cmd::global::activate::run(&fs, &layout, &adapters, &fake_home, &name, yes)
+                        cmd::global::activate::run(
+                            &fs,
+                            &layout,
+                            &adapters,
+                            &fake_home,
+                            &name,
+                            yes,
+                            skip_preflight,
+                        )
                     }
                     GlobalAction::Deactivate { force, prune } => {
                         cmd::global::deactivate::run(&fs, &layout, &fake_home, force, prune)
