@@ -414,6 +414,42 @@ cd - >/dev/null
 
 ---
 
+## When things go wrong — recovery
+
+The risk with a global activation is that a namespace's `on_activate` hook (or its materialized config — say, a broken Claude Code `pre-tool-use` hook in `settings.json`) can lock you out of every Bash command from inside Claude Code. There are two escape hatches; try them in order.
+
+**Symptom.** Inside Claude Code, every Bash tool call returns an error from a hook that won't budge. Or `claude` itself exits before reading a prompt because its config is bad.
+
+**First try — `--force`.** From any **non-Claude** shell (a fresh terminal tab, an editor terminal, an SSH session — anything that doesn't go through Claude Code's hook chain):
+
+```bash
+aenv global deactivate --force
+```
+
+`--force` skips the namespace's `on_deactivate` lifecycle hook (handy when that hook itself is the thing that's broken). File restoration still runs — your original `~/.claude/CLAUDE.md`, `~/.claude/settings.json`, etc. come back from `$AENV_HOME/global-stash/<ts>/`.
+
+**If that fails — `aenv-rescue`.** When the main `aenv` binary itself can't be invoked (e.g. it's been swapped out, or its dependencies are broken), use the dedicated rescue binary. It ships alongside `aenv`:
+
+```bash
+aenv-rescue
+```
+
+`aenv-rescue` reads `$AENV_HOME/global-state.json` directly, removes every materialized file, restores every backup, and tears down the state and lock files. It **never** spawns subprocesses and **never** runs `on_deactivate`. It runs from any shell, panic-mode-friendly.
+
+**After recovery.** You're back to your pre-activation `$HOME`. Now investigate what broke — it's almost always an `on_activate` script (or a config file the namespace materialized) that left the environment in an unusable state. Fix the namespace under `$AENV_HOME/envs/<ns>/`, then try `aenv global activate <ns>` again.
+
+**One caveat.** `aenv-rescue` deliberately does **not** run the namespace's `on_deactivate` hook. If `on_activate` installed software (say, `pip install foo` into a venv) or wrote files outside the state-tracked surface, that cleanup is on you. See [`lifecycle-hooks.md`](./lifecycle-hooks.md) for the contract — `on_deactivate` is the right place for "uninstall what `on_activate` installed", and skipping it means that work is skipped.
+
+```bash
+$BIN global status
+```
+
+```
+no global activation
+```
+
+---
+
 ## Step 8 — wrap-up
 
 A clean `aenv global deactivate` restores the original `~/.claude/` contents (every backed-up file moved back into place) and deletes `$AENV_HOME/global-state.json`:
