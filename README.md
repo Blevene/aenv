@@ -270,90 +270,77 @@ On the next `aenv activate`, the skill materializes at `.claude/skills/aenv/SKIL
 
 ## Global namespaces
 
-A namespace can describe two surfaces at once: the project-local one (`CLAUDE.md`, `.cursorrules`, …) and the **user-global** one under `$HOME` (`~/.claude/CLAUDE.md`, `~/.claude/agents/`, `~/.codex/`, …). `aenv global activate <ns>` swaps the user surface atomically — one global activation lives per user; activating a new namespace deactivates the prior one in a single transaction.
+### What it does
 
-### Example: a `research` namespace that overrides `~/.claude/`
+`aenv global` moves user-scope harness files (`~/.claude/CLAUDE.md`, `~/.claude/agents/`, `~/.codex/AGENTS.md`, …) in and out of `$HOME` under a single named activation. Files declared in a namespace's `user_files` are materialized from `~/.aenv/envs/<ns>/user/`; collisions with pre-existing files are stashed to `~/.aenv/global-stash/<ts>/` and restored byte-for-byte on deactivate. If the namespace ships an `on_activate` script, aenv runs it after materialization (with first-run approval pinned to the script's sha256). Everything else under `$HOME` — files no namespace declares — is yours: aenv neither touches it nor knows about it.
 
-```bash
-# Scaffold the namespace and author its user-scope content.
-aenv create research --adapter claude-code
-mkdir -p ~/.aenv/envs/research/user/.claude/agents
-cat > ~/.aenv/envs/research/user/.claude/CLAUDE.md <<'EOF'
-# Research mode
-Prefer exploratory analysis; cite primary sources.
-EOF
-cat > ~/.aenv/envs/research/user/.claude/agents/explorer.md <<'EOF'
----
-name: explorer
-description: Explores datasets and surfaces patterns.
----
-EOF
-
-# Declare which user-scope files this namespace owns. Paths are written
-# WITHOUT a leading ~/ — they live under ~/.aenv/envs/<ns>/user/ and
-# materialize under $HOME at activation time.
-$EDITOR ~/.aenv/envs/research/aenv.toml
-# Under [adapters.claude-code], add:
-#   user_files = [".claude/CLAUDE.md", ".claude/agents/explorer.md"]
-
-# Activate globally.
-aenv global activate research
-# → Activated 'research' globally in /home/you
-#     + .claude/CLAUDE.md (Replace)
-#     + .claude/agents/explorer.md (Replace)
-#   Note: running harness sessions retain their previous config until restart.
-
-# Inspect.
-aenv global status
-aenv global which ~/.claude/CLAUDE.md
-```
-
-### Reverse it
+### The snapshot → import → swap → deactivate cycle
 
 ```bash
-aenv global deactivate
-# → Deactivated namespace 'research' globally in /home/you
-# Original ~/.claude/ contents are restored byte-for-byte.
+# 1. Capture your current ~/.claude/ as a namespace called 'default'.
+aenv global snapshot default
+
+# 2. Import claude-ctrl from upstream as a new namespace called 'claude-cntrl'.
+#    install.sh and uninstall.sh at the repo root are wired up as lifecycle hooks.
+aenv global import https://github.com/juanandresgs/claude-ctrl claude-cntrl
+
+# 3. Activate claude-cntrl. First time only: aenv prints the script's sha256
+#    and the first 8 lines, and asks before running install.sh.
+aenv global activate claude-cntrl
+
+# 4. Swap back to whatever you had before.
+aenv global activate default
 ```
 
-### The running-session caveat
-
-`aenv global` swaps files on disk, but already-running harness processes
-(Claude Code, the Codex CLI, etc.) cache their config at startup. As both
-`aenv global activate` and `aenv global status` print:
-
-> Note: running harness sessions retain their previous config until restart.
-
-Quit and relaunch the harness to pick up the new surface.
+`aenv global activate <new>` deactivates whatever is currently active and activates `<new>` under one transaction; if the new activation fails the prior one is restored as best-effort rollback. One global activation lives per user, full stop.
 
 ### Verbs at a glance
 
 | Command | Purpose |
 |---|---|
-| `aenv global activate <ns>` | Activate `<ns>` globally; swap out any prior activation. |
-| `aenv global deactivate [--prune]` | Restore the pre-activation `$HOME` surface. `--prune` also clears orphan stash dirs. |
+| `aenv global snapshot <name> [--include <path>...]` | Capture the current `$HOME` user-scope surface into a new namespace. |
+| `aenv global import <source> [<name>] [--pin <ref>]` | Import a local path or git URL as a new namespace. Auto-wires `install.sh` / `uninstall.sh` as lifecycle hooks; honors an `aenv-namespace.toml` at the source root if present. |
+| `aenv global activate <ns> [--yes] [--skip-preflight]` | Activate `<ns>`; swap out any prior activation. Prompts for lifecycle approval on first run and for unresolvable settings.json command paths. |
+| `aenv global deactivate [--force] [--prune]` | Restore the pre-activation `$HOME` surface. `--force` skips a broken `on_deactivate`; `--prune` also clears orphan stash dirs. |
 | `aenv global status [--json]` | Show the active namespace + every managed `~/<path>`. |
-| `aenv global which <path>` | "Which namespace manages `~/.claude/foo`?" |
+| `aenv global which <path> [--json]` | "Which namespace manages `~/.claude/foo`?" — JSON includes the file's `content_hash`. |
 | `aenv global list [--json]` | List every namespace whose manifest declares `user_files`. |
-| `aenv global doctor [<ns>] [--json]` | Run policies against user-scope candidates; flag orphan stashes (exit 19). |
-| `aenv global diff [<a> <b>] [--json]` | Drift detection (no args) or structural diff between two namespaces' user-scope subsets. |
+| `aenv global doctor [<ns>] [--json]` | Run policies (`instructions_max_chars`, `hook_paths_resolvable`, `copy_mode_local_edits`) against user-scope candidates; flag orphan stashes (exit 19). |
+| `aenv global diff [<a> <b>] [--json]` | Byte-level drift detection (no args) or structural diff between two namespaces' user-scope subsets. |
+| `aenv use <ns> --global [--yes]` | Sugar: `aenv use <ns> && aenv activate && aenv global activate <ns>`. |
 
-Lifecycle hook contract: see [`pm_docs/lifecycle-hooks.md`](./pm_docs/lifecycle-hooks.md) for the full contract namespace authors should follow.
+### Lifecycle hooks: when to use them
+
+If your namespace needs to install a runtime (e.g. claude-ctrl's Python policy engine), declare `[lifecycle] on_activate = "install.sh"` in its `aenv.toml`. The script runs after materialization with `cwd = $HOME`, env vars `AENV_NAMESPACE` / `AENV_NAMESPACE_DIR` / `AENV_TARGET_ROOT` set. First activation prompts before running; approvals are pinned to the script's sha256 at `~/.aenv/envs/<ns>/.approved`, so future edits re-prompt. Full contract in [`pm_docs/lifecycle-hooks.md`](./pm_docs/lifecycle-hooks.md).
 
 ### Extending the adapter surface
 
 A namespace's `user_files` is not capped by what its adapter declares. claude-ctrl, for example, declares `.claude/runtime/` in its own manifest even though the builtin claude-code adapter doesn't — aenv materializes any user-scoped path the namespace asks for, as long as it's relative and doesn't escape with `..`.
 
-### Sugar: project + global in one call
+### Editing a live activation: where your edits go
 
-```bash
-# Pin the project AND activate user-scope files in one shot.
-aenv use research --global
-```
+Two materialization modes, picked per adapter or per namespace via `materialize = "symlink"` (default) or `materialize = "copy"`:
 
-`aenv use <ns> --global` is exactly `aenv use <ns> && aenv activate && aenv global activate <ns>` — the project gets pinned, project-scope files materialize under the project root, and the namespace's user-scope files materialize under `$HOME`. Both surfaces are fully applied in one command.
+- **Symlink mode (default).** `~/.claude/CLAUDE.md` is a symlink into `~/.aenv/envs/<ns>/user/.claude/CLAUDE.md`. Opening it in your editor edits the namespace source directly — and re-activating the same namespace shows the same edits because they were never separate.
+- **Copy mode.** `~/.claude/CLAUDE.md` is a regular file copied from the namespace source at activation. Edits stick to the working copy; the namespace source is untouched. The next `aenv global activate <same-ns>` overwrites your edits without warning.
 
-See [`pm_docs/walkthrough-global-namespaces.md`](./pm_docs/walkthrough-global-namespaces.md) for a step-by-step tour including the swap-between-namespaces transaction, oversize-CLAUDE.md doctor warnings, and the orphan-stash cleanup flow with `--prune`.
+If you want to keep edits made under copy mode, run `aenv global snapshot <new-name>` first to capture the current `$HOME` state into a fresh namespace. `aenv global doctor` warns when a copy-mode target has drifted from its source.
+
+### Recovery: when things go wrong
+
+Two escape hatches:
+
+- **`aenv global deactivate --force`** — skips the namespace's `on_deactivate` lifecycle hook. Use when that hook is itself broken. File restoration runs either way.
+- **`aenv-rescue`** — a standalone binary (no `aenv` dependency) that reads `~/.aenv/global-state.json` directly, undoes the activation via fs ops, and never invokes lifecycle scripts. Use when the main aenv binary or its lifecycle scripts have locked you out of a Claude Code session via a broken PreToolUse hook.
+
+Full recovery flow in [`pm_docs/walkthrough-global-namespaces.md`](./pm_docs/walkthrough-global-namespaces.md).
+
+### What aenv does NOT do
+
+- **Generic package installation.** `on_activate` can run `pip install` or `brew install`, but aenv doesn't know pip from npm from apt — it just runs your script.
+- **Live-reload of running harness processes.** Claude Code, Codex, Cursor read their config at startup. Restart the harness to pick up a new activation.
+- **Process-tree isolation.** One global activation lives per user. Two terminals can't each see a different active namespace.
+- **Live-edit conflict resolution.** Files no namespace declares are yours; aenv won't touch them, won't back them up, won't merge them. If you want a file managed, declare it in `user_files`.
 
 ## Shell integration
 
