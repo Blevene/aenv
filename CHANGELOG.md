@@ -44,7 +44,7 @@ Issue #4: global namespaces. `aenv` can now swap user-level harness configuratio
 - **Namespace manifest `[adapters.<name>]` gains `user_files`, `user_merge`, `materialize`** — all optional.
 - **`SkillDecl` gains `scope: Scope`** (default `Project`).
 - **`Candidate` gains `scope`, `adapter_materialize_override`**.
-- **Builtin claude-code / codex / cursor adapters** declare canonical `user_files` (so out-of-the-box snapshots capture the standard surfaces).
+- **Builtin claude-code / codex / cursor adapters** declare canonical `user_files` (so out-of-the-box snapshots capture the standard surfaces). The claude-code adapter covers `CLAUDE.md`, `agents/`, `commands/`, `hooks/`, `plugins/`, `policy-limits.json`, `settings.json`, `statusline/`, plus skills via `user_skills_dir`. Runtime/state directories (`backups/`, `cache/`, `projects/`, `sessions/`, `history.jsonl`, `.credentials.json`, etc.) are deliberately excluded.
 - **Resolver trims trailing `/` on file/`user_files` entries** before constructing target paths — `symlink()` ENOENT regression fix for directory declarations.
 - **`aenv global doctor`** reports findings from three synthetic policies: `instructions_max_chars` (existing), `hook_paths_resolvable` (Task 17), `copy_mode_local_edits` (Task 22). Plus orphan-stash detection (Task 20).
 
