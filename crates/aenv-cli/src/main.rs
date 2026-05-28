@@ -55,6 +55,12 @@ enum Command {
         /// `aenv use <ns> && aenv activate && aenv global activate <ns>`.
         #[arg(long)]
         global: bool,
+        /// Approve any `[lifecycle].on_activate` script without prompting.
+        /// Records the approval as if the user had answered "yes" — future
+        /// activations with an unchanged script proceed silently. Only
+        /// meaningful in combination with `--global`.
+        #[arg(long)]
+        yes: bool,
     },
     /// Materialize the active namespace's content into the project as
     /// symlinks (or merged files where strategy demands). Reads the
@@ -305,6 +311,13 @@ enum GlobalAction {
     Activate {
         /// Namespace name to activate globally.
         name: String,
+        /// Approve any `[lifecycle].on_activate` script without prompting.
+        /// The approval is recorded as if you had answered "yes" — future
+        /// activations of the same namespace with an unchanged script
+        /// proceed silently. Use with caution: lifecycle scripts run with
+        /// your user privileges.
+        #[arg(long)]
+        yes: bool,
     },
     /// Reverse `aenv global activate`: restore stashed originals, delete the
     /// global state file. Exit 0 with a note if no activation is live.
@@ -418,6 +431,7 @@ fn main() -> ExitCode {
                 name,
                 project,
                 global,
+                yes,
             } => {
                 let project_root = paths::resolve_project_root_for_pin(&fs, project)?;
                 cmd::use_::run(&fs, &layout, &project_root, &name)?;
@@ -438,7 +452,7 @@ fn main() -> ExitCode {
                                 "HOME not set; --global requires HOME".into(),
                             )
                         })?;
-                    cmd::global::activate::run(&fs, &layout, &adapters, &fake_home, &name)?;
+                    cmd::global::activate::run(&fs, &layout, &adapters, &fake_home, &name, yes)?;
                 }
                 Ok(())
             }
@@ -653,12 +667,12 @@ fn main() -> ExitCode {
                         )
                     })?;
                 match action {
-                    GlobalAction::Activate { name } => {
+                    GlobalAction::Activate { name, yes } => {
                         let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
                             &fs,
                             &layout.adapters_dir(),
                         )?;
-                        cmd::global::activate::run(&fs, &layout, &adapters, &fake_home, &name)
+                        cmd::global::activate::run(&fs, &layout, &adapters, &fake_home, &name, yes)
                     }
                     GlobalAction::Deactivate { prune } => {
                         cmd::global::deactivate::run(&fs, &layout, &fake_home, prune)

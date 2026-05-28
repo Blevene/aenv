@@ -427,7 +427,10 @@ fn materialize_one<F: Filesystem>(
 /// is redundant on the happy path but keeps the lifecycle hook decoupled
 /// from resolver internals (and lets us consult fields the resolver doesn't
 /// expose, like `[lifecycle]`).
-pub(crate) fn load_leaf_manifest<F: Filesystem>(
+///
+/// Public so the CLI can inspect `[lifecycle]` to decide whether to prompt
+/// for approval before invoking the activator.
+pub fn load_leaf_manifest<F: Filesystem>(
     fs: &F,
     layout: &RegistryLayout,
     leaf: &NamespaceId,

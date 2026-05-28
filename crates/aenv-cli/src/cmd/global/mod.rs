@@ -1,6 +1,7 @@
 //! `aenv global …` — user-scope activation verbs.
 
 pub mod activate;
+pub mod approval;
 pub mod deactivate;
 pub mod diff;
 pub mod doctor;

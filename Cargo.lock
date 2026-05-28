@@ -9,6 +9,7 @@ dependencies = [
  "aenv-core",
  "clap",
  "serde_json",
+ "sha2",
  "tempfile",
  "thiserror",
  "walkdir",
