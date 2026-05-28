@@ -163,13 +163,35 @@ the rest of the deactivate transaction).
 ## 8. Approval model
 
 The first time a namespace's `on_activate` is about to run, aenv prompts
-the user for approval:
+the user for approval. The prompt includes the script path, its SHA-256,
+and the first eight lines of content so the user can verify what they're
+approving:
 
 ```
-Namespace 'foo' wants to run an on_activate lifecycle script:
-  <path to script>
+About to run on_activate hook:
+  Script: /home/you/.aenv/envs/foo/install.sh
+  sha256: sha256:3a4f8b...c2d1
+  First 8 lines:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd "$AENV_NAMESPACE_DIR"
+    pip install --user -e ./runtime
+    echo "runtime installed"
+Allow this script to run on every future activation until its content changes? [y/N]:
+```
 
-Approve and remember this script's SHA-256? [y/N]
+If the script's content has changed since a prior approval, the prompt
+instead shows both the previously-approved SHA and the current SHA so
+the user can see the diff before re-approving:
+
+```
+The on_activate script has changed since your last approval:
+  Script: /home/you/.aenv/envs/foo/install.sh
+  Previously approved: sha256:3a4f8b...c2d1
+  Current:             sha256:7e2a1d...b3f0
+  First 8 lines:
+    ...
+Re-approve? [y/N]:
 ```
 
 The approval is recorded at `~/.aenv/envs/<ns>/.approved` and pinned to
