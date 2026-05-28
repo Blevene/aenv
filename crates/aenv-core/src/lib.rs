@@ -31,6 +31,7 @@ pub mod namespace;
 pub mod namespaces_builtin;
 pub mod parameters;
 pub mod policies;
+pub mod preflight;
 pub mod project;
 pub mod resolve;
 pub mod restore;
