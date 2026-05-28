@@ -714,7 +714,11 @@ fn main() -> ExitCode {
                         cmd::global::status::run(&fs, &layout, &fake_home, json)
                     }
                     GlobalAction::Which { path, json } => {
-                        cmd::global::which::run(&fs, &layout, &fake_home, &path, json)
+                        let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
+                            &fs,
+                            &layout.adapters_dir(),
+                        )?;
+                        cmd::global::which::run(&fs, &layout, &adapters, &fake_home, &path, json)
                     }
                     GlobalAction::List { json } => cmd::global::list::run(&fs, &layout, json),
                     GlobalAction::Doctor { namespace, json } => {

@@ -68,6 +68,74 @@ fn global_which_returns_managing_namespace() {
 }
 
 #[test]
+fn global_which_json_includes_content_hash() {
+    let tmp = tempfile::tempdir().unwrap();
+    let aenv_home = canon(tmp.path()).join(".aenv");
+    let fake_home = canon(tmp.path()).join("home");
+    std::fs::create_dir_all(&fake_home).unwrap();
+    setup_active_ns(&aenv_home, &fake_home, "ns", b"known bytes for hash");
+
+    let out = aenv()
+        .env("AENV_HOME", &aenv_home)
+        .env("HOME", &fake_home)
+        .args(["global", "which", "--json", "~/.claude/CLAUDE.md"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout)
+        .unwrap_or_else(|_| panic!("non-JSON: {}", String::from_utf8_lossy(&out.stdout)));
+    assert_eq!(json["scope"], "user");
+    assert!(
+        json["content_hash"]
+            .as_str()
+            .unwrap_or("")
+            .starts_with("sha256:"),
+        "content_hash missing or malformed: {}",
+        json["content_hash"]
+    );
+
+    // Manually compute the expected hash and compare.
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(b"known bytes for hash");
+    let expected_hex = format!("{:x}", hasher.finalize());
+    let expected = format!("sha256:{expected_hex}");
+    assert_eq!(json["content_hash"], expected);
+}
+
+#[test]
+fn global_which_text_output_unchanged() {
+    // Existing text output should not include the hash; only --json does.
+    let tmp = tempfile::tempdir().unwrap();
+    let aenv_home = canon(tmp.path()).join(".aenv");
+    let fake_home = canon(tmp.path()).join("home");
+    std::fs::create_dir_all(&fake_home).unwrap();
+    setup_active_ns(&aenv_home, &fake_home, "ns", b"x");
+
+    let out = aenv()
+        .env("AENV_HOME", &aenv_home)
+        .env("HOME", &fake_home)
+        .args(["global", "which", "~/.claude/CLAUDE.md"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        !stdout.contains("sha256:"),
+        "text output should not include hash (JSON only): {stdout}"
+    );
+}
+
+#[test]
 fn global_list_filters_to_namespaces_with_user_files() {
     let tmp = tempfile::tempdir().unwrap();
     let aenv_home = canon(tmp.path()).join(".aenv");
