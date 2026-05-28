@@ -1,0 +1,17 @@
+[package]
+name = "aenv-rescue"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Emergency deactivate for aenv global namespaces when shell hooks have locked the user out."
+
+[[bin]]
+name = "aenv-rescue"
+path = "src/main.rs"
+
+[dependencies]
+aenv-core = { path = "../aenv-core" }
+
+[dev-dependencies]
+tempfile.workspace = true

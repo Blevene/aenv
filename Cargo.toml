@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/aenv-core", "crates/aenv-cli"]
+members = ["crates/aenv-core", "crates/aenv-cli", "crates/aenv-rescue"]
 
 [workspace.package]
 version = "0.0.3"
