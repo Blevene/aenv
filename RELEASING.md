@@ -107,6 +107,21 @@ tar -xzf "aenv-${VERSION}-${TARGET}.tar.gz"
 "./aenv-${VERSION}-${TARGET}/aenv" --version
 ```
 
+## Pre-tag ritual
+
+Before tagging a release, run the gated `#[ignore]` integration tests locally:
+
+```bash
+PATH="$HOME/.cargo/bin:$PATH" cargo test -p aenv-cli --test lifecycle_claude_ctrl_real -- --ignored
+PATH="$HOME/.cargo/bin:$PATH" cargo test -p aenv-cli --test lifecycle_mini_fixture -- --ignored
+```
+
+These fetch the live claude-ctrl repo and exercise the full snapshot →
+import → activate → swap → deactivate cycle (claude-ctrl test), and
+pip-install through a lifecycle hook (mini fixture). They prove the
+documented headline flow works against real third-party config repos
+and aren't run in regular CI (network / Python / setuptools required).
+
 ## Dry-running the pipeline
 
 Before a real release, you can validate the workflow end-to-end against a throwaway tag:
