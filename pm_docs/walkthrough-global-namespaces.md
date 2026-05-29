@@ -1,7 +1,13 @@
 # Walkthrough: global namespaces with claude-cntrl
 
 **Tested against:** `main`, `aenv 0.0.3`.
-**Goal:** capture your current `~/.claude/` as a namespace called `default`, import claude-ctrl from upstream as `claude-cntrl`, activate it (approving its `install.sh` lifecycle hook on first run), swap back to `default`, exercise the doctor surface, and walk through the full recovery story for when something breaks.
+**Goal:** onboard claude-ctrl from upstream in a single command (`aenv global use <url>`, which imports + activates and auto-captures a `baseline` return point), swap back to `baseline`, author your own profile from scratch with `aenv global new`, exercise the doctor surface, and walk through the full recovery story for when something breaks.
+
+> **The short version.** Standing up an alternate global profile is one command:
+> ```bash
+> aenv global use https://github.com/juanandresgs/claude-ctrl
+> ```
+> That imports the repo as a namespace, captures your current `~/` as `baseline` (first time only), and activates it. Swap back with `aenv global use baseline`, or toggle to the profile you were just on with `aenv global use -`. The step-by-step below unpacks what that one command does.
 
 A **global** namespace owns files under `$HOME` — `~/.claude/CLAUDE.md`, `~/.claude/agents/`, `~/.codex/AGENTS.md`, `~/.claude/settings.json`, …. The namespace's user-scope content lives at `~/.aenv/envs/<ns>/user/` and materializes under `$HOME` at activation time. One activation lives per user; activating a new namespace deactivates the prior one in a single transaction.
 
@@ -59,7 +65,11 @@ EOF
 
 ---
 
-## Step 1 — snapshot your current state as `default`
+## Step 1 — capture a return point (usually automatic)
+
+You want a named namespace you can always switch back to. The first time you activate *any* global profile, aenv captures this for you automatically as a namespace called `baseline` — so you can skip ahead to Step 2 and a return point will exist after onboarding.
+
+If you'd rather capture it explicitly (or name it yourself), `global snapshot` does that on demand:
 
 ```bash
 $BIN global snapshot default
@@ -95,22 +105,17 @@ This is the point you can always swap back to. Re-activating `default` later is 
 
 ---
 
-## Step 2 — import claude-ctrl from upstream
+## Step 2 — onboard claude-ctrl in one command
 
-`aenv global import <source>` takes a local path or a git URL. The importer prefers an `aenv-namespace.toml` at the source root if one is shipped (see [`aenv-namespace-toml-spec.md`](./aenv-namespace-toml-spec.md) for the convention file format); otherwise it falls back to a built-in heuristic that recognizes a handful of well-known layouts (notably claude-ctrl-style repos).
+`aenv global use <target>` is the front door. When `<target>` is a git URL or local path, it imports the source as a namespace **and** activates it in a single step; when it's an existing namespace name it just switches to it; `-` toggles to the previous profile. Here we onboard claude-ctrl, naming the namespace `claude-cntrl` with `--as`:
 
 ```bash
-$BIN global import https://github.com/juanandresgs/claude-ctrl claude-cntrl
+$BIN global use https://github.com/juanandresgs/claude-ctrl --as claude-cntrl
 ```
 
-```
-Imported 'claude-cntrl' from https://github.com/juanandresgs/claude-ctrl (2 files, 2 directories captured; via heuristic layout).
-  + .claude/CLAUDE.md
-  + .claude/agents/
-  + .claude/hooks/
-```
+aenv does three things under one command:
 
-The heuristic picked up `CLAUDE.md`, `agents/`, and `hooks/` and mapped them under `.claude/`. It also noticed `install.sh` at the source root and wired it up as `[lifecycle] on_activate`. The generated manifest reads:
+**(a) Import.** The importer prefers an `aenv-namespace.toml` at the source root if one is shipped (see [`aenv-namespace-toml-spec.md`](./aenv-namespace-toml-spec.md) for the convention file format); otherwise it falls back to a built-in heuristic that recognizes well-known layouts (notably claude-ctrl-style repos). Here the heuristic picks up `CLAUDE.md`, `agents/`, and `hooks/`, maps them under `.claude/`, and notices `install.sh` / `uninstall.sh` at the repo root and wires them as lifecycle hooks. The generated `~/.aenv/envs/claude-cntrl/aenv.toml` reads:
 
 ```toml
 name = "claude-cntrl"
@@ -129,19 +134,17 @@ on_activate = "install.sh"
 on_deactivate = "uninstall.sh"
 ```
 
-The `install.sh` itself was copied into the namespace dir root (NOT under `user/`) — at `~/.aenv/envs/claude-cntrl/install.sh`. Lifecycle scripts live alongside the namespace, not in its materialization surface.
+The `install.sh` itself is copied into the namespace dir root (NOT under `user/`) — at `~/.aenv/envs/claude-cntrl/install.sh`. Lifecycle scripts live alongside the namespace, not in its materialization surface. (`--pin <ref>` pins git URL sources to a tag or commit SHA for reproducibility; omit for `HEAD`. The standalone `aenv global import <source> [<name>]` does the import half only, without activating — useful when you want to inspect a namespace before turning it on.)
 
-`--pin <ref>` pins git URL imports to a tag or commit SHA, so the import is reproducible across machines. Omit it for `HEAD`. Local-path imports ignore `--pin`.
+**(b) Baseline capture (first activation only).** Because this is the first global activation and no `baseline` namespace exists yet, aenv snapshots your current `~/` surface into `baseline` before materializing anything, then prints:
 
----
-
-## Step 3 — activate claude-cntrl (first time)
-
-```bash
-$BIN global activate claude-cntrl
+```
+Captured your current ~/ surface as 'baseline' (swap back with: aenv global use baseline).
 ```
 
-The first time aenv is about to run an `on_activate` script for this namespace, it pauses and prints the script's full path, sha256, and first 8 lines, then asks for approval:
+(If you ran `global snapshot default` in Step 1, or pass `--no-baseline`, this is skipped.)
+
+**(c) Activate, with lifecycle approval.** The first time aenv is about to run an `on_activate` script for this namespace, it pauses and prints the script's full path, sha256, and first 8 lines, then asks for approval:
 
 ```
 About to run on_activate hook:
@@ -181,13 +184,13 @@ What happened:
 
 Subsequent activations of `claude-cntrl` with the same script content do NOT prompt — aenv compares the recorded sha against the current file. Editing `install.sh` invalidates the approval and re-prompts the next time around. This is the SHA-pinned approval contract from [`lifecycle-hooks.md` §8](./lifecycle-hooks.md#8-approval-model).
 
-For non-interactive use, `--yes` skips the prompt and records approval as if you had answered yes:
+For non-interactive use, `--yes` proceeds without prompting — it records the lifecycle approval as if you'd answered yes, and proceeds past any pre-flight findings:
 
 ```bash
-$BIN global activate claude-cntrl --yes
+$BIN global use https://github.com/juanandresgs/claude-ctrl --as claude-cntrl --yes
 ```
 
-`--skip-preflight` skips the pre-flight scan that warns when a settings.json hook / MCP / statusLine command path doesn't exist on disk (e.g. you're activating a namespace whose `install.sh` hasn't deposited its runtime yet).
+The pre-flight scan still runs under `--yes` and prints what it found (e.g. a settings.json hook / MCP / statusLine command path that doesn't exist on disk yet because `install.sh` hasn't deposited its runtime) — `--yes` only suppresses the prompt, so you still see the warnings.
 
 Verify state:
 
@@ -248,8 +251,10 @@ Quit and relaunch the harness when you want a swap to take effect.
 ## Step 5 — swap back to `default`
 
 ```bash
-$BIN global activate default
+$BIN global use default
 ```
+
+(Or `$BIN global use -` to toggle back to whatever profile you were on previously — aenv records the outgoing namespace on every swap. And `$BIN global use baseline` returns to the surface aenv auto-captured on your first activation.)
 
 ```
 Activated 'default' globally in /tmp/aenv-home-XXXXXX
@@ -274,6 +279,30 @@ Standard operating mode.
 ```
 
 The `agents/` and `hooks/` symlinks from `claude-cntrl` are gone — they belonged to `claude-cntrl` and were removed during its deactivate half of the transaction. The `.claude/` directory now contains only what `default` declared.
+
+---
+
+## Step 5b — author your own profile from scratch
+
+Importing an existing profile is one path; building your own is another. `aenv global new` scaffolds an editable user-scope namespace so you don't have to `mkdir user/.claude/` and hand-write the manifest:
+
+```bash
+$BIN global new mine
+```
+
+```
+Created user-scope namespace 'mine' at /tmp/aenv-home-XXXXXX/.aenv/envs/mine
+  + user/.claude/CLAUDE.md  (edit this, then run: aenv global use mine)
+```
+
+It seeds the adapter's instructions file (`~/.claude/CLAUDE.md` for the default `claude-code` adapter) under the namespace's `user/` subtree with a starter header, and pre-wires `[adapters.claude-code] user_files = [".claude/CLAUDE.md"]` in the manifest. Edit the file, then turn it on the same way as any other profile:
+
+```bash
+$EDITOR $AENV_HOME/envs/mine/user/.claude/CLAUDE.md
+$BIN global use mine
+```
+
+`--adapter <name>` scaffolds for a different harness. This is the third way to create a namespace, alongside `global snapshot` (from your current `$HOME`) and `global import` / `global use <source>` (from an external tree).
 
 ---
 
@@ -324,7 +353,7 @@ The `~/` prefix on the qualified-name target (`chatty::~/.claude/CLAUDE.md`) mar
 instructions_max_chars = { value = 5000, enforce = true }
 ```
 
-…and the next `aenv global activate chatty` will refuse (exit 17) before materializing anything.
+…and the next `aenv global use chatty` will refuse (exit 17) before materializing anything.
 
 ### 6b — copy-mode local edits
 
@@ -345,7 +374,7 @@ materialize = "copy"
 EOF
 
 $BIN global deactivate >/dev/null
-$BIN global activate copyns
+$BIN global use copyns
 ```
 
 ```
@@ -477,23 +506,23 @@ $BIN global doctor; echo "exit: $?"
 ```
 Orphan stashes:
   /tmp/aenv-global-XXXXXX/.aenv/global-stash/epoch-99
-error: global conflict: 1 orphan stash found; run `aenv global deactivate --prune` to clear
+error: global conflict: 1 orphan stash found; run `aenv global doctor --fix` to clear
 exit: 19
 ```
 
 Exit code 19 is `GlobalConflict` — a hard error when the user is auditing global state. (Passing a namespace name to `doctor` reports orphans informationally and still exits 0; the namespace audit is the foreground task.)
 
-Clear the orphan:
+Clear the orphan with `--fix`, which pairs the audit with its remediation:
 
 ```bash
-$BIN global deactivate --prune
+$BIN global doctor --fix
 ```
 
 ```
 Pruned 1 orphan stash.
 ```
 
-`--prune` runs `aenv global deactivate` first (a no-op if no activation is live), then removes every directory under `$AENV_HOME/global-stash/` not referenced by the current state file. Re-running `aenv global doctor` against an empty global state now returns the no-activation form:
+`doctor --fix` deletes every orphan stash the audit finds — directories under `$AENV_HOME/global-stash/` not referenced by the active state — and then reports clean (exit 0). A live activation's own stash is referenced by state and is never touched. Re-running `aenv global doctor` against an empty global state now returns the no-activation form:
 
 ```bash
 $BIN global doctor; echo "exit: $?"

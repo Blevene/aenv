@@ -274,38 +274,46 @@ On the next `aenv activate`, the skill materializes at `.claude/skills/aenv/SKIL
 
 `aenv global` moves user-scope harness files (`~/.claude/CLAUDE.md`, `~/.claude/agents/`, `~/.codex/AGENTS.md`, …) in and out of `$HOME` under a single named activation. Files declared in a namespace's `user_files` are materialized from `~/.aenv/envs/<ns>/user/`; collisions with pre-existing files are stashed to `~/.aenv/global-stash/<ts>/` and restored byte-for-byte on deactivate. If the namespace ships an `on_activate` script, aenv runs it after materialization (with first-run approval pinned to the script's sha256). Everything else under `$HOME` — files no namespace declares — is yours: aenv neither touches it nor knows about it.
 
-### The snapshot → import → swap → deactivate cycle
+### Onboard a profile in one command
 
 ```bash
-# 1. Capture your current ~/.claude/ as a namespace called 'default'.
-aenv global snapshot default
+# Onboard claude-ctrl from upstream: import it AND activate it in one shot.
+# First time only: aenv prints the install.sh sha256 + first 8 lines and asks
+# before running it. On your very first global activation, aenv also captures
+# your current ~/ surface as a 'baseline' namespace so you have a return point.
+aenv global use https://github.com/juanandresgs/claude-ctrl
 
-# 2. Import claude-ctrl from upstream as a new namespace called 'claude-cntrl'.
-#    install.sh and uninstall.sh at the repo root are wired up as lifecycle hooks.
-aenv global import https://github.com/juanandresgs/claude-ctrl claude-cntrl
+# Swap back to your captured baseline (or any namespace by name).
+aenv global use baseline
 
-# 3. Activate claude-cntrl. First time only: aenv prints the script's sha256
-#    and the first 8 lines, and asks before running install.sh.
-aenv global activate claude-cntrl
-
-# 4. Swap back to whatever you had before.
-aenv global activate default
+# Toggle back to the profile you were just on.
+aenv global use -
 ```
 
-`aenv global activate <new>` deactivates whatever is currently active and activates `<new>` under one transaction; if the new activation fails the prior one is restored as best-effort rollback. One global activation lives per user, full stop.
+`aenv global use <target>` is the front door: `<target>` is a git URL or local path (imported on the spot if not already present, then activated), an existing namespace name (switch), or `-` (toggle to the previous profile). Switching deactivates whatever is currently active and activates the target in one transaction; if it fails, the prior one is restored as best-effort rollback. One global activation lives per user, full stop.
+
+To author your own profile from scratch instead of importing one:
+
+```bash
+aenv global new mine        # scaffold an editable ~/.aenv/envs/mine/user/.claude/CLAUDE.md
+$EDITOR ~/.aenv/envs/mine/user/.claude/CLAUDE.md
+aenv global use mine
+```
 
 ### Verbs at a glance
 
 | Command | Purpose |
 |---|---|
+| `aenv global use <target> [--as <name>] [--pin <ref>] [--yes] [--no-baseline]` | **The front door.** `<target>` = git URL / local path (import + activate), an existing namespace name (switch), or `-` (previous profile). |
+| `aenv global new <name> [--adapter <a>]` | Scaffold a new, editable user-scope namespace from scratch (seeds the adapter's instructions file + a pre-wired manifest). |
 | `aenv global snapshot <name> [--include <path>...]` | Capture the current `$HOME` user-scope surface into a new namespace. |
-| `aenv global import <source> [<name>] [--pin <ref>]` | Import a local path or git URL as a new namespace. Auto-wires `install.sh` / `uninstall.sh` as lifecycle hooks; honors an `aenv-namespace.toml` at the source root if present. |
-| `aenv global activate <ns> [--yes] [--skip-preflight]` | Activate `<ns>`; swap out any prior activation. Prompts for lifecycle approval on first run and for unresolvable settings.json command paths. |
-| `aenv global deactivate [--force] [--prune]` | Restore the pre-activation `$HOME` surface. `--force` skips a broken `on_deactivate`; `--prune` also clears orphan stash dirs. |
+| `aenv global import <source> [<name>] [--pin <ref>]` | Lower-level import (no activation): turn a local path or git URL into a namespace. Auto-wires `install.sh` / `uninstall.sh` as lifecycle hooks; honors an `aenv-namespace.toml` at the source root if present. |
+| `aenv global activate <ns> [--yes] [--no-baseline]` | Lower-level activate of an existing namespace (alias for `use <name>` without source-import). Prompts for lifecycle approval on first run and for unresolvable settings.json command paths; `--yes` proceeds without prompting. |
+| `aenv global deactivate [--force]` | Restore the pre-activation `$HOME` surface. `--force` skips a broken `on_deactivate`; file restoration runs either way. |
 | `aenv global status [--json]` | Show the active namespace + every managed `~/<path>`. |
 | `aenv global which <path> [--json]` | "Which namespace manages `~/.claude/foo`?" — JSON includes the file's `content_hash`. |
 | `aenv global list [--json]` | List every namespace whose manifest declares `user_files`. |
-| `aenv global doctor [<ns>] [--json]` | Run policies (`instructions_max_chars`, `hook_paths_resolvable`, `copy_mode_local_edits`) against user-scope candidates; flag orphan stashes (exit 19). |
+| `aenv global doctor [<ns>] [--json] [--fix]` | Run policies (`instructions_max_chars`, `hook_paths_resolvable`, `copy_mode_local_edits`) against user-scope candidates; flag orphan stashes (exit 19). `--fix` clears the orphan stashes it finds. |
 | `aenv global diff [<a> <b>] [--json]` | Byte-level drift detection (no args) or structural diff between two namespaces' user-scope subsets. |
 | `aenv use <ns> --global [--yes]` | Sugar: `aenv use <ns> && aenv activate && aenv global activate <ns>`. |
 
@@ -322,7 +330,7 @@ A namespace's `user_files` is not capped by what its adapter declares. claude-ct
 Two materialization modes, picked per adapter or per namespace via `materialize = "symlink"` (default) or `materialize = "copy"`:
 
 - **Symlink mode (default).** `~/.claude/CLAUDE.md` is a symlink into `~/.aenv/envs/<ns>/user/.claude/CLAUDE.md`. Opening it in your editor edits the namespace source directly — and re-activating the same namespace shows the same edits because they were never separate.
-- **Copy mode.** `~/.claude/CLAUDE.md` is a regular file copied from the namespace source at activation. Edits stick to the working copy; the namespace source is untouched. The next `aenv global activate <same-ns>` overwrites your edits without warning.
+- **Copy mode.** `~/.claude/CLAUDE.md` is a regular file copied from the namespace source at activation. Edits stick to the working copy; the namespace source is untouched. The next `aenv global use <same-ns>` overwrites your edits without warning.
 
 If you want to keep edits made under copy mode, run `aenv global snapshot <new-name>` first to capture the current `$HOME` state into a fresh namespace. `aenv global doctor` warns when a copy-mode target has drifted from its source.
 
