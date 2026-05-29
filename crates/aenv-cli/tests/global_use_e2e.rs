@@ -220,4 +220,10 @@ fn activate_alias_still_works() {
         String::from_utf8_lossy(&out.stderr)
     );
     assert!(fake_home.join(".claude/CLAUDE.md").exists());
+    // The alias still works but warns that `use` is preferred.
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("deprecated"),
+        "expected deprecation notice on `global activate`: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 }

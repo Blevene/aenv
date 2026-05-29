@@ -330,10 +330,11 @@ enum GlobalAction {
         #[arg(long)]
         no_baseline: bool,
     },
-    /// Activate a namespace's user-scope files into `$HOME`. Replaces any
-    /// existing global activation in a single transaction. (Lower-level form
-    /// of `aenv global use <name>`, which also imports sources and records a
-    /// swap-back point.)
+    /// DEPRECATED: use `aenv global use <name>` instead. Activates a
+    /// namespace's user-scope files into `$HOME`, replacing any existing
+    /// activation in one transaction. `use` is a superset — it also imports
+    /// git/path sources on the spot and records a swap-back point. This alias
+    /// still works but prints a deprecation notice.
     Activate {
         /// Namespace name to activate globally.
         name: String,
@@ -759,6 +760,10 @@ fn main() -> ExitCode {
                         yes,
                         no_baseline,
                     } => {
+                        eprintln!(
+                            "warning: `aenv global activate` is deprecated; use \
+                             `aenv global use {name}` instead."
+                        );
                         let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
                             &fs,
                             &layout.adapters_dir(),
