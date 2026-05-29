@@ -84,11 +84,13 @@ fn use_local_source_imports_and_activates_in_one_command() {
 }
 
 #[test]
-fn use_local_source_with_lifecycle_hook_activates() {
-    // Regression: import copies install.sh byte-for-byte, dropping its
-    // executable bit. The activator must still be able to run on_activate
-    // (it restores owner-execute before exec) — otherwise `use <source>` on
-    // any lifecycle namespace (e.g. claude-ctrl) fails with Permission denied.
+fn use_source_with_convention_lifecycle_hook_activates() {
+    // Regression: import copies the lifecycle script byte-for-byte, dropping
+    // its executable bit. The activator must still run on_activate (it restores
+    // owner-execute before exec) — otherwise `use <source>` on a namespace that
+    // opts into a lifecycle hook via aenv-namespace.toml fails Permission
+    // denied. Lifecycle hooks are opt-in (convention file), never inferred from
+    // a bare install.sh, so the source ships an aenv-namespace.toml here.
     let tmp = tempfile::tempdir().unwrap();
     let aenv_home = canon(tmp.path()).join(".aenv");
     let fake_home = canon(tmp.path()).join("home");
@@ -98,11 +100,17 @@ fn use_local_source_with_lifecycle_hook_activates() {
     let src = canon(tmp.path()).join("ctrl-src");
     std::fs::create_dir_all(&src).unwrap();
     std::fs::write(src.join("CLAUDE.md"), b"hooked profile").unwrap();
-    // A real, shebang'd install.sh. We deliberately do NOT chmod +x the
-    // namespace copy — import writes bytes only, so it lands non-executable.
+    // A real, shebang'd install.sh. We deliberately do NOT chmod +x — import
+    // writes bytes only, so the namespace copy lands non-executable.
     std::fs::write(
         src.join("install.sh"),
         b"#!/usr/bin/env bash\ntouch \"$AENV_TARGET_ROOT/.install-ran\"\n",
+    )
+    .unwrap();
+    // Opt into the lifecycle hook explicitly via the convention file.
+    std::fs::write(
+        src.join("aenv-namespace.toml"),
+        b"[lifecycle]\non_activate = \"install.sh\"\n\n[layout]\n\"CLAUDE.md\" = \".claude/CLAUDE.md\"\n",
     )
     .unwrap();
 

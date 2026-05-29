@@ -50,7 +50,9 @@ fn global_import_local_dir_creates_activable_namespace() {
 
     let ns_dir = aenv_home.join("envs/claude-cntrl");
     assert!(ns_dir.join("aenv.toml").exists());
-    assert!(ns_dir.join("install.sh").exists());
+    // The heuristic imports config only — it does not infer a lifecycle hook
+    // from a repo's install.sh, so install.sh is not copied into the namespace.
+    assert!(!ns_dir.join("install.sh").exists());
     assert!(ns_dir.join("user/.claude/CLAUDE.md").exists());
     assert_eq!(
         std::fs::read(ns_dir.join("user/.claude/CLAUDE.md")).unwrap(),
@@ -59,11 +61,12 @@ fn global_import_local_dir_creates_activable_namespace() {
     assert!(ns_dir.join("user/.claude/agents/a.md").exists());
     assert!(ns_dir.join("user/.claude/hooks/pre.sh").exists());
 
-    // The manifest should mention the [lifecycle] section.
+    // The heuristic imports config only — it does not infer a [lifecycle]
+    // section from the repo's install.sh (opt-in via aenv-namespace.toml).
     let manifest_text = std::fs::read_to_string(ns_dir.join("aenv.toml")).unwrap();
     assert!(
-        manifest_text.contains("[lifecycle]"),
-        "expected [lifecycle] in manifest:\n{manifest_text}"
+        !manifest_text.contains("[lifecycle]"),
+        "heuristic should not infer [lifecycle]:\n{manifest_text}"
     );
 
     // `aenv global list` surfaces the new namespace.

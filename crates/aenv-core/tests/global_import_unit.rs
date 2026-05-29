@@ -107,13 +107,6 @@ fn import_heuristic_recognizes_claude_ctrl_layout() {
         b"#!/bin/sh\n"
     );
 
-    // install.sh ends up at the namespace dir root, not under user/.
-    let ns_dir = layout.namespace_dir("claude-cntrl");
-    assert_eq!(
-        fs.read(&ns_dir.join("install.sh")).unwrap(),
-        b"#!/bin/sh\necho install\n"
-    );
-
     let manifest = read_manifest(&fs, &layout, "claude-cntrl");
     let entry = manifest.adapters.get("claude-code").unwrap();
     let declared: std::collections::BTreeSet<&str> =
@@ -122,13 +115,20 @@ fn import_heuristic_recognizes_claude_ctrl_layout() {
     assert!(declared.contains(".claude/agents/"));
     assert!(declared.contains(".claude/hooks/"));
 
-    // Verify [lifecycle] section was appended verbatim.
+    // The heuristic does NOT infer lifecycle hooks from a repo's install.sh:
+    // such scripts are self-installers that fight aenv's materialization.
+    // No [lifecycle] section, and install.sh is not copied into the namespace
+    // (it's only copied when a script is actually wired).
+    let ns_dir = layout.namespace_dir("claude-cntrl");
+    assert!(
+        !fs.exists(&ns_dir.join("install.sh")).unwrap(),
+        "heuristic should not copy install.sh into the namespace"
+    );
     let raw = read_manifest_str(&fs, &layout, "claude-cntrl");
     assert!(
-        raw.contains("[lifecycle]"),
-        "expected [lifecycle] section in manifest, got:\n{raw}"
+        !raw.contains("[lifecycle]"),
+        "heuristic must not infer a [lifecycle] block, got:\n{raw}"
     );
-    assert!(raw.contains("on_activate = \"install.sh\""));
 }
 
 #[test]

@@ -359,16 +359,18 @@ pub struct ImportSummary {
 /// The importer first looks for `<source>/aenv-namespace.toml`. If present,
 /// it's parsed as a [`NamespaceImportSpec`] and used as the authoritative
 /// layout. If absent, a heuristic probes a fixed list of source-relative
-/// paths (CLAUDE.md, agents/, hooks/, install.sh, …) and maps them into the
-/// destination namespace.
+/// paths (CLAUDE.md, agents/, hooks/, …) and maps them into the destination
+/// namespace.
 ///
 /// The generated manifest:
 /// - lives at `envs/<name>/aenv.toml`
 /// - declares each captured target path under the adapter whose prefix it
 ///   matches (`.claude/...` -> `claude-code`, `.codex/...` -> `codex`, else
 ///   `claude-code` as a fallback)
-/// - declares a `[lifecycle]` block when `on_activate` / `on_deactivate`
-///   scripts were detected (via convention file or heuristic).
+/// - declares a `[lifecycle]` block ONLY when a convention file
+///   (`aenv-namespace.toml`) explicitly declares one. The heuristic never
+///   infers lifecycle hooks from a repo's `install.sh` — see
+///   [`heuristic_entries`].
 pub fn import_global<F: Filesystem>(
     fs: &F,
     layout: &RegistryLayout,
@@ -600,8 +602,16 @@ fn ignore_matches(ignore: &[String], path: &str) -> bool {
 
 /// Fallback path detection when no `aenv-namespace.toml` is present. Probes
 /// a fixed list of well-known source-relative paths and maps them to
-/// destination paths under `user/`. Also detects `install.sh` / `uninstall.sh`
-/// for lifecycle hooks.
+/// destination paths under `user/`.
+///
+/// Lifecycle hooks are deliberately NOT inferred here. A repository's
+/// `install.sh` is, in practice, a self-installer that wants to own
+/// `~/.claude` (validate a payload, back up the existing config, move itself
+/// into place) — running it as an aenv `on_activate` fights aenv's own
+/// materialization and stash. So the heuristic imports config files only;
+/// lifecycle hooks must be declared explicitly in an `aenv-namespace.toml`,
+/// where the author has opted into aenv's execution model (CWD, env vars,
+/// rollback-on-failure) knowingly. See `pm_docs/aenv-namespace-toml-spec.md`.
 fn heuristic_entries<F: Filesystem>(
     fs: &F,
     source: &Path,
@@ -633,15 +643,9 @@ fn heuristic_entries<F: Filesystem>(
         }
     }
 
-    let mut lifecycle = ImportLifecycleSpec::default();
-    if fs.exists(&source.join("install.sh"))? {
-        lifecycle.on_activate = Some("install.sh".to_string());
-    }
-    if fs.exists(&source.join("uninstall.sh"))? {
-        lifecycle.on_deactivate = Some("uninstall.sh".to_string());
-    }
-
-    Ok((entries, lifecycle))
+    // Lifecycle hooks are opt-in via aenv-namespace.toml only — never inferred
+    // from a repo's install.sh/uninstall.sh (see the doc comment above).
+    Ok((entries, ImportLifecycleSpec::default()))
 }
 
 /// Recursively copy `src` into `dst`, returning the count of regular files

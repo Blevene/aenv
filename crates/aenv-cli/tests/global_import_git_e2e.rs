@@ -90,7 +90,8 @@ fn global_import_local_git_repo_clones_and_imports() {
         b"# repo-imported"
     );
     assert!(ns_dir.join("user/.claude/agents/hello.md").exists());
-    assert!(ns_dir.join("install.sh").exists());
+    // Heuristic does not auto-wire a repo's install.sh as a lifecycle hook.
+    assert!(!ns_dir.join("install.sh").exists());
 }
 
 #[test]
