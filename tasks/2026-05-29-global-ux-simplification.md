@@ -130,3 +130,23 @@ Order: **1 → 4 → 6 → 2 → 5.** (1 and 4 are small clap edits; 6 adds an i
 - `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; `cargo fmt --check` (all `PATH=`-prefixed).
 - Walk the README/walkthrough end-to-end for behavior drift.
 - Capture user corrections in `tasks/lessons.md`.
+
+---
+
+## Review (executed 2026-05-29)
+
+All five approved changes landed; Change 3 (folding `aenv-rescue`) was **dropped** at the user's direction — rescue stays as the corruption-proof safety net. Commits on `main`:
+
+- `c87b0fd` Change 1 — collapse `--yes`/`--skip-preflight` → `--yes`.
+- `9db1255` Change 4 — orphan `--prune` moved from `deactivate` to `doctor --fix` (surfaced + fixed a latent exit-13 bug in the no-activation `--fix` path).
+- `fe68522` Change 6 — `aenv global new` scaffolds an editable user-scope namespace.
+- `95b3c72` Change 2 — auto-baseline on first activation (`--no-baseline` opt-out).
+- `be6ecb0` Change 5 — `aenv global use <target>` front door (URL/path/name/`-`), `activate` kept as alias; gated real-network test repointed.
+- `dde253b` Docs — README + walkthrough rewritten around the new UX.
+- `70c74f4` Fix — `use -` returns to `baseline` immediately after the first onboard (first activation had no prior profile to record).
+
+**Verification:** 132 test binaries green, `clippy -D warnings` clean, `fmt --check` clean. End-to-end smoke test confirmed one-command onboarding + `use -` toggle on the real binary.
+
+**Net UX win:** onboarding a profile went from 3 commands (`snapshot` + `import` + `activate`) to 1 (`aenv global use <url>`); authoring from scratch got a real `global new` scaffold; swapping is unified under `use` with a `-` toggle and a named `baseline` return point.
+
+**Investigation note:** a smoke test showed `cherny`/`karpathy` namespaces appearing in isolated temp registries. Root cause: these are **intentional built-in example namespaces** (`crates/aenv-core/src/namespaces_builtin/mod.rs`, embedded via `include_str!`) that auto-seed every registry — pre-existing v0.1.0 behavior, not a regression and not from this work. Recorded in auto-memory to avoid re-investigating.
