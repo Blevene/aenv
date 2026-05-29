@@ -19,6 +19,11 @@ use aenv_core::identity::NamespaceId;
 use std::io::{BufRead, Write};
 use std::path::Path;
 
+/// Name of the auto-captured baseline namespace (the user's pre-aenv `$HOME`
+/// surface), so `aenv global use baseline` always restores the starting point.
+const BASELINE_NAMESPACE: &str = "baseline";
+
+#[allow(clippy::fn_params_excessive_bools)]
 pub fn run<F: Filesystem>(
     fs: &F,
     layout: &RegistryLayout,
@@ -26,6 +31,7 @@ pub fn run<F: Filesystem>(
     fake_home: &Path,
     name: &str,
     yes: bool,
+    no_baseline: bool,
 ) -> Result<()> {
     let leaf = NamespaceId::new(name).map_err(|e| AenvError::ManifestInvalid(e.to_string()))?;
 
@@ -123,6 +129,16 @@ pub fn run<F: Filesystem>(
         }
     }
 
+    // Safer default: on the first-ever global activation, capture the current
+    // `$HOME` user-scope surface as a `baseline` namespace so there's always a
+    // named return point (`aenv global use baseline`). Runs only when nothing
+    // is active yet AND no baseline exists AND the user didn't opt out. An
+    // empty `$HOME` captures nothing, so we discard the empty namespace rather
+    // than leave clutter.
+    if !no_baseline {
+        maybe_capture_baseline(fs, layout, adapters, fake_home)?;
+    }
+
     let state = aenv_core::activate::swap_or_activate_user(fs, layout, adapters, fake_home, &leaf)?;
     for w in &state.warnings {
         eprintln!("[aenv] warning: {w}");
@@ -146,5 +162,42 @@ pub fn run<F: Filesystem>(
         }
     }
     println!("Note: running harness sessions retain their previous config until restart.");
+    Ok(())
+}
+
+/// Capture the current `$HOME` user-scope surface as the `baseline` namespace,
+/// but only on the first-ever global activation (no live state) and only when
+/// `baseline` doesn't already exist. A no-op capture (empty `$HOME`) discards
+/// the empty namespace so we don't leave an inert directory behind.
+fn maybe_capture_baseline<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    adapters: &AdapterRegistry,
+    fake_home: &Path,
+) -> Result<()> {
+    if fs.exists(&layout.global_state_path())? {
+        return Ok(());
+    }
+    let baseline_dir = layout.namespace_dir(BASELINE_NAMESPACE);
+    if fs.exists(&baseline_dir)? {
+        return Ok(());
+    }
+    let summary = aenv_core::global_snapshot::snapshot_global(
+        fs,
+        layout,
+        adapters,
+        fake_home,
+        BASELINE_NAMESPACE,
+        &[],
+    )?;
+    if summary.files_copied + summary.directories_copied == 0 {
+        // Nothing to preserve — drop the empty namespace snapshot wrote.
+        let _ = fs.remove_dir_all(&baseline_dir);
+        return Ok(());
+    }
+    println!(
+        "Captured your current ~/ surface as '{BASELINE_NAMESPACE}' \
+         (swap back with: aenv global use {BASELINE_NAMESPACE})."
+    );
     Ok(())
 }

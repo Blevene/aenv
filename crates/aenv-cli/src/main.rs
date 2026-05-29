@@ -320,6 +320,12 @@ enum GlobalAction {
         /// scripts run with your user privileges.
         #[arg(long)]
         yes: bool,
+        /// Skip the first-activation baseline capture. By default, the very
+        /// first global activation snapshots your current `$HOME` surface
+        /// into a `baseline` namespace so you always have a named return
+        /// point. Pass this to opt out.
+        #[arg(long)]
+        no_baseline: bool,
     },
     /// Reverse `aenv global activate`: restore stashed originals, delete the
     /// global state file. Exit 0 with a note if no activation is live.
@@ -480,8 +486,11 @@ fn main() -> ExitCode {
                     // activate global) runs non-interactively; without it,
                     // the pre-flight and lifecycle-approval gates prompt as
                     // usual. We never auto-approve a lifecycle script the
-                    // user didn't consent to.
-                    cmd::global::activate::run(&fs, &layout, &adapters, &fake_home, &name, yes)?;
+                    // user didn't consent to. Baseline capture stays enabled
+                    // (the safer default).
+                    cmd::global::activate::run(
+                        &fs, &layout, &adapters, &fake_home, &name, yes, false,
+                    )?;
                 }
                 Ok(())
             }
@@ -696,12 +705,24 @@ fn main() -> ExitCode {
                         )
                     })?;
                 match action {
-                    GlobalAction::Activate { name, yes } => {
+                    GlobalAction::Activate {
+                        name,
+                        yes,
+                        no_baseline,
+                    } => {
                         let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
                             &fs,
                             &layout.adapters_dir(),
                         )?;
-                        cmd::global::activate::run(&fs, &layout, &adapters, &fake_home, &name, yes)
+                        cmd::global::activate::run(
+                            &fs,
+                            &layout,
+                            &adapters,
+                            &fake_home,
+                            &name,
+                            yes,
+                            no_baseline,
+                        )
                     }
                     GlobalAction::Deactivate { force } => {
                         cmd::global::deactivate::run(&fs, &layout, &fake_home, force)

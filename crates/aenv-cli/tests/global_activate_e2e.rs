@@ -636,3 +636,127 @@ fn activate_without_yes_no_stdin_aborts_on_preflight_findings() {
     // No activation landed.
     assert!(!aenv_home.join("global-state.json").exists());
 }
+
+// --------------------------------------------------------------------------
+// Auto-baseline on first activation (safer default)
+// --------------------------------------------------------------------------
+
+#[test]
+fn first_activate_captures_baseline_of_existing_home() {
+    let tmp = tempdir().unwrap();
+    let aenv_home = std::fs::canonicalize(tmp.path()).unwrap().join(".aenv");
+    let fake_home = std::fs::canonicalize(tmp.path()).unwrap().join("home");
+    std::fs::create_dir_all(&aenv_home).unwrap();
+    std::fs::create_dir_all(fake_home.join(".claude")).unwrap();
+    // Pre-existing user content that must be preserved as a return point.
+    std::fs::write(fake_home.join(".claude/CLAUDE.md"), b"my original profile").unwrap();
+    seed_minimal_user_scope(&aenv_home);
+
+    let out = aenv(&aenv_home, &fake_home)
+        .args(["global", "activate", "ns"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "activate failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&out.stdout).contains("baseline"),
+        "expected baseline-capture note: {}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+
+    // The baseline namespace exists and holds the original bytes, so it is a
+    // real reactivatable return point.
+    let baseline_src = aenv_home.join("envs/baseline/user/.claude/CLAUDE.md");
+    assert!(baseline_src.exists(), "baseline namespace not created");
+    assert_eq!(
+        std::fs::read(&baseline_src).unwrap(),
+        b"my original profile"
+    );
+}
+
+#[test]
+fn first_activate_with_empty_home_creates_no_baseline() {
+    let tmp = tempdir().unwrap();
+    let aenv_home = std::fs::canonicalize(tmp.path()).unwrap().join(".aenv");
+    let fake_home = std::fs::canonicalize(tmp.path()).unwrap().join("home");
+    std::fs::create_dir_all(&aenv_home).unwrap();
+    std::fs::create_dir_all(&fake_home).unwrap();
+    seed_minimal_user_scope(&aenv_home);
+
+    let out = aenv(&aenv_home, &fake_home)
+        .args(["global", "activate", "ns"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    // Nothing to capture → no empty baseline namespace left behind.
+    assert!(
+        !aenv_home.join("envs/baseline").exists(),
+        "empty $HOME should not produce a baseline namespace"
+    );
+}
+
+#[test]
+fn no_baseline_flag_suppresses_capture() {
+    let tmp = tempdir().unwrap();
+    let aenv_home = std::fs::canonicalize(tmp.path()).unwrap().join(".aenv");
+    let fake_home = std::fs::canonicalize(tmp.path()).unwrap().join("home");
+    std::fs::create_dir_all(&aenv_home).unwrap();
+    std::fs::create_dir_all(fake_home.join(".claude")).unwrap();
+    std::fs::write(fake_home.join(".claude/CLAUDE.md"), b"original").unwrap();
+    seed_minimal_user_scope(&aenv_home);
+
+    let out = aenv(&aenv_home, &fake_home)
+        .args(["global", "activate", "ns", "--no-baseline"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert!(
+        !aenv_home.join("envs/baseline").exists(),
+        "--no-baseline should not create a baseline namespace"
+    );
+}
+
+#[test]
+fn second_activation_does_not_recapture_baseline() {
+    let tmp = tempdir().unwrap();
+    let aenv_home = std::fs::canonicalize(tmp.path()).unwrap().join(".aenv");
+    let fake_home = std::fs::canonicalize(tmp.path()).unwrap().join("home");
+    std::fs::create_dir_all(&aenv_home).unwrap();
+    std::fs::create_dir_all(fake_home.join(".claude")).unwrap();
+    std::fs::write(fake_home.join(".claude/CLAUDE.md"), b"original").unwrap();
+    seed_minimal_user_scope(&aenv_home);
+
+    // First activation captures baseline.
+    assert!(aenv(&aenv_home, &fake_home)
+        .args(["global", "activate", "ns"])
+        .status()
+        .unwrap()
+        .success());
+    let baseline_mtime = std::fs::metadata(aenv_home.join("envs/baseline/aenv.toml"))
+        .unwrap()
+        .modified()
+        .unwrap();
+
+    // Re-activate (state is live now); baseline must not be re-snapshotted.
+    let out = aenv(&aenv_home, &fake_home)
+        .args(["global", "activate", "ns"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert!(
+        !String::from_utf8_lossy(&out.stdout).contains("Captured your current"),
+        "second activation should not recapture baseline: {}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let after = std::fs::metadata(aenv_home.join("envs/baseline/aenv.toml"))
+        .unwrap()
+        .modified()
+        .unwrap();
+    assert_eq!(
+        baseline_mtime, after,
+        "baseline manifest should be untouched"
+    );
+}
