@@ -84,6 +84,55 @@ fn use_local_source_imports_and_activates_in_one_command() {
 }
 
 #[test]
+fn use_local_source_with_lifecycle_hook_activates() {
+    // Regression: import copies install.sh byte-for-byte, dropping its
+    // executable bit. The activator must still be able to run on_activate
+    // (it restores owner-execute before exec) — otherwise `use <source>` on
+    // any lifecycle namespace (e.g. claude-ctrl) fails with Permission denied.
+    let tmp = tempfile::tempdir().unwrap();
+    let aenv_home = canon(tmp.path()).join(".aenv");
+    let fake_home = canon(tmp.path()).join("home");
+    std::fs::create_dir_all(&aenv_home).unwrap();
+    std::fs::create_dir_all(&fake_home).unwrap();
+    seed_adapter(&aenv_home);
+    let src = canon(tmp.path()).join("ctrl-src");
+    std::fs::create_dir_all(&src).unwrap();
+    std::fs::write(src.join("CLAUDE.md"), b"hooked profile").unwrap();
+    // A real, shebang'd install.sh. We deliberately do NOT chmod +x the
+    // namespace copy — import writes bytes only, so it lands non-executable.
+    std::fs::write(
+        src.join("install.sh"),
+        b"#!/usr/bin/env bash\ntouch \"$AENV_TARGET_ROOT/.install-ran\"\n",
+    )
+    .unwrap();
+
+    let out = aenv(&aenv_home, &fake_home)
+        .args([
+            "global",
+            "use",
+            src.to_str().unwrap(),
+            "--as",
+            "ctrl",
+            "--yes",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "use <source-with-hook> failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        fake_home.join(".install-ran").exists(),
+        "on_activate hook did not run (executable-bit fix regressed)"
+    );
+    assert_eq!(
+        std::fs::read(fake_home.join(".claude/CLAUDE.md")).unwrap(),
+        b"hooked profile"
+    );
+}
+
+#[test]
 fn use_existing_name_switches() {
     let tmp = tempfile::tempdir().unwrap();
     let aenv_home = canon(tmp.path()).join(".aenv");

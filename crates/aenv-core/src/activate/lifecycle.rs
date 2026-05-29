@@ -52,6 +52,25 @@ pub(crate) fn run_lifecycle_script(
     event: LifecycleEvent,
     force: bool,
 ) -> std::io::Result<()> {
+    // aenv copies lifecycle scripts into the namespace dir, and the import /
+    // snapshot copy path writes bytes only — it drops the source file's
+    // executable bit. Since we exec the script directly (honoring its
+    // shebang), restore owner-execute first so a locally- or git-imported
+    // `on_activate` isn't refused with "Permission denied". No-op when the
+    // bit is already set.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(meta) = std::fs::metadata(script_path) {
+            let mode = meta.permissions().mode();
+            if mode & 0o111 == 0 {
+                let mut perms = meta.permissions();
+                perms.set_mode(mode | 0o100);
+                let _ = std::fs::set_permissions(script_path, perms);
+            }
+        }
+    }
+
     let mut cmd = Command::new(script_path);
     cmd.current_dir(target_root);
     cmd.env("AENV_NAMESPACE", leaf.as_str());
