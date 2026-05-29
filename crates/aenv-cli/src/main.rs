@@ -428,10 +428,13 @@ enum GlobalAction {
     },
     /// Import a source directory or git URL as a new namespace. When the
     /// source root contains `aenv-namespace.toml`, its declared `[layout]`
-    /// is authoritative; otherwise a built-in heuristic probes well-known
-    /// paths (CLAUDE.md, agents/, hooks/, install.sh, …).
+    /// and `[lifecycle]` are authoritative; otherwise a built-in heuristic
+    /// probes well-known config paths (CLAUDE.md, agents/, hooks/, skills/,
+    /// settings.json, …). The heuristic imports config only — it never wires
+    /// a repo's install.sh as a lifecycle hook; declare hooks explicitly in
+    /// `aenv-namespace.toml` if you want them.
     ///
-    /// The resulting namespace can be activated with `aenv global activate
+    /// The resulting namespace can be activated with `aenv global use
     /// <name>`. See `pm_docs/aenv-namespace-toml-spec.md` for the convention
     /// file format.
     Import {

@@ -12,10 +12,16 @@ importer which adapters the source touches, where to place each piece in the
 destination namespace, and which lifecycle scripts to wire up.
 
 When `aenv-namespace.toml` is absent, the importer falls back to a heuristic
-that recognizes a few well-known layouts (notably `claude-ctrl`-style
+that recognizes a few well-known config layouts (notably `claude-ctrl`-style
 repositories). The heuristic is documented in the import command's source and
 is intentionally less expressive — authors of bespoke harness layouts should
 ship a convention file.
+
+**Lifecycle hooks are opt-in here only.** The heuristic imports config files
+and never infers a lifecycle hook from a repo's `install.sh` (such scripts are
+usually self-installers that conflict with aenv's materialization). If a
+namespace needs a setup hook, declare it in the `[lifecycle]` block below; it
+should do runtime-only work, since aenv has already placed the config.
 
 ## Schema
 
@@ -113,12 +119,10 @@ fixed set of source-relative paths and maps them as follows:
 | `sidecars/`        | `.claude/sidecars/`          |
 | `.codex/`          | `.codex/`                    |
 
-Additionally:
-
-- If `install.sh` exists at the source root, the importer copies it into the
-  namespace dir (at `envs/<name>/install.sh`, not under `user/`) and sets
-  `[lifecycle] on_activate = "install.sh"` in the generated manifest.
-- Symmetric handling for `uninstall.sh` -> `on_deactivate`.
+The heuristic captures config only. It does **not** wire a repo's `install.sh`
+/ `uninstall.sh` as lifecycle hooks — that is opt-in and must be declared in
+the `[lifecycle]` block of an `aenv-namespace.toml` (see above). A bare
+`install.sh` in the source is ignored by the heuristic.
 
 Paths the heuristic doesn't know about are not captured. Authors who need
 them must ship an `aenv-namespace.toml`.

@@ -20,6 +20,11 @@ Global-tooling UX simplification: standing up and switching a global profile is 
 
 - **`--yes` now covers pre-flight** — `aenv global activate`/`use --yes` proceeds past pre-flight findings without prompting (the scan still runs and prints what it found). The separate `--skip-preflight` flag is gone.
 - **Orphan-stash cleanup moved to `aenv global doctor --fix`** — `aenv global deactivate` no longer takes `--prune`; it does exactly one thing.
+- **Heuristic import no longer auto-wires `install.sh` / `uninstall.sh` as lifecycle hooks.** A repo's installer is typically a self-installer that wants to own `~/.claude` and fights aenv's materialization (e.g. claude-ctrl's `install.sh` fails: "missing settings.json"). The heuristic now imports config files only; lifecycle hooks are opt-in via `aenv-namespace.toml`. This makes `aenv global use <repo-url>` activate cleanly for config-bearing repos.
+
+### Fixed
+
+- **Imported lifecycle scripts are made executable before running.** The import/snapshot copy path writes bytes only, dropping the source's executable bit; the activator now restores owner-execute before exec'ing an `on_activate` script, so an opt-in hook from a git/path import isn't refused with "Permission denied."
 
 ### Deprecated
 

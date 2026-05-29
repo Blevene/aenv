@@ -115,7 +115,7 @@ $BIN global use https://github.com/juanandresgs/claude-ctrl --as claude-cntrl
 
 aenv does three things under one command:
 
-**(a) Import.** The importer prefers an `aenv-namespace.toml` at the source root if one is shipped (see [`aenv-namespace-toml-spec.md`](./aenv-namespace-toml-spec.md) for the convention file format); otherwise it falls back to a built-in heuristic that recognizes well-known layouts (notably claude-ctrl-style repos). Here the heuristic picks up `CLAUDE.md`, `agents/`, and `hooks/`, maps them under `.claude/`, and notices `install.sh` / `uninstall.sh` at the repo root and wires them as lifecycle hooks. The generated `~/.aenv/envs/claude-cntrl/aenv.toml` reads:
+**(a) Import.** The importer prefers an `aenv-namespace.toml` at the source root if one is shipped (see [`aenv-namespace-toml-spec.md`](./aenv-namespace-toml-spec.md) for the convention file format); otherwise it falls back to a built-in heuristic that recognizes well-known config layouts (notably claude-ctrl-style repos). It picks up the config it knows — `CLAUDE.md`, `agents/`, `commands/`, `hooks/`, `skills/`, `settings.json`, `bin/`, `runtime/`, `sidecars/`, `.codex/`, … — and maps each under its adapter target. The generated `~/.aenv/envs/claude-cntrl/aenv.toml` reads roughly:
 
 ```toml
 name = "claude-cntrl"
@@ -126,15 +126,21 @@ files = []
 user_files = [
     ".claude/CLAUDE.md",
     ".claude/agents/",
+    ".claude/bin/",
+    ".claude/commands/",
     ".claude/hooks/",
+    ".claude/runtime/",
+    ".claude/settings.json",
+    ".claude/sidecars/",
+    ".claude/skills/",
 ]
 
-[lifecycle]
-on_activate = "install.sh"
-on_deactivate = "uninstall.sh"
+[adapters.codex]
+files = []
+user_files = [".codex/", ".codex/AGENTS.md"]
 ```
 
-The `install.sh` itself is copied into the namespace dir root (NOT under `user/`) — at `~/.aenv/envs/claude-cntrl/install.sh`. Lifecycle scripts live alongside the namespace, not in its materialization surface. (`--pin <ref>` pins git URL sources to a tag or commit SHA for reproducibility; omit for `HEAD`. The standalone `aenv global import <source> [<name>]` does the import half only, without activating — useful when you want to inspect a namespace before turning it on.)
+Note there is **no `[lifecycle]` block**. The heuristic imports config files only — it does *not* auto-wire a repo's `install.sh` as `on_activate`. A repo's installer is typically a self-installer that wants to own `~/.claude` (validate a payload, back up your config, move itself into place); running it as an aenv hook would fight aenv's own materialization. If a namespace genuinely needs a runtime-setup hook, it declares one explicitly in `aenv-namespace.toml` (see [Lifecycle hooks](#lifecycle-hooks-opt-in) below). (`--pin <ref>` pins git URL sources to a tag or commit SHA for reproducibility; omit for `HEAD`. The standalone `aenv global import <source> [<name>]` does the import half only, without activating — useful when you want to inspect a namespace before turning it on.)
 
 **(b) Baseline capture (first activation only).** Because this is the first global activation and no `baseline` namespace exists yet, aenv snapshots your current `~/` surface into `baseline` before materializing anything, then prints:
 
@@ -144,31 +150,21 @@ Captured your current ~/ surface as 'baseline' (swap back with: aenv global use 
 
 (If you ran `global snapshot default` in Step 1, or pass `--no-baseline`, this is skipped.)
 
-**(c) Activate, with lifecycle approval.** The first time aenv is about to run an `on_activate` script for this namespace, it pauses and prints the script's full path, sha256, and first 8 lines, then asks for approval:
+**(c) Activate.** With no lifecycle hook wired, activation just materializes the config — no approval prompt. A pre-flight scan runs first and reports any `settings.json` hook / MCP / statusLine command paths that don't exist on disk (claude-ctrl references its own runtime scripts, which aren't installed in this bare example, so you'll see a batch of these); `--yes` proceeds past them without prompting:
 
 ```
-About to run on_activate hook:
-  Script: /tmp/aenv-global-XXXXXX/.aenv/envs/claude-cntrl/install.sh
-  sha256: sha256:df0271474a03150413c76ec1453b0cdc8acd9720aa6d717d551ac2632ec49b9f
-  First 8 lines:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    echo "Running claude-cntrl install..."
-    echo "  + provisioning policy engine"
-    echo "  + ok"
-Allow this script to run on every future activation until its content changes? [y/N]:
-```
-
-Read the script before you answer. `cat $AENV_HOME/envs/claude-cntrl/install.sh` shows it in full. Answer `y` to proceed:
-
-```
-Running claude-cntrl install...
-  + provisioning policy engine
-  + ok
+Pre-flight found 33 potential issues:
+  - hooks/PreToolUse in …/.claude/settings.json: command '$HOME/.claude/hooks/pre-bash.sh' references … (missing)
+  …
+Continuing because --yes was passed.
+Captured your current ~/ surface as 'baseline' (swap back with: aenv global use baseline).
 Activated 'claude-cntrl' globally in /tmp/aenv-home-XXXXXX
   + .claude/CLAUDE.md (Symlink)
   + .claude/agents (Symlink)
-  + .claude/hooks (Symlink)
+  + .claude/bin (Symlink)
+  + .claude/commands (Symlink)
+  + .claude/settings.json (Symlink)
+  …
 Backed up 1 file(s):
   - .claude/CLAUDE.md -> /tmp/aenv-global-XXXXXX/.aenv/global-stash/epoch-<ts>/.claude/CLAUDE.md
 Note: running harness sessions retain their previous config until restart.
@@ -178,19 +174,9 @@ What happened:
 
 1. `~/.claude/CLAUDE.md` already existed (you wrote it in Setup). It was moved to `$AENV_HOME/global-stash/<ts>/.claude/CLAUDE.md` for byte-perfect restore on deactivate.
 2. Each managed path was symlinked back into `$AENV_HOME/envs/claude-cntrl/user/`.
-3. `install.sh` ran with `cwd = $HOME`, `AENV_NAMESPACE = "claude-cntrl"`, `AENV_TARGET_ROOT = $HOME`. Its stdout/stderr passed through directly.
-4. The activation state file at `$AENV_HOME/global-state.json` was written — the activation is now persisted.
-5. The approval was recorded at `$AENV_HOME/envs/claude-cntrl/.approved`, pinned to the script's sha256.
+3. The activation state file at `$AENV_HOME/global-state.json` was written — the activation is now persisted.
 
-Subsequent activations of `claude-cntrl` with the same script content do NOT prompt — aenv compares the recorded sha against the current file. Editing `install.sh` invalidates the approval and re-prompts the next time around. This is the SHA-pinned approval contract from [`lifecycle-hooks.md` §8](./lifecycle-hooks.md#8-approval-model).
-
-For non-interactive use, `--yes` proceeds without prompting — it records the lifecycle approval as if you'd answered yes, and proceeds past any pre-flight findings:
-
-```bash
-$BIN global use https://github.com/juanandresgs/claude-ctrl --as claude-cntrl --yes
-```
-
-The pre-flight scan still runs under `--yes` and prints what it found (e.g. a settings.json hook / MCP / statusLine command path that doesn't exist on disk yet because `install.sh` hasn't deposited its runtime) — `--yes` only suppresses the prompt, so you still see the warnings.
+> **claude-ctrl's policy-engine runtime.** Because aenv didn't run claude-ctrl's `install.sh`, its Python runtime / `cc-policy` wiring isn't set up here — the pre-flight warnings above flag exactly that. The clean way to wire it is for claude-ctrl to ship an `aenv-namespace.toml` with a **runtime-only** `on_activate` (one that sets up the runtime, since aenv already placed the config). See [Lifecycle hooks](#lifecycle-hooks-opt-in).
 
 Verify state:
 
@@ -201,10 +187,11 @@ $BIN global status
 ```
 Active global namespace: claude-cntrl
 Target root: /tmp/aenv-home-XXXXXX
-Managed files: 3
+Managed files: 11
   ~/.claude/CLAUDE.md
   ~/.claude/agents
-  ~/.claude/hooks
+  ~/.claude/bin
+  …
 Note: running harness sessions retain their previous config until restart.
 ```
 
@@ -248,6 +235,50 @@ Quit and relaunch the harness when you want a swap to take effect.
 
 ---
 
+## Lifecycle hooks (opt-in)
+
+A namespace can run a setup script on activation — but only if it **opts in**, by declaring `[lifecycle]` in its manifest (hand-authored) or in a source repo's `aenv-namespace.toml` (imported). aenv never infers a hook from a bare `install.sh`. A hook should do *runtime-only* setup (install a Python runtime, wire a binary onto `PATH`); aenv has already placed the config files, so a hook that re-copies config fights aenv.
+
+Author a tiny opt-in example:
+
+```bash
+mkdir -p "$AENV_HOME/envs/hooked/user/.claude"
+echo '# hooked profile' > "$AENV_HOME/envs/hooked/user/.claude/CLAUDE.md"
+cat > "$AENV_HOME/envs/hooked/install.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "provisioning runtime for $AENV_NAMESPACE"
+EOF
+cat > "$AENV_HOME/envs/hooked/aenv.toml" <<'EOF'
+name = "hooked"
+
+[adapters.claude-code]
+user_files = [".claude/CLAUDE.md"]
+
+[lifecycle]
+on_activate = "install.sh"
+EOF
+
+$BIN global use hooked
+```
+
+The first activation pauses and asks before running the script — showing its path, sha256, and first 8 lines:
+
+```
+About to run on_activate hook:
+  Script: /tmp/aenv-global-XXXXXX/.aenv/envs/hooked/install.sh
+  sha256: sha256:...
+  First 8 lines:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "provisioning runtime for $AENV_NAMESPACE"
+Allow this script to run on every future activation until its content changes? [y/N]:
+```
+
+Answer `y` and the script runs (you'll see `provisioning runtime for hooked`), then activation completes. The approval is namespace-scoped and SHA-pinned at `$AENV_HOME/envs/hooked/.approved`: subsequent activations with the same script content don't prompt; editing `install.sh` invalidates the approval and re-prompts. `--yes` records approval and skips the prompt (for CI / scripts). The aenv binary restores the script's executable bit before running it, so an imported script that lost its `+x` on copy still runs. Full contract — env vars, exit-code semantics, rollback — in [`lifecycle-hooks.md`](./lifecycle-hooks.md).
+
+---
+
 ## Step 5 — swap back to `default`
 
 ```bash
@@ -264,7 +295,7 @@ Note: running harness sessions retain their previous config until restart.
 
 Behind the scenes that one call performed two operations under a single global lock (`$AENV_HOME/global.lock`):
 
-1. **Deactivated `claude-cntrl`** — ran its `on_deactivate` script (`uninstall.sh` from the import, if it exists), removed every symlink it created, restored the backed-up `.claude/CLAUDE.md` from the stash, and deleted `claude-cntrl`'s state.
+1. **Deactivated `claude-cntrl`** — removed every symlink it created, restored the backed-up `.claude/CLAUDE.md` from the stash, and deleted `claude-cntrl`'s state. (It declared no `on_deactivate`, so there was no lifecycle script to run; a namespace that opts into one would run it here first.)
 2. **Activated `default`** — applied `default`'s `user_files` against the now-restored `$HOME`. The strategy for `.claude/CLAUDE.md` is `Identical`: `default`'s source bytes already match what's at `~/.claude/CLAUDE.md` (because `default` is a snapshot of that file), so there's nothing to swap.
 
 If step 2 had failed, aenv would re-activate `claude-cntrl` as best-effort rollback before returning the error. One activation lives per user, full stop.

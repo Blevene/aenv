@@ -277,10 +277,12 @@ On the next `aenv activate`, the skill materializes at `.claude/skills/aenv/SKIL
 ### Onboard a profile in one command
 
 ```bash
-# Onboard claude-ctrl from upstream: import it AND activate it in one shot.
-# First time only: aenv prints the install.sh sha256 + first 8 lines and asks
-# before running it. On your very first global activation, aenv also captures
-# your current ~/ surface as a 'baseline' namespace so you have a return point.
+# Onboard claude-ctrl from upstream: import its config AND activate it in one
+# shot. On your very first global activation, aenv also captures your current
+# ~/ surface as a 'baseline' namespace so you always have a return point.
+# (A namespace can declare a lifecycle hook in aenv-namespace.toml to run a
+# runtime installer on activation; the first run prompts for approval. The
+# heuristic does not auto-run a repo's install.sh — see Lifecycle hooks below.)
 aenv global use https://github.com/juanandresgs/claude-ctrl
 
 # Swap back to your captured baseline (or any namespace by name).
@@ -307,7 +309,7 @@ aenv global use mine
 | `aenv global use <target> [--as <name>] [--pin <ref>] [--yes] [--no-baseline]` | **The front door.** `<target>` = git URL / local path (import + activate), an existing namespace name (switch), or `-` (previous profile). |
 | `aenv global new <name> [--adapter <a>]` | Scaffold a new, editable user-scope namespace from scratch (seeds the adapter's instructions file + a pre-wired manifest). |
 | `aenv global snapshot <name> [--include <path>...]` | Capture the current `$HOME` user-scope surface into a new namespace. |
-| `aenv global import <source> [<name>] [--pin <ref>]` | Lower-level import (no activation): turn a local path or git URL into a namespace. Auto-wires `install.sh` / `uninstall.sh` as lifecycle hooks; honors an `aenv-namespace.toml` at the source root if present. |
+| `aenv global import <source> [<name>] [--pin <ref>]` | Lower-level import (no activation): turn a local path or git URL into a namespace. Imports config files (heuristic, or per the source's `aenv-namespace.toml`). Lifecycle hooks are opt-in via `aenv-namespace.toml` only — a bare `install.sh` is not auto-wired. |
 | `aenv global activate <ns> [--yes] [--no-baseline]` | **Deprecated** — use `aenv global use <ns>`. Still works (prints a notice); equivalent to `use` on an existing namespace, minus source-import. |
 | `aenv global deactivate [--force]` | Restore the pre-activation `$HOME` surface. `--force` skips a broken `on_deactivate`; file restoration runs either way. |
 | `aenv global status [--json]` | Show the active namespace + every managed `~/<path>`. |
@@ -319,7 +321,7 @@ aenv global use mine
 
 ### Lifecycle hooks: when to use them
 
-If your namespace needs to install a runtime (e.g. claude-ctrl's Python policy engine), declare `[lifecycle] on_activate = "install.sh"` in its `aenv.toml`. The script runs after materialization with `cwd = $HOME`, env vars `AENV_NAMESPACE` / `AENV_NAMESPACE_DIR` / `AENV_TARGET_ROOT` set. First activation prompts before running; approvals are pinned to the script's sha256 at `~/.aenv/envs/<ns>/.approved`, so future edits re-prompt. Full contract in [`pm_docs/lifecycle-hooks.md`](./pm_docs/lifecycle-hooks.md).
+If your namespace needs to install a runtime (e.g. claude-ctrl's Python policy engine), declare `[lifecycle] on_activate = "install.sh"` in its `aenv.toml` — or, for a repo intended to be imported, in its `aenv-namespace.toml`. Lifecycle hooks are **opt-in and explicit**: aenv never infers them from a bare `install.sh` during a heuristic import, because a repo's installer typically wants to own `~/.claude` itself and would fight aenv's materialization. A declared `on_activate` runs after materialization with `cwd = $HOME` and env vars `AENV_NAMESPACE` / `AENV_NAMESPACE_DIR` / `AENV_TARGET_ROOT` set, and should do runtime-only setup (aenv already placed the files). First activation prompts before running; approvals are pinned to the script's sha256 at `~/.aenv/envs/<ns>/.approved`, so future edits re-prompt. Full contract in [`pm_docs/lifecycle-hooks.md`](./pm_docs/lifecycle-hooks.md).
 
 ### Extending the adapter surface
 
