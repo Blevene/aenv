@@ -1,6 +1,6 @@
 # Walkthrough: global namespaces with claude-cntrl
 
-**Tested against:** `main`, `aenv 0.0.3`.
+**Tested against:** `main`, `aenv 0.1.0`.
 **Goal:** onboard claude-ctrl from upstream in a single command (`aenv global use <url>`, which imports + activates and auto-captures a `baseline` return point), swap back to `baseline`, author your own profile from scratch with `aenv global new`, exercise the doctor surface, and walk through the full recovery story for when something breaks.
 
 > **The short version.** Standing up an alternate global profile is one command:
@@ -35,7 +35,7 @@ export RESCUE=$PWD/target/release/aenv-rescue
 
 mkdir -p "$HOME"
 $BIN --version
-# → aenv 0.0.3
+# → aenv 0.1.0
 ```
 
 Two paths to keep in your head:
