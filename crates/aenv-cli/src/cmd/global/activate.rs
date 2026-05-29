@@ -9,7 +9,7 @@
 //! candidate and reports hook / MCP / statusLine command paths that point
 //! at files that don't exist on disk and aren't being materialized by
 //! this activation. If any findings, the user is prompted to continue.
-//! `--yes` answers yes; `--skip-preflight` skips the scan entirely.
+//! `--yes` reports the findings and proceeds without prompting.
 
 use aenv_core::adapter::AdapterRegistry;
 use aenv_core::error::{AenvError, Result};
@@ -19,7 +19,6 @@ use aenv_core::identity::NamespaceId;
 use std::io::{BufRead, Write};
 use std::path::Path;
 
-#[allow(clippy::fn_params_excessive_bools)]
 pub fn run<F: Filesystem>(
     fs: &F,
     layout: &RegistryLayout,
@@ -27,7 +26,6 @@ pub fn run<F: Filesystem>(
     fake_home: &Path,
     name: &str,
     yes: bool,
-    skip_preflight: bool,
 ) -> Result<()> {
     let leaf = NamespaceId::new(name).map_err(|e| AenvError::ManifestInvalid(e.to_string()))?;
 
@@ -35,7 +33,7 @@ pub fn run<F: Filesystem>(
     // lifecycle script. A missing hook target is the F5 lockout class
     // — surfacing it up front is cheaper than discovering it after the
     // activation succeeds and hooks deny every subsequent shell call.
-    if !skip_preflight {
+    {
         let resolution = aenv_core::resolve::resolve_namespace(fs, layout, adapters, &leaf)?;
         let findings = aenv_core::preflight::preflight_settings_commands(
             fs,

@@ -534,7 +534,7 @@ on_deactivate = "fail.sh"
 }
 
 // --------------------------------------------------------------------------
-// Pre-flight scan (Task 18: --skip-preflight, --yes interaction, decline)
+// Pre-flight scan (--yes interaction, decline)
 // --------------------------------------------------------------------------
 
 /// Seed a namespace whose settings.json references a hook command at a
@@ -571,33 +571,6 @@ user_files = [".claude/settings.json"]
 "#,
     )
     .unwrap();
-}
-
-#[test]
-fn activate_skip_preflight_succeeds_even_with_missing_hooks() {
-    let tmp = tempdir().unwrap();
-    let aenv_home = std::fs::canonicalize(tmp.path()).unwrap().join(".aenv");
-    let fake_home = std::fs::canonicalize(tmp.path()).unwrap().join("home");
-    std::fs::create_dir_all(&aenv_home).unwrap();
-    std::fs::create_dir_all(&fake_home).unwrap();
-    seed_namespace_with_broken_hook(&aenv_home);
-
-    let out = aenv(&aenv_home, &fake_home)
-        .args(["global", "activate", "brokens", "--yes", "--skip-preflight"])
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "activate --skip-preflight failed: stderr={}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    // The pre-flight banner should not appear in stderr when we skip.
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        !stderr.contains("Pre-flight"),
-        "--skip-preflight should suppress the banner: {stderr}"
-    );
-    assert!(aenv_home.join("global-state.json").exists());
 }
 
 #[test]
