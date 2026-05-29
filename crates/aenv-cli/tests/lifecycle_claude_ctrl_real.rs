@@ -1,7 +1,7 @@
-//! Real claude-ctrl integration. Clones the upstream repo, imports it
-//! as a namespace, activates under tempdir-HOME with `--yes`, asserts
-//! the key materialization markers are in place, then deactivates and
-//! asserts restoration.
+//! Real claude-ctrl integration. Onboards the upstream repo in one command
+//! (`aenv global use <url>` = import + activate) under a tempdir-HOME with
+//! `--yes`, asserts the key materialization markers are in place, swaps back
+//! to a `default` snapshot, then deactivates and asserts restoration.
 //!
 //! This test:
 //! - clones from a public github repo (network required),
@@ -59,36 +59,27 @@ fn claude_ctrl_imports_activates_deactivates_clean() {
         String::from_utf8_lossy(&out.stderr)
     );
 
-    // 2. Import claude-ctrl from upstream as namespace `claude-cntrl`.
+    // 2. Onboard claude-ctrl from upstream in ONE command: `global use <url>`
+    //    imports it as `claude-cntrl` and activates it (with --yes so the
+    //    lifecycle approval prompt doesn't block). --no-baseline because we
+    //    already captured `default` as our return point above.
     let out = aenv()
         .env("AENV_HOME", &aenv_home)
         .env("HOME", &fake_home)
         .args([
             "global",
-            "import",
+            "use",
             "https://github.com/juanandresgs/claude-ctrl",
+            "--as",
             "claude-cntrl",
+            "--yes",
+            "--no-baseline",
         ])
         .output()
         .unwrap();
     assert!(
         out.status.success(),
-        "import failed: stdout={} stderr={}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-
-    // 3. Activate with --yes so the lifecycle approval prompt doesn't
-    //    block.
-    let out = aenv()
-        .env("AENV_HOME", &aenv_home)
-        .env("HOME", &fake_home)
-        .args(["global", "activate", "claude-cntrl", "--yes"])
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "activate failed: stdout={} stderr={}",
+        "use <url> failed: stdout={} stderr={}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
     );
@@ -112,13 +103,13 @@ fn claude_ctrl_imports_activates_deactivates_clean() {
         "hooks/ not materialized under fake_home/.claude/"
     );
 
-    // 5. Swap to the empty "default" snapshot. This is the
-    //    activate-while-already-active transaction (deactivate the
-    //    current namespace, materialize the new one, all in one shot).
+    // 5. Swap to the empty "default" snapshot via `use <name>`. This is the
+    //    activate-while-already-active transaction (deactivate the current
+    //    namespace, materialize the new one, all in one shot).
     let out = aenv()
         .env("AENV_HOME", &aenv_home)
         .env("HOME", &fake_home)
-        .args(["global", "activate", "default", "--yes"])
+        .args(["global", "use", "default", "--yes", "--no-baseline"])
         .output()
         .unwrap();
     assert!(

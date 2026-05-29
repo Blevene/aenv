@@ -306,8 +306,34 @@ enum CacheAction {
 
 #[derive(Debug, Subcommand)]
 enum GlobalAction {
+    /// Switch your active global profile. `<target>` may be a git URL or
+    /// local path (imported on the spot if not already present), an existing
+    /// namespace name, or `-` to toggle back to the previous profile. This is
+    /// the one-command front door: it folds import + activate + swap into a
+    /// single step. On the first-ever activation it captures a `baseline`
+    /// (opt out with --no-baseline).
+    Use {
+        /// git URL, local path, existing namespace name, or `-` (previous).
+        target: String,
+        /// Name to give an imported source (defaults to the derived name).
+        /// Ignored when the target is an existing namespace or `-`.
+        #[arg(long = "as")]
+        as_name: Option<String>,
+        /// Pin a git source to a tag, commit, or branch. git URLs only.
+        #[arg(long)]
+        pin: Option<String>,
+        /// Non-interactive: approve lifecycle scripts and proceed past
+        /// pre-flight findings without prompting. See `activate --yes`.
+        #[arg(long)]
+        yes: bool,
+        /// Skip the first-activation baseline capture.
+        #[arg(long)]
+        no_baseline: bool,
+    },
     /// Activate a namespace's user-scope files into `$HOME`. Replaces any
-    /// existing global activation in a single transaction.
+    /// existing global activation in a single transaction. (Lower-level form
+    /// of `aenv global use <name>`, which also imports sources and records a
+    /// swap-back point.)
     Activate {
         /// Namespace name to activate globally.
         name: String,
@@ -705,6 +731,29 @@ fn main() -> ExitCode {
                         )
                     })?;
                 match action {
+                    GlobalAction::Use {
+                        target,
+                        as_name,
+                        pin,
+                        yes,
+                        no_baseline,
+                    } => {
+                        let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
+                            &fs,
+                            &layout.adapters_dir(),
+                        )?;
+                        cmd::global::use_::run(
+                            &fs,
+                            &layout,
+                            &adapters,
+                            &fake_home,
+                            &target,
+                            as_name.as_deref(),
+                            pin.as_deref(),
+                            yes,
+                            no_baseline,
+                        )
+                    }
                     GlobalAction::Activate {
                         name,
                         yes,

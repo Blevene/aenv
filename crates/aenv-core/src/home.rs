@@ -76,4 +76,11 @@ impl RegistryLayout {
     pub fn global_lock_path(&self) -> PathBuf {
         self.root.join("global.lock")
     }
+
+    /// Path to the marker recording the previously-active global namespace.
+    /// Written on each `aenv global use` swap; read by `aenv global use -`
+    /// to toggle back. Contents are a single namespace name.
+    pub fn global_previous_path(&self) -> PathBuf {
+        self.root.join("global-previous")
+    }
 }

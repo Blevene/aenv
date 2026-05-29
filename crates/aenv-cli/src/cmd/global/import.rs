@@ -86,7 +86,7 @@ pub(crate) fn looks_like_git_url(source: &str) -> bool {
 /// Resolve a local-path source string into an absolute `PathBuf`. The
 /// `file://` prefix is reserved for git URLs (see [`looks_like_git_url`]);
 /// callers must hand non-git sources as plain filesystem paths.
-fn resolve_local_source(source: &str) -> Result<PathBuf> {
+pub(crate) fn resolve_local_source(source: &str) -> Result<PathBuf> {
     let p = PathBuf::from(source);
     let abs = if p.is_absolute() {
         p
