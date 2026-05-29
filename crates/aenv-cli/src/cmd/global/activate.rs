@@ -195,6 +195,13 @@ fn maybe_capture_baseline<F: Filesystem>(
         let _ = fs.remove_dir_all(&baseline_dir);
         return Ok(());
     }
+    // Record the baseline as the previous profile so `aenv global use -`
+    // toggles back to the pre-aenv surface immediately after this first
+    // activation — there's no prior named profile to point at otherwise.
+    fs.write(
+        &layout.global_previous_path(),
+        BASELINE_NAMESPACE.as_bytes(),
+    )?;
     println!(
         "Captured your current ~/ surface as '{BASELINE_NAMESPACE}' \
          (swap back with: aenv global use {BASELINE_NAMESPACE})."

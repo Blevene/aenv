@@ -145,6 +145,46 @@ fn use_dash_toggles_to_previous_profile() {
 }
 
 #[test]
+fn use_dash_after_first_onboard_returns_to_baseline() {
+    let tmp = tempfile::tempdir().unwrap();
+    let aenv_home = canon(tmp.path()).join(".aenv");
+    let fake_home = canon(tmp.path()).join("home");
+    std::fs::create_dir_all(&aenv_home).unwrap();
+    std::fs::create_dir_all(fake_home.join(".claude")).unwrap();
+    // Pre-existing surface that auto-baseline will capture on first activation.
+    std::fs::write(fake_home.join(".claude/CLAUDE.md"), b"pre-aenv profile").unwrap();
+    seed_adapter(&aenv_home);
+    seed_namespace(&aenv_home, "alpha", "alpha body");
+
+    // First onboard — captures `baseline` and records it as the previous.
+    assert!(aenv(&aenv_home, &fake_home)
+        .args(["global", "use", "alpha", "--yes"])
+        .status()
+        .unwrap()
+        .success());
+    assert_eq!(
+        std::fs::read(fake_home.join(".claude/CLAUDE.md")).unwrap(),
+        b"alpha body"
+    );
+
+    // `use -` toggles straight back to the pre-aenv baseline.
+    let out = aenv(&aenv_home, &fake_home)
+        .args(["global", "use", "-", "--yes"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "use - after first onboard failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(
+        std::fs::read(fake_home.join(".claude/CLAUDE.md")).unwrap(),
+        b"pre-aenv profile",
+        "use - did not restore the auto-captured baseline"
+    );
+}
+
+#[test]
 fn use_dash_with_no_previous_errors() {
     let tmp = tempfile::tempdir().unwrap();
     let aenv_home = canon(tmp.path()).join(".aenv");
