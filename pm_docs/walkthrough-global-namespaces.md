@@ -40,7 +40,7 @@ $BIN --version
 
 Two paths to keep in your head:
 
-- **`$HOME`** — the surface global activations materialize into. `aenv global activate <ns>` writes (symlinks or copies) files under here.
+- **`$HOME`** — the surface global activations materialize into. `aenv global use <ns>` writes (symlinks or copies) files under here.
 - **`$AENV_HOME`** — where the namespace registry lives, and also where the per-user **global activation state** is stored: `$AENV_HOME/global-state.json` (schema v6), stashes under `$AENV_HOME/global-stash/<timestamp>/`, the cross-process lock at `$AENV_HOME/global.lock`, and per-namespace lifecycle approval markers at `$AENV_HOME/envs/<ns>/.approved`.
 
 Confirm the starting state:
@@ -240,7 +240,7 @@ $BIN global which ~/.claude/CLAUDE.md --json
 
 This is where you actually do work. Open a fresh Claude Code session and the harness reads the now-materialized `~/.claude/CLAUDE.md`, the agents under `~/.claude/agents/`, and the hooks under `~/.claude/hooks/`. aenv's job is done — it's a file-mover, not a runtime.
 
-Running harness sessions started **before** the activation keep their previous config until restart. `aenv global activate` prints this caveat every time:
+Running harness sessions started **before** the activation keep their previous config until restart. `aenv global use` prints this caveat every time:
 
 > Note: running harness sessions retain their previous config until restart.
 
@@ -565,7 +565,7 @@ Everything aenv reads or writes for the global scope lives under one of these ro
 
 - **State.** `$AENV_HOME/global-state.json` — JSON schema v6. Records the active namespace name, the target root (`$HOME`), every managed `<rel-path>` with its strategy, the original location of every backed-up file, `lifecycle_ran`, and `was_present_before_activation`. One per user; exists only while a global activation is live.
 - **Stash.** `$AENV_HOME/global-stash/<timestamp>/<rel-path>` — pre-activation originals, moved here by `mv` so the restore is byte-perfect. `<timestamp>` is nanoseconds-since-epoch, so concurrent activations don't collide. A clean deactivate consumes its own stash.
-- **Lock.** `$AENV_HOME/global.lock` — advisory file lock acquired around any state-mutating global op. Concurrent `aenv global activate` invocations serialize cleanly; in-flight reads (`global status`, `global which`, `global list`) don't take the lock.
+- **Lock.** `$AENV_HOME/global.lock` — advisory file lock acquired around any state-mutating global op. Concurrent `aenv global use` invocations serialize cleanly; in-flight reads (`global status`, `global which`, `global list`) don't take the lock.
 - **Lifecycle approval markers.** `$AENV_HOME/envs/<ns>/.approved` — file containing the sha256 of the `on_activate` script the user previously approved for `<ns>`. Subsequent activations with matching SHA proceed silently; mismatched SHA re-prompts.
 - **Materialized files.** `$HOME/<rel-path>` — what the agent harness sees. Symlinks back into the namespace source under the default `materialize = "symlink"`; regular file copies under `materialize = "copy"`.
 - **Source layout.** `$AENV_HOME/envs/<ns>/user/<rel-path>` — what you hand-author (or what the importer / snapshotter wrote). The `user/` subdir mirrors the materialization target one-to-one: a file at `~/.aenv/envs/claude-cntrl/user/.claude/CLAUDE.md` materializes at `$HOME/.claude/CLAUDE.md`.

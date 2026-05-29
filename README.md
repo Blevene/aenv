@@ -308,14 +308,14 @@ aenv global use mine
 | `aenv global new <name> [--adapter <a>]` | Scaffold a new, editable user-scope namespace from scratch (seeds the adapter's instructions file + a pre-wired manifest). |
 | `aenv global snapshot <name> [--include <path>...]` | Capture the current `$HOME` user-scope surface into a new namespace. |
 | `aenv global import <source> [<name>] [--pin <ref>]` | Lower-level import (no activation): turn a local path or git URL into a namespace. Auto-wires `install.sh` / `uninstall.sh` as lifecycle hooks; honors an `aenv-namespace.toml` at the source root if present. |
-| `aenv global activate <ns> [--yes] [--no-baseline]` | Lower-level activate of an existing namespace (alias for `use <name>` without source-import). Prompts for lifecycle approval on first run and for unresolvable settings.json command paths; `--yes` proceeds without prompting. |
+| `aenv global activate <ns> [--yes] [--no-baseline]` | **Deprecated** — use `aenv global use <ns>`. Still works (prints a notice); equivalent to `use` on an existing namespace, minus source-import. |
 | `aenv global deactivate [--force]` | Restore the pre-activation `$HOME` surface. `--force` skips a broken `on_deactivate`; file restoration runs either way. |
 | `aenv global status [--json]` | Show the active namespace + every managed `~/<path>`. |
 | `aenv global which <path> [--json]` | "Which namespace manages `~/.claude/foo`?" — JSON includes the file's `content_hash`. |
 | `aenv global list [--json]` | List every namespace whose manifest declares `user_files`. |
 | `aenv global doctor [<ns>] [--json] [--fix]` | Run policies (`instructions_max_chars`, `hook_paths_resolvable`, `copy_mode_local_edits`) against user-scope candidates; flag orphan stashes (exit 19). `--fix` clears the orphan stashes it finds. |
 | `aenv global diff [<a> <b>] [--json]` | Byte-level drift detection (no args) or structural diff between two namespaces' user-scope subsets. |
-| `aenv use <ns> --global [--yes]` | Sugar: `aenv use <ns> && aenv activate && aenv global activate <ns>`. |
+| `aenv use <ns> --global [--yes]` | Sugar: pin the project, activate it, and activate `<ns>` globally — all in one command. |
 
 ### Lifecycle hooks: when to use them
 

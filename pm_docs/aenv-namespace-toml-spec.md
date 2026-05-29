@@ -6,9 +6,10 @@
 
 A repository or directory that's intended to be imported as an aenv namespace
 MAY ship an `aenv-namespace.toml` at its root. When `aenv global import
-<source>` runs, this file (if present) is authoritative: it tells the importer
-which adapters the source touches, where to place each piece in the destination
-namespace, and which lifecycle scripts to wire up.
+<source>` — or the one-command `aenv global use <source>`, which imports and
+then activates — runs, this file (if present) is authoritative: it tells the
+importer which adapters the source touches, where to place each piece in the
+destination namespace, and which lifecycle scripts to wire up.
 
 When `aenv-namespace.toml` is absent, the importer falls back to a heuristic
 that recognizes a few well-known layouts (notably `claude-ctrl`-style

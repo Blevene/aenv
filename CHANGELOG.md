@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Global-tooling UX simplification: standing up and switching a global profile is now a one-command experience, with safer defaults and a smaller flag surface.
+
+### Added
+
+- **`aenv global use <target>`** — the one-command front door for global profiles. `<target>` is a git URL or local path (imported on the spot if not already present, then activated), an existing namespace name (switch to it), or `-` (toggle back to the previously-active profile). Collapses the former `snapshot` → `import` → `activate` ritual into a single command: `aenv global use https://github.com/juanandresgs/claude-ctrl`. Flags: `--as <name>` (name an imported source), `--pin <ref>` (git sources), `--yes`, `--no-baseline`.
+- **`aenv global new <name> [--adapter <a>]`** — scaffold a new, editable user-scope namespace from scratch. Seeds the adapter's instructions file (e.g. `~/.claude/CLAUDE.md`) under the namespace's `user/` subtree and pre-wires the manifest's `user_files`. The third way to create a namespace, alongside `snapshot` and `import`.
+- **Auto-baseline on first activation** — the first-ever global activation captures the current `$HOME` user-scope surface into a `baseline` namespace, so there's always a named return point (`aenv global use baseline` or `aenv global use -`). Opt out with `--no-baseline`. An empty `$HOME` captures nothing and leaves no namespace behind.
+- **`aenv global doctor --fix`** — deletes the orphan stash directories the audit finds, then reports clean (exit 0).
+
+### Changed
+
+- **`--yes` now covers pre-flight** — `aenv global activate`/`use --yes` proceeds past pre-flight findings without prompting (the scan still runs and prints what it found). The separate `--skip-preflight` flag is gone.
+- **Orphan-stash cleanup moved to `aenv global doctor --fix`** — `aenv global deactivate` no longer takes `--prune`; it does exactly one thing.
+
+### Deprecated
+
+- **`aenv global activate <ns>`** — use `aenv global use <ns>` instead. The alias still works but prints a deprecation notice. Project-scope `aenv activate` is unaffected.
+
+### Removed
+
+- **`aenv global activate --skip-preflight`** — folded into `--yes` (see Changed).
+- **`aenv global deactivate --prune`** — replaced by `aenv global doctor --fix` (see Changed).
+
 ## [0.1.0] — 2026-05-28
 
 Issue #4: global namespaces. `aenv` can now swap user-level harness configurations (`~/.claude/`, `~/.codex/`) the same way it swaps project-local configs, with lifecycle hooks for runtime install/uninstall, byte-level recovery, and a separate emergency-recovery binary for hook-lockout scenarios.

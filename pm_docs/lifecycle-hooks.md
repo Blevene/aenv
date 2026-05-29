@@ -22,7 +22,7 @@ with this document, the code is the source of truth — open an issue.
 
 ### `on_activate`
 
-Runs as the LAST step of `aenv global activate` (and `aenv use --global`),
+Runs as the LAST step of `aenv global use` (and `aenv use --global`),
 AFTER all user-scope files have been materialized into `$HOME` and BEFORE
 the global state file (`global-state.json`) is written. This ordering is
 load-bearing: the script may probe the materialized surface (e.g.
@@ -48,7 +48,7 @@ Set by `run_lifecycle_script` for every lifecycle invocation:
 | Variable | Value | Notes |
 |---|---|---|
 | `AENV_NAMESPACE` | Leaf namespace name (e.g. `"research"`) | Same as the `name` field in the namespace's manifest. |
-| `AENV_SCOPE` | `"project"` or `"user"` | Today, `aenv global activate` always passes `"user"`; project-scope lifecycle is a future surface. |
+| `AENV_SCOPE` | `"project"` or `"user"` | Today, `aenv global use` always passes `"user"`; project-scope lifecycle is a future surface. |
 | `AENV_TARGET_ROOT` | Absolute path to the activation root | `$HOME` for global activation; the project root for project activation. |
 | `AENV_NAMESPACE_DIR` | Absolute path to the namespace dir | Typically `~/.aenv/envs/<ns>/`. The script's siblings (its `runtime/`, `templates/`, etc.) live here. |
 | `AENV_LIFECYCLE_EVENT` | `"activate"` or `"deactivate"` | Useful when one script is symlinked to both keys. |
@@ -200,7 +200,7 @@ an UNCHANGED script proceed silently. If the script's contents change
 (any byte), the SHA differs, the recorded approval is stale, and the
 prompt re-fires.
 
-`--yes` on `aenv global activate <ns>` (and on `aenv use <ns> --global`)
+`--yes` on `aenv global use <ns>` (and on `aenv use <ns> --global`)
 skips the prompt and records approval as if the user had answered "yes."
 This is the right thing for non-interactive contexts (CI, scripted
 provisioning); it is the WRONG thing if you don't trust the namespace
