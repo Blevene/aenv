@@ -146,16 +146,16 @@ fn full_cycle_activate_swap_deactivate_prune() {
         "which stdout missing 'default': {stdout}"
     );
 
-    // 5. deactivate --prune.
+    // 5. deactivate, then doctor --fix to clear the now-orphan stash.
     let out = aenv()
         .env("AENV_HOME", &aenv_home)
         .env("HOME", &fake_home)
-        .args(["global", "deactivate", "--prune"])
+        .args(["global", "deactivate"])
         .output()
         .unwrap();
     assert!(
         out.status.success(),
-        "global deactivate --prune failed: status={:?}, stdout={}, stderr={}",
+        "global deactivate failed: status={:?}, stdout={}, stderr={}",
         out.status,
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
@@ -168,7 +168,22 @@ fn full_cycle_activate_swap_deactivate_prune() {
     assert_eq!(
         std::fs::read(fake_home.join(".claude/CLAUDE.md")).unwrap(),
         b"original CLAUDE.md",
-        "original CLAUDE.md not restored after deactivate --prune"
+        "original CLAUDE.md not restored after deactivate"
+    );
+    // After a clean deactivate the stash it consumed is gone; any remaining
+    // stash would be orphan. `doctor --fix` clears orphans and exits 0.
+    let out = aenv()
+        .env("AENV_HOME", &aenv_home)
+        .env("HOME", &fake_home)
+        .args(["global", "doctor", "--fix"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "global doctor --fix failed: status={:?}, stdout={}, stderr={}",
+        out.status,
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
     );
     // Stash dir empty or absent.
     let stash_root = aenv_home.join("global-stash");
@@ -180,7 +195,7 @@ fn full_cycle_activate_swap_deactivate_prune() {
             .collect();
         assert!(
             remaining.is_empty(),
-            "global-stash should be empty after --prune; got {} dirs",
+            "global-stash should be empty after doctor --fix; got {} dirs",
             remaining.len()
         );
     }

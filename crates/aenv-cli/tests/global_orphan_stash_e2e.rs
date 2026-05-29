@@ -1,4 +1,4 @@
-//! End-to-end tests for orphan-stash detection and `aenv global deactivate --prune`.
+//! End-to-end tests for orphan-stash detection and `aenv global doctor --fix`.
 //!
 //! An orphan stash is a timestamped subdir of `<aenv_home>/global-stash/` that
 //! is not referenced by the currently-active `global-state.json`. With no
@@ -57,7 +57,7 @@ fn global_doctor_reports_orphan_stash() {
 }
 
 #[test]
-fn global_deactivate_prune_removes_orphan_stash() {
+fn global_doctor_fix_removes_orphan_stash() {
     let tmp = tempfile::tempdir().unwrap();
     let aenv_home = canon(tmp.path()).join(".aenv");
     let fake_home = canon(tmp.path()).join("home");
@@ -70,18 +70,24 @@ fn global_deactivate_prune_removes_orphan_stash() {
     let out = aenv()
         .env("AENV_HOME", &aenv_home)
         .env("HOME", &fake_home)
-        .args(["global", "deactivate", "--prune"])
+        .args(["global", "doctor", "--fix"])
         .output()
         .unwrap();
+    // --fix clears the orphan and exits 0 (no longer the exit-19 error).
     assert!(
         out.status.success(),
-        "stderr: {}",
+        "doctor --fix should exit 0; stderr: {}",
         String::from_utf8_lossy(&out.stderr)
     );
     // The orphan stash dir is gone.
     assert!(
         !aenv_home.join("global-stash/epoch-77").exists(),
         "orphan stash should have been pruned"
+    );
+    assert!(
+        String::from_utf8_lossy(&out.stdout).contains("Pruned 1 orphan stash"),
+        "expected pruned summary; stdout={}",
+        String::from_utf8_lossy(&out.stdout)
     );
 }
 

@@ -82,7 +82,7 @@ enum Command {
         project: Option<PathBuf>,
         /// Also remove every timestamped backup directory under
         /// `.aenv-state/backup/`. Older runs' backups accumulate
-        /// otherwise. Project-side analog of `aenv global deactivate --prune`.
+        /// otherwise. (The global-scope analog is `aenv global doctor --fix`.)
         #[arg(long)]
         prune: bool,
     },
@@ -329,10 +329,6 @@ enum GlobalAction {
         /// missing or corrupted). File restoration proceeds either way.
         #[arg(long)]
         force: bool,
-        /// Also remove orphan stash directories (timestamped subdirs of
-        /// `<aenv_home>/global-stash/` not referenced by any active state).
-        #[arg(long)]
-        prune: bool,
     },
     /// Show the active global namespace and managed files.
     Status {
@@ -353,12 +349,19 @@ enum GlobalAction {
         #[arg(long)]
         json: bool,
     },
-    /// Evaluate policies against a namespace's user-scope candidates.
+    /// Evaluate policies against a namespace's user-scope candidates, and
+    /// audit global state for orphan stash directories.
     Doctor {
         /// Namespace to evaluate (defaults to the active global namespace).
         namespace: Option<String>,
         #[arg(long)]
         json: bool,
+        /// Delete any orphan stash directories found during the audit
+        /// (subdirs of `<aenv_home>/global-stash/` not referenced by the
+        /// active state), then report clean. Without this, orphans are an
+        /// error (exit 19) when auditing global state as a whole.
+        #[arg(long)]
+        fix: bool,
     },
     /// Snapshot the current `$HOME` user-scope surface (`~/.claude/`,
     /// `~/.codex/`, etc.) into a new namespace. The set of captured paths
@@ -687,8 +690,8 @@ fn main() -> ExitCode {
                         )?;
                         cmd::global::activate::run(&fs, &layout, &adapters, &fake_home, &name, yes)
                     }
-                    GlobalAction::Deactivate { force, prune } => {
-                        cmd::global::deactivate::run(&fs, &layout, &fake_home, force, prune)
+                    GlobalAction::Deactivate { force } => {
+                        cmd::global::deactivate::run(&fs, &layout, &fake_home, force)
                     }
                     GlobalAction::Status { json } => {
                         cmd::global::status::run(&fs, &layout, &fake_home, json)
@@ -701,7 +704,11 @@ fn main() -> ExitCode {
                         cmd::global::which::run(&fs, &layout, &adapters, &fake_home, &path, json)
                     }
                     GlobalAction::List { json } => cmd::global::list::run(&fs, &layout, json),
-                    GlobalAction::Doctor { namespace, json } => {
+                    GlobalAction::Doctor {
+                        namespace,
+                        json,
+                        fix,
+                    } => {
                         let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
                             &fs,
                             &layout.adapters_dir(),
@@ -713,6 +720,7 @@ fn main() -> ExitCode {
                             &fake_home,
                             namespace.as_deref(),
                             json,
+                            fix,
                         )
                     }
                     GlobalAction::Snapshot { name, include } => {

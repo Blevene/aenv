@@ -1,13 +1,13 @@
 //! `aenv global deactivate` — reverse a global activation.
 //!
-//! Exit 0 with a no-op message when no global activation is live. With
-//! `prune = true`, also removes orphan stash directories (subdirs of
-//! `<aenv_home>/global-stash/` not referenced by any active state) after
-//! the deactivation. Calling `--prune` against a clean home is a no-op.
+//! Exit 0 with a no-op message when no global activation is live.
 //!
 //! `force = true` skips the namespace's `on_deactivate` lifecycle hook —
 //! useful when the hook itself is broken (e.g. a missing interpreter).
 //! File restoration proceeds either way.
+//!
+//! Orphan stash cleanup lives on `aenv global doctor --fix`, not here:
+//! deactivation does exactly one thing.
 
 use aenv_core::error::Result;
 use aenv_core::fs::Filesystem;
@@ -19,47 +19,28 @@ pub fn run<F: Filesystem>(
     layout: &RegistryLayout,
     fake_home: &Path,
     force: bool,
-    prune: bool,
 ) -> Result<()> {
     if !fs.exists(&layout.global_state_path())? {
         println!("no global activation to deactivate");
+        return Ok(());
+    }
+    let active = aenv_core::deactivate::deactivate_namespace_in_scope_with_force(
+        fs,
+        layout,
+        fake_home,
+        aenv_core::scope::Scope::User,
+        force,
+    )?;
+    if force {
+        println!(
+            "Deactivated namespace '{active}' globally in {}. (--force: skipped on_deactivate.)",
+            fake_home.display()
+        );
     } else {
-        let active = aenv_core::deactivate::deactivate_namespace_in_scope_with_force(
-            fs,
-            layout,
-            fake_home,
-            aenv_core::scope::Scope::User,
-            force,
-        )?;
-        if force {
-            println!(
-                "Deactivated namespace '{active}' globally in {}. (--force: skipped on_deactivate.)",
-                fake_home.display()
-            );
-        } else {
-            println!(
-                "Deactivated namespace '{active}' globally in {}",
-                fake_home.display()
-            );
-        }
+        println!(
+            "Deactivated namespace '{active}' globally in {}",
+            fake_home.display()
+        );
     }
-
-    if prune {
-        // Call `list_orphan_stashes` after deactivation: the just-finished
-        // activation's stash directory is now orphan and will be pruned in
-        // the same call.
-        let orphans = aenv_core::state::list_orphan_stashes(layout)?;
-        for path in &orphans {
-            let _ = std::fs::remove_dir_all(path);
-        }
-        if !orphans.is_empty() {
-            println!(
-                "Pruned {} orphan stash{}.",
-                orphans.len(),
-                if orphans.len() == 1 { "" } else { "es" }
-            );
-        }
-    }
-
     Ok(())
 }

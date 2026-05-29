@@ -1,9 +1,15 @@
-//! `aenv global doctor [<ns>]` — user-scope policy evaluation.
+//! `aenv global doctor [<ns>] [--fix]` — user-scope policy evaluation.
 //!
 //! Resolves a namespace (either explicitly passed or read from
 //! `global-state.json`), runs `aenv_core::doctor::evaluate`, and filters the
 //! outcomes to those whose target label is a user-scope path (i.e. the
 //! qualified-name display contains `::~/`).
+//!
+//! Also detects orphan stash directories (subdirs of
+//! `<aenv_home>/global-stash/` not referenced by the active state). Without
+//! `--fix`, orphans are reported and, when auditing global state as a whole
+//! (no namespace arg), treated as a hard error (exit 19). With `--fix`, the
+//! orphans are deleted up front and the audit proceeds clean (exit 0).
 
 use aenv_core::adapter::AdapterRegistry;
 use aenv_core::error::{AenvError, Result};
@@ -19,12 +25,33 @@ pub fn run<F: Filesystem>(
     fake_home: &std::path::Path,
     namespace: Option<&str>,
     json: bool,
+    fix: bool,
 ) -> Result<()> {
     // Detect orphan stashes up-front: subdirs of `<aenv_home>/global-stash/`
     // not referenced by the active state. Surfaced informationally when a
     // specific namespace is being audited; treated as a hard error (exit 19)
     // when the user is auditing global state as a whole (no namespace arg).
-    let orphans = aenv_core::state::list_orphan_stashes(layout)?;
+    let mut orphans = aenv_core::state::list_orphan_stashes(layout)?;
+
+    // `--fix` is the remediation half of the audit: delete the orphan stashes
+    // and proceed as if they were never there (no error, clean report). A live
+    // activation's own stash is referenced by state and is never orphan, so it
+    // is never deleted here.
+    let mut pruned: Vec<String> = Vec::new();
+    if fix && !orphans.is_empty() {
+        for path in &orphans {
+            let _ = std::fs::remove_dir_all(path);
+            pruned.push(path.display().to_string());
+        }
+        if !json {
+            println!(
+                "Pruned {} orphan stash{}.",
+                pruned.len(),
+                if pruned.len() == 1 { "" } else { "es" }
+            );
+        }
+        orphans = Vec::new();
+    }
 
     // Resolve which namespace to audit. If none was passed, read the active
     // global state. With no active state, we still need to report orphans
@@ -46,7 +73,7 @@ pub fn run<F: Filesystem>(
         }
     };
 
-    // No namespace to evaluate and no active state: handle the two sub-cases.
+    // No namespace to evaluate and no active state: handle the sub-cases.
     let Some(ns_name) = ns_name else {
         if json {
             let orphan_paths: Vec<String> =
@@ -58,21 +85,24 @@ pub fn run<F: Filesystem>(
                     "namespace": null,
                     "outcomes": [],
                     "orphan_stashes": orphan_paths,
+                    "pruned_stashes": pruned,
                 }))
                 .unwrap()
             );
-        } else if orphans.is_empty() {
-            // Nothing to do — but the user asked for a global audit with no
-            // activation. Match the previous behaviour: error out.
+        } else if !orphans.is_empty() {
+            print_orphans_text(&orphans);
+        } else if !fix {
+            // Nothing to do — the user asked for a global audit with no
+            // activation and nothing to clean. Match the historical
+            // behaviour and error out. With `--fix`, the cleanup (possibly a
+            // no-op) is itself the goal, so this stays a success.
             return Err(AenvError::ActivationConflict(
                 "no global activation; pass a namespace name to evaluate one directly".into(),
             ));
-        } else {
-            print_orphans_text(&orphans);
         }
         if !orphans.is_empty() {
             return Err(AenvError::GlobalConflict(format!(
-                "{} orphan stash{} found; run `aenv global deactivate --prune` to clear",
+                "{} orphan stash{} found; run `aenv global doctor --fix` to clear",
                 orphans.len(),
                 if orphans.len() == 1 { "" } else { "es" },
             )));
@@ -134,6 +164,7 @@ pub fn run<F: Filesystem>(
             "namespace": ns_name,
             "outcomes": outcomes_json,
             "orphan_stashes": orphan_paths,
+            "pruned_stashes": pruned,
         });
         println!("{}", serde_json::to_string_pretty(&payload).unwrap());
     } else {
@@ -172,7 +203,7 @@ pub fn run<F: Filesystem>(
     // report and exit 0.
     if namespace.is_none() && !orphans.is_empty() {
         return Err(AenvError::GlobalConflict(format!(
-            "{} orphan stash{} found; run `aenv global deactivate --prune` to clear",
+            "{} orphan stash{} found; run `aenv global doctor --fix` to clear",
             orphans.len(),
             if orphans.len() == 1 { "" } else { "es" },
         )));
