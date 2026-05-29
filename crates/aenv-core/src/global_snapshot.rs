@@ -200,6 +200,102 @@ pub fn snapshot_global<F: Filesystem>(
     Ok(summary)
 }
 
+/// Summary returned by [`scaffold_global_namespace`].
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ScaffoldSummary {
+    /// Adapter-relative target paths declared in the generated manifest and
+    /// scaffolded on disk under `user/`.
+    pub user_files_declared: Vec<String>,
+    /// The instructions file seeded with a starter header, if one was found.
+    pub seeded_instructions: Option<String>,
+}
+
+/// Scaffold an empty, editable user-scope namespace from scratch.
+///
+/// The dual of `aenv create` for the global scope: instead of populating a
+/// namespace from `$HOME` (snapshot) or an external tree (import), this seeds
+/// a minimal hand-authorable starting point. It picks the adapter's
+/// instructions-role user file (e.g. `~/.claude/CLAUDE.md` for claude-code),
+/// writes it under `user/` with a one-line starter header, and declares it in
+/// the manifest's `[adapters.<adapter>].user_files`. The result is
+/// immediately `aenv global use`-able and ready to edit.
+///
+/// - `name` must be a valid `NamespaceId`; the namespace dir must not exist.
+/// - `adapter_name` must be installed (else `AdapterMissing`).
+pub fn scaffold_global_namespace<F: Filesystem>(
+    fs: &F,
+    layout: &RegistryLayout,
+    adapters: &AdapterRegistry,
+    name: &str,
+    adapter_name: &str,
+) -> Result<ScaffoldSummary> {
+    let _ = NamespaceId::new(name)?;
+    let ns_dir = layout.namespace_dir(name);
+    if fs.exists(&ns_dir)? {
+        return Err(AenvError::ActivationConflict(format!(
+            "namespace '{name}' already exists at {}; choose a different name",
+            ns_dir.display()
+        )));
+    }
+    let adapter = adapters
+        .get(adapter_name)
+        .ok_or_else(|| AenvError::AdapterMissing(adapter_name.to_string()))?;
+
+    // Pick the path to seed: the adapter's instructions-role user file if it
+    // declares one, else the first concrete (non-glob, non-directory) entry in
+    // its `user_files`. Directory markers and globs aren't seedable as a single
+    // editable file, so we skip them.
+    let seed_raw = adapter
+        .user_roles
+        .iter()
+        .find(|(_, role)| role.as_str() == "instructions")
+        .map(|(p, _)| p.clone())
+        .or_else(|| {
+            adapter
+                .user_files
+                .iter()
+                .find(|f| !f.contains('*') && !f.ends_with('/'))
+                .cloned()
+        });
+
+    let mut summary = ScaffoldSummary::default();
+    if let Some(raw) = seed_raw {
+        let rel = strip_tilde(&raw).trim_end_matches('/').to_string();
+        if !rel.is_empty() {
+            let dst = ns_dir.join("user").join(&rel);
+            fs.write(&dst, format!("# {name}\n").as_bytes())?;
+            summary.user_files_declared.push(rel.clone());
+            summary.seeded_instructions = Some(rel);
+        }
+    }
+
+    let mut adapters_block: BTreeMap<String, AdapterEntry> = BTreeMap::new();
+    adapters_block.insert(
+        adapter_name.to_string(),
+        AdapterEntry {
+            files: Vec::new(),
+            merge: None,
+            user_files: summary.user_files_declared.clone(),
+            user_merge: None,
+            materialize: None,
+        },
+    );
+    let manifest = AenvManifest {
+        name: name.to_string(),
+        extends: Vec::new(),
+        adapters: adapters_block,
+        parameters: BTreeMap::new(),
+        policies: BTreeMap::new(),
+        skills: Vec::new(),
+        lifecycle: LifecycleHooks::default(),
+    };
+    let body =
+        toml::to_string_pretty(&manifest).map_err(|e| AenvError::ManifestInvalid(e.to_string()))?;
+    fs.write(&layout.manifest_path(name), body.as_bytes())?;
+
+    Ok(summary)
+}
+
 /// Parsed shape of a source repo's `aenv-namespace.toml` convention file.
 ///
 /// All fields are optional; an empty convention file is legal. See

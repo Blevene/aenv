@@ -363,6 +363,19 @@ enum GlobalAction {
         #[arg(long)]
         fix: bool,
     },
+    /// Scaffold a new, empty user-scope namespace ready to edit. Seeds the
+    /// adapter's instructions file (e.g. `~/.claude/CLAUDE.md`) under the
+    /// namespace's `user/` subtree and pre-wires the manifest's `user_files`.
+    /// Author your own global profile from scratch, then turn it on with
+    /// `aenv global use <name>`.
+    New {
+        /// Name of the new namespace. Must be a valid `NamespaceId` and not
+        /// already exist.
+        name: String,
+        /// Adapter to scaffold for.
+        #[arg(long, default_value = "claude-code")]
+        adapter: String,
+    },
     /// Snapshot the current `$HOME` user-scope surface (`~/.claude/`,
     /// `~/.codex/`, etc.) into a new namespace. The set of captured paths
     /// is determined by every installed adapter's `user_files` plus any
@@ -722,6 +735,9 @@ fn main() -> ExitCode {
                             json,
                             fix,
                         )
+                    }
+                    GlobalAction::New { name, adapter } => {
+                        cmd::global::new::run(&fs, &layout, &name, &adapter)
                     }
                     GlobalAction::Snapshot { name, include } => {
                         let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(

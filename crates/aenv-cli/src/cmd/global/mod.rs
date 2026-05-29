@@ -7,6 +7,7 @@ pub mod diff;
 pub mod doctor;
 pub mod import;
 pub mod list;
+pub mod new;
 pub mod snapshot;
 pub mod status;
 pub mod which;
