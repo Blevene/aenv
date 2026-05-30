@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Global-tooling UX simplification: standing up and switching a global profile is now a one-command experience, with safer defaults and a smaller flag surface.
+## [0.2.0] — 2026-05-30
+
+Global-tooling UX simplification: standing up and switching a global profile is now a one-command experience, with safer defaults and a smaller flag surface. (First tagged release since v0.0.3; supersedes the un-tagged v0.1.0 prep below, whose global-namespaces work this release also includes.)
 
 ### Added
 
@@ -132,7 +134,8 @@ Initial tagged release. Everything described in the README's "What works today" 
 - **Phase 6 (partial)** — `aenv install` / `aenv sync` / `aenv promote` for git-remote-backed multi-machine sync.
 - **Phase 7** — Windows symlink fallback to copy-mode + Windows CI; macOS notarization.
 
-[Unreleased]: https://github.com/Blevene/aenv/compare/v0.0.3...HEAD
+[Unreleased]: https://github.com/Blevene/aenv/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Blevene/aenv/compare/v0.0.3...v0.2.0
 [0.0.3]: https://github.com/Blevene/aenv/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/Blevene/aenv/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/Blevene/aenv/releases/tag/v0.0.1
