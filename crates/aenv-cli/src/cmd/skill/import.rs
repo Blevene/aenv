@@ -19,6 +19,7 @@ pub fn run<F: Filesystem>(
     adapter_arg: Option<&str>,
     pin: Option<&str>,
     path_arg: Option<&str>,
+    scope: aenv_core::scope::Scope,
 ) -> Result<()> {
     let manifest_path = layout.manifest_path(namespace);
     if !fs.exists(&manifest_path)? {
@@ -72,7 +73,7 @@ pub fn run<F: Filesystem>(
         ref_: pin.map(String::from),
         path: path_arg.map(String::from),
         required: false,
-        scope: aenv_core::scope::Scope::default(),
+        scope,
     };
 
     if let Some(pin_ref) = pin {
@@ -89,6 +90,7 @@ pub fn run<F: Filesystem>(
     fs.write(&manifest_path, manifest.to_toml().as_bytes())?;
     println!("Imported skill '{skill_name}' into namespace '{namespace}':");
     println!("  - source: {source}");
+    println!("  - scope: {}", scope.as_str());
     if let Some(p) = pinned_path {
         println!("  - path: {p}");
     }

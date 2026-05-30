@@ -258,6 +258,11 @@ enum SkillAction {
         /// Adapter (defaults to the namespace's only adapter if exactly one).
         #[arg(long)]
         adapter: Option<String>,
+        /// Scope: `project` (default) or `user`. `user` scaffolds the skill
+        /// under the adapter's user_skills_dir so it materializes into
+        /// `~/.claude/skills/<name>/` when the namespace is activated globally.
+        #[arg(long, default_value = "project")]
+        scope: String,
     },
     /// Import a skill from a local path, git URL, or registry.
     Import {
@@ -274,6 +279,11 @@ enum SkillAction {
         /// `--path scientific-skills/scanpy`).
         #[arg(long)]
         path: Option<String>,
+        /// Scope: `project` (default) or `user`. `user` makes the skill
+        /// materialize into `~/.claude/skills/<name>/` when the namespace is
+        /// activated globally (`aenv global use <ns>`).
+        #[arg(long, default_value = "project")]
+        scope: String,
     },
     /// List every skill in every namespace (or one if --ns).
     List {
@@ -464,6 +474,18 @@ enum GlobalAction {
     },
 }
 
+/// Parse a `--scope` flag value into a `Scope`. Accepts only `project` or
+/// `user`; anything else is a `ManifestInvalid` (exit 12).
+fn parse_scope(s: &str) -> Result<aenv_core::scope::Scope, aenv_core::AenvError> {
+    match s {
+        "project" => Ok(aenv_core::scope::Scope::Project),
+        "user" => Ok(aenv_core::scope::Scope::User),
+        other => Err(aenv_core::AenvError::ManifestInvalid(format!(
+            "invalid --scope '{other}'; expected 'project' or 'user'"
+        ))),
+    }
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let fs = RealFilesystem;
@@ -612,7 +634,12 @@ fn main() -> ExitCode {
                 cmd::unpin::run(&fs, &project_root)
             }
             Command::Skill { action } => match action {
-                SkillAction::New { name, ns, adapter } => {
+                SkillAction::New {
+                    name,
+                    ns,
+                    adapter,
+                    scope,
+                } => {
                     let adapters_reg = aenv_core::adapter::AdapterRegistry::load_from_dir(
                         &fs,
                         &layout.adapters_dir(),
@@ -624,6 +651,7 @@ fn main() -> ExitCode {
                         &ns,
                         &name,
                         adapter.as_deref(),
+                        parse_scope(&scope)?,
                     )
                 }
                 SkillAction::Import {
@@ -632,6 +660,7 @@ fn main() -> ExitCode {
                     adapter,
                     pin,
                     path,
+                    scope,
                 } => {
                     let adapters_reg = aenv_core::adapter::AdapterRegistry::load_from_dir(
                         &fs,
@@ -646,6 +675,7 @@ fn main() -> ExitCode {
                         adapter.as_deref(),
                         pin.as_deref(),
                         path.as_deref(),
+                        parse_scope(&scope)?,
                     )
                 }
                 SkillAction::List { ns, json } => {

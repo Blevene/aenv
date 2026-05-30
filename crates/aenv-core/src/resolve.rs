@@ -539,26 +539,43 @@ fn gather_skill_candidates<F: Filesystem>(
             .get(&adapter_name)
             .ok_or_else(|| ResolutionError::AdapterMissing(adapter_name.clone()))?;
 
-        let skills_dir =
-            adapter
-                .skills_dir
-                .as_deref()
-                .ok_or_else(|| ResolutionError::ManifestInvalid {
-                    namespace: ns.clone(),
-                    reason: format!(
-                        "adapter '{}' has no skills_dir; cannot materialize skill '{}'",
-                        adapter_name, decl.name
-                    ),
-                })?;
+        // Skills materialize under the adapter's project `skills_dir`, or —
+        // for user-scope skills — its `user_skills_dir` (tilde-stripped, since
+        // candidate paths are target-relative). The scope picks both the
+        // destination dir and, at activation, the root ($HOME vs project).
+        let skill_scope = decl.scope;
+        let skills_dir = match skill_scope {
+            crate::scope::Scope::Project => adapter.skills_dir.as_deref(),
+            crate::scope::Scope::User => adapter.user_skills_dir.as_deref(),
+        }
+        .ok_or_else(|| ResolutionError::ManifestInvalid {
+            namespace: ns.clone(),
+            reason: format!(
+                "adapter '{}' has no {} for skill '{}'",
+                adapter_name,
+                match skill_scope {
+                    crate::scope::Scope::Project => "skills_dir",
+                    crate::scope::Scope::User => "user_skills_dir",
+                },
+                decl.name
+            ),
+        })?;
+        let skills_dir = skills_dir.strip_prefix("~/").unwrap_or(skills_dir);
 
-        // Destination directory in project: <skills_dir>/<skill_name>/
+        // Destination directory: <skills_dir>/<skill_name>/ (target-relative).
         let dest_prefix = format!("{}/{}", skills_dir, decl.name);
 
         match decl.mode {
             SkillMode::Authored => {
-                // Walk the namespace directory at <ns_root>/<dest_prefix>/
+                // Authored skill sources live in the namespace tree: at the
+                // root for project scope, under `user/` for user scope (same
+                // place other user_files live).
                 let ns_root = registry.namespace_dir(ns.as_str());
-                let skill_dir_abs = ns_root.join(&dest_prefix);
+                let walk_base = match skill_scope {
+                    crate::scope::Scope::User => ns_root.join("user"),
+                    crate::scope::Scope::Project => ns_root.clone(),
+                };
+                let skill_dir_abs = walk_base.join(&dest_prefix);
                 if !fs
                     .exists(&skill_dir_abs)
                     .map_err(|e| ResolutionError::Io(e.to_string()))?
@@ -570,13 +587,13 @@ fn gather_skill_candidates<F: Filesystem>(
                 let mut rel_files: Vec<String> = Vec::new();
                 walk_dir(
                     fs,
-                    &ns_root,
+                    &walk_base,
                     std::path::Path::new(&dest_prefix),
                     &mut rel_files,
                 )
                 .map_err(|e| ResolutionError::Io(e.to_string()))?;
                 for rel_str in rel_files {
-                    let source_path = ns_root.join(&rel_str);
+                    let source_path = walk_base.join(&rel_str);
                     // Compute skill_provenance only for the SKILL.md file.
                     let skill_provenance = if std::path::Path::new(&rel_str).file_name()
                         == Some("SKILL.md".as_ref())
@@ -598,7 +615,7 @@ fn gather_skill_candidates<F: Filesystem>(
                         path: PathBuf::from(&rel_str),
                         source_path,
                         adapter: adapter_name.clone(),
-                        scope: crate::scope::Scope::Project,
+                        scope: skill_scope,
                         merge_override: None,
                         skill_provenance,
                         adapter_materialize_override: None,
@@ -637,7 +654,7 @@ fn gather_skill_candidates<F: Filesystem>(
                                 path: PathBuf::from(&dest_path),
                                 source_path,
                                 adapter: adapter_name.clone(),
-                                scope: crate::scope::Scope::Project,
+                                scope: skill_scope,
                                 merge_override: None,
                                 skill_provenance,
                                 adapter_materialize_override: None,

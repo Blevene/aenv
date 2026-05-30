@@ -14,6 +14,7 @@ pub fn run<F: Filesystem>(
     namespace: &str,
     skill_name: &str,
     adapter_arg: Option<&str>,
+    scope: aenv_core::scope::Scope,
 ) -> Result<()> {
     let manifest_path = layout.manifest_path(namespace);
     if !fs.exists(&manifest_path)? {
@@ -41,11 +42,22 @@ pub fn run<F: Filesystem>(
     let adapter = adapters
         .get(&adapter_name)
         .ok_or_else(|| AenvError::AdapterMissing(adapter_name.clone()))?;
-    let skills_dir = adapter.skills_dir.as_deref().ok_or_else(|| {
+    // Project skills live under `skills_dir`; user-scope skills under
+    // `user_skills_dir` (tilde-stripped) inside the namespace's `user/` subtree.
+    let skills_dir = match scope {
+        aenv_core::scope::Scope::Project => adapter.skills_dir.as_deref(),
+        aenv_core::scope::Scope::User => adapter.user_skills_dir.as_deref(),
+    }
+    .ok_or_else(|| {
         AenvError::ManifestInvalid(format!(
-            "adapter '{adapter_name}' has no skills_dir; cannot scaffold skills"
+            "adapter '{adapter_name}' has no {} for skill scaffolding",
+            match scope {
+                aenv_core::scope::Scope::Project => "skills_dir",
+                aenv_core::scope::Scope::User => "user_skills_dir",
+            }
         ))
     })?;
+    let skills_dir = skills_dir.strip_prefix("~/").unwrap_or(skills_dir);
 
     // Reject duplicate name.
     if manifest.skills.iter().any(|s| s.name == skill_name) {
@@ -54,9 +66,13 @@ pub fn run<F: Filesystem>(
         )));
     }
 
-    // Scaffold SKILL.md.
-    let skill_md_path = layout
-        .namespace_dir(namespace)
+    // Scaffold SKILL.md. User-scope sources live under the namespace's
+    // `user/` subtree (mirroring user_files); project-scope at the root.
+    let scaffold_base = match scope {
+        aenv_core::scope::Scope::Project => layout.namespace_dir(namespace),
+        aenv_core::scope::Scope::User => layout.namespace_dir(namespace).join("user"),
+    };
+    let skill_md_path = scaffold_base
         .join(skills_dir)
         .join(skill_name)
         .join("SKILL.md");
@@ -74,7 +90,7 @@ pub fn run<F: Filesystem>(
         ref_: None,
         path: None,
         required: false,
-        scope: aenv_core::scope::Scope::default(),
+        scope,
     });
     fs.write(&manifest_path, manifest.to_toml().as_bytes())?;
     println!("Created authored skill '{skill_name}' in namespace '{namespace}':");
