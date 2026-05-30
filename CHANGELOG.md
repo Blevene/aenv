@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-05-30
+
+Docs/tooling follow-ups to v0.2.0; no binary behavior change.
+
+### Fixed
+
+- **CI `Doc build` (warnings-as-errors) is green again.** `cargo doc` had been failing (latent for days, masked one crate at a time since rustdoc stops at the first failing crate): a public doc linked a private item (`rustdoc::private-intra-doc-links`), `[[skills]]` doc strings were read as unresolved intra-doc links, and bare `<placeholder>` text parsed as unclosed HTML tags. Wrapped placeholders in backticks and dropped the private link.
+
+### Changed
+
+- **`aenv` Claude Code skill (`skills/aenv/SKILL.md`) updated for the global surface.** Adds the project-vs-global scopes note, a global request→command map (`use` front door, `-` toggle, `baseline`, `new`, `snapshot`, `import`, `status`/`which`/`list`, `doctor --fix`, `deactivate --force`), global gotchas (one-activation-per-user, auto-baseline, restart-to-take-effect, opt-in lifecycle hooks + SHA-pinned approval, `aenv-rescue` recovery), and the `global activate`→`use` deprecation. Fixed a stale `docs/walkthroughs/` path → `pm_docs/`.
+- **`INSTALL_FROM_BINARY.md`** default `VERSION` bumped to the current release.
+
 ## [0.2.0] — 2026-05-30
 
 Global-tooling UX simplification: standing up and switching a global profile is now a one-command experience, with safer defaults and a smaller flag surface. (First tagged release since v0.0.3; supersedes the un-tagged v0.1.0 prep below, whose global-namespaces work this release also includes.)
@@ -134,7 +147,8 @@ Initial tagged release. Everything described in the README's "What works today" 
 - **Phase 6 (partial)** — `aenv install` / `aenv sync` / `aenv promote` for git-remote-backed multi-machine sync.
 - **Phase 7** — Windows symlink fallback to copy-mode + Windows CI; macOS notarization.
 
-[Unreleased]: https://github.com/Blevene/aenv/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Blevene/aenv/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/Blevene/aenv/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Blevene/aenv/compare/v0.0.3...v0.2.0
 [0.0.3]: https://github.com/Blevene/aenv/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/Blevene/aenv/compare/v0.0.1...v0.0.2
