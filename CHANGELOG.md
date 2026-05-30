@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-05-30
+
+Global profiles can now carry skills, and importing one skill from a monorepo no longer clones the whole thing.
+
+### Changed
+
+- **`aenv skill import --path <subdir>` now uses a sparse, partial clone** (cone-mode sparse-checkout + `--filter=blob:none`) instead of cloning the entire repo. Importing one skill out of a large monorepo (e.g. `microsoft/ai-agents-for-beginners`) no longer pulls the whole tree — which previously wasted disk and could fail outright on big repos. Multiple skills from the same repo+ref accumulate their subtrees into the shared cache clone; pre-existing full clones are left intact. Whole-repo sources (`aenv global import`) and path-less imports keep full-clone behavior.
+
 ### Added
 
 - **User-scope skills — `aenv skill import|new --scope user`.** Skills can now be declared in a *global* profile and materialize under the adapter's `user_skills_dir` (`~/.claude/skills/<name>/`) on `aenv global use <ns>`. Previously `SkillDecl.scope` existed in the schema (Issue #4) but the resolver hardcoded every skill candidate to project scope, so skills in a global namespace silently never materialized. The resolver now honors `decl.scope` (user-scope authored sources live under the namespace's `user/` subtree), and the CLI exposes `--scope <project|user>` (default `project`) on `skill import` and `skill new`.
@@ -151,7 +159,8 @@ Initial tagged release. Everything described in the README's "What works today" 
 - **Phase 6 (partial)** — `aenv install` / `aenv sync` / `aenv promote` for git-remote-backed multi-machine sync.
 - **Phase 7** — Windows symlink fallback to copy-mode + Windows CI; macOS notarization.
 
-[Unreleased]: https://github.com/Blevene/aenv/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/Blevene/aenv/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Blevene/aenv/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/Blevene/aenv/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Blevene/aenv/compare/v0.0.3...v0.2.0
 [0.0.3]: https://github.com/Blevene/aenv/compare/v0.0.2...v0.0.3
