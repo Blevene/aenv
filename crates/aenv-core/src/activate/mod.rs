@@ -590,7 +590,7 @@ pub fn fork_file<F: Filesystem>(
 /// auto-activation skip this project.
 ///
 /// The `.aenv` pin file is intentionally NOT removed — the project retains
-/// its declaration of "I was forked from <namespace>" for human reference.
+/// its declaration of "I was forked from `<namespace>`" for human reference.
 /// Re-pin with `aenv use <name>` to re-enable activation.
 ///
 /// Idempotent: a project with no state file returns `Ok(())` without

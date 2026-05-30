@@ -369,8 +369,8 @@ pub struct ImportSummary {
 ///   `claude-code` as a fallback)
 /// - declares a `[lifecycle]` block ONLY when a convention file
 ///   (`aenv-namespace.toml`) explicitly declares one. The heuristic never
-///   infers lifecycle hooks from a repo's `install.sh` — see
-///   [`heuristic_entries`].
+///   infers lifecycle hooks from a repo's `install.sh` (see the
+///   `heuristic_entries` helper).
 pub fn import_global<F: Filesystem>(
     fs: &F,
     layout: &RegistryLayout,

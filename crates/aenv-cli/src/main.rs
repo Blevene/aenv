@@ -261,7 +261,7 @@ enum SkillAction {
     },
     /// Import a skill from a local path, git URL, or registry.
     Import {
-        /// Source: /abs/path, ~/path, git+URL[#ref], or registry:<name>.
+        /// Source: `/abs/path`, `~/path`, `git+URL[#ref]`, or `registry:<name>`.
         source: String,
         #[arg(long)]
         ns: String,
@@ -284,7 +284,7 @@ enum SkillAction {
     },
     /// Remove a skill from a namespace.
     ///
-    /// Deletes the [[skills]] entry from the manifest. For authored
+    /// Deletes the `[[skills]]` entry from the manifest. For authored
     /// skills, also removes the on-disk skill directory. For imported
     /// skills, the `~/.aenv/cache/skills/` clone is left in place — run
     /// `aenv cache prune` to reclaim space.
@@ -299,7 +299,7 @@ enum SkillAction {
 
 #[derive(Debug, Subcommand)]
 enum CacheAction {
-    /// Walk every namespace's [[skills]] entries, collect the
+    /// Walk every namespace's `[[skills]]` entries, collect the
     /// (source-hash, ref) cache directories in use, delete the rest.
     Prune,
 }
