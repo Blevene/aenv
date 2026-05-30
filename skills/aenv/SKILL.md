@@ -108,4 +108,4 @@ For non-destructive ops (`aenv use`, `aenv activate`, `aenv deactivate`, `aenv s
 - `aenv --help`, `aenv <subcommand> --help`, and `aenv global --help` for the full flag surface.
 - `~/.aenv/envs/<ns>/aenv.toml` for the manifest of any namespace.
 - `aenv status --json` / `aenv global status --json` for machine-readable everything.
-- The repo's `pm_docs/` directory has step-by-step walkthroughs — notably [`walkthrough-global-namespaces.md`](../../pm_docs/walkthrough-global-namespaces.md) (global profiles end-to-end) and [`lifecycle-hooks.md`](../../pm_docs/lifecycle-hooks.md) (the hook contract).
+- The repo's `pm_docs/` directory has step-by-step walkthroughs — notably `pm_docs/walkthrough-global-namespaces.md` (global profiles end-to-end) and `pm_docs/lifecycle-hooks.md` (the hook contract). (Plain paths, not links: this skill is imported standalone, so repo-relative links wouldn't resolve.)
