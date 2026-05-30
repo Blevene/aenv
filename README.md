@@ -232,9 +232,10 @@ To share a namespace across machines, `git init ~/.aenv/envs/my-style && git pus
 Day-to-day changes on an existing namespace — adding a skill, bumping a pinned ref, editing instructions, removing things — follow a few patterns. Full step-by-step in [`docs/walkthroughs/updating-a-profile.md`](./docs/walkthroughs/updating-a-profile.md). The cheat sheet:
 
 ```bash
-# Add a skill (authored or imported)
-aenv skill new <name> --ns <profile>
-aenv skill import git+<url> --ns <profile> --pin <ref> [--path <subdir>]
+# Add a skill (authored or imported). For a GLOBAL profile, pass --scope user
+# so the skill materializes into ~/.claude/skills/ on `aenv global use`.
+aenv skill new <name> --ns <profile> [--scope user]
+aenv skill import git+<url> --ns <profile> --pin <ref> [--path <subdir>] [--scope user]
 
 # Edit existing content (CLAUDE.md, an existing SKILL.md, etc.)
 $EDITOR ~/.aenv/envs/<profile>/CLAUDE.md           # live via symlink; no re-activate

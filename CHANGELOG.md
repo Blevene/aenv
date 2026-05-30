@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **User-scope skills — `aenv skill import|new --scope user`.** Skills can now be declared in a *global* profile and materialize under the adapter's `user_skills_dir` (`~/.claude/skills/<name>/`) on `aenv global use <ns>`. Previously `SkillDecl.scope` existed in the schema (Issue #4) but the resolver hardcoded every skill candidate to project scope, so skills in a global namespace silently never materialized. The resolver now honors `decl.scope` (user-scope authored sources live under the namespace's `user/` subtree), and the CLI exposes `--scope <project|user>` (default `project`) on `skill import` and `skill new`.
+
 ## [0.2.1] — 2026-05-30
 
 Docs/tooling follow-ups to v0.2.0; no binary behavior change.
