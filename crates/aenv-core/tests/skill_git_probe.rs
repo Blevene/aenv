@@ -120,7 +120,7 @@ fn clone_to_destination_returns_resolved_sha() {
 
     let url = format!("file://{}", bare_path.display());
     let dest = tempdir().unwrap();
-    let sha = git_clone(&url, None, dest.path()).unwrap();
+    let sha = git_clone(&url, None, dest.path(), None).unwrap();
     assert_eq!(sha.len(), 40);
     assert!(dest.path().join("SKILL.md").exists());
 }

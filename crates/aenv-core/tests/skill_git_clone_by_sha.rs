@@ -78,7 +78,7 @@ fn clone_succeeds_when_ref_is_a_full_sha() {
     // `git clone --branch <sha>` and fail.
     let dest = tempdir().unwrap();
     let dest_path = dest.path().join("clone");
-    let resolved = git_clone(&url, Some(&sha), &dest_path).unwrap();
+    let resolved = git_clone(&url, Some(&sha), &dest_path, None).unwrap();
     assert_eq!(resolved, sha, "clone should report the same SHA");
     assert!(
         dest_path.join("README.md").exists(),
@@ -97,7 +97,7 @@ fn clone_still_works_for_branch_name() {
 
     let dest = tempdir().unwrap();
     let dest_path = dest.path().join("clone");
-    let resolved = git_clone(&url, Some("master"), &dest_path).unwrap();
+    let resolved = git_clone(&url, Some("master"), &dest_path, None).unwrap();
     assert_eq!(resolved.len(), 40);
     assert!(dest_path.join("README.md").exists());
 }

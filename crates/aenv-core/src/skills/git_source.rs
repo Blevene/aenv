@@ -34,7 +34,8 @@ pub fn resolve_git<F: Filesystem>(
     let cache_dir = skill_cache_path(layout, url, &ref_label);
 
     if !fs.exists(&cache_dir)? {
-        // Not cached. Create parent, clone, then read.
+        // Not cached. Create parent, clone (sparse when a sub_path is given),
+        // then read.
         if let Some(parent) = cache_dir.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
                 AenvError::Io(std::io::Error::new(
@@ -43,7 +44,11 @@ pub fn resolve_git<F: Filesystem>(
                 ))
             })?;
         }
-        git_clone(url, ref_spec, &cache_dir)?;
+        git_clone(url, ref_spec, &cache_dir, sub_path)?;
+    } else if let Some(p) = sub_path {
+        // Cache hit. If it's a sparse clone from a prior --path import, make
+        // sure this skill's subtree is in the cone too (no-op for full clones).
+        crate::skills::git::ensure_sparse_path(&cache_dir, p)?;
     }
 
     let resolved_sha = git_head_sha(&cache_dir)?;

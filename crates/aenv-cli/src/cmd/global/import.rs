@@ -136,7 +136,8 @@ fn run_git<F: Filesystem>(
     let tmp = tempfile::tempdir().map_err(AenvError::Io)?;
     // `git_clone` requires the destination not to exist (git clone creates it).
     let clone_dir = tmp.path().join("clone");
-    let resolved = git_clone(url, pin, &clone_dir)?;
+    // Whole-repo import: full clone (no sub_path sparse filter).
+    let resolved = git_clone(url, pin, &clone_dir, None)?;
 
     let summary = aenv_core::global_snapshot::import_global(
         fs,
