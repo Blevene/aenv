@@ -31,7 +31,7 @@ You now have an empty namespace at `$AENV_HOME/envs/base/` with a skeletal manif
 
 ## 1. Add managed files (manifest edit)
 
-`--adapter claude-code` seeded an empty `[adapters.claude-code] files = []` block. Fill it in by editing `aenv.toml`:
+`--adapter claude-code` seeded a `[adapters.claude-code]` block with `files = ["CLAUDE.md"]` (and an empty `CLAUDE.md` on disk). Reshape it by editing `aenv.toml` — here we set the managed file list and its content explicitly:
 
 ```bash
 cat > $AENV_HOME/envs/base/aenv.toml <<'EOF'
@@ -236,6 +236,7 @@ $BIN skill import $SKILL_SRC/match-conventions --ns base
 ```
 Imported skill 'match-conventions' into namespace 'base':
   - source: /tmp/skill-src-XXXXXX/match-conventions
+  - scope: project
   - no pin (resolves on each activation)
   - registered in /tmp/aenv-modify-XXXXXX/envs/base/aenv.toml
 ```

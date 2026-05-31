@@ -69,10 +69,10 @@ name = "with-adapter"
 extends = []
 
 [adapters.claude-code]
-files = []
+files = ["CLAUDE.md"]
 ```
 
-The `files = []` is your next edit — list which paths in the project this namespace's `claude-code` adapter should manage:
+`--adapter claude-code` also scaffolds an empty `CLAUDE.md` in the namespace dir and lists it in `files`, so a freshly-created namespace materializes a working (if empty) file tree on `aenv activate` with no manual manifest edit. Add more managed paths as you need them:
 
 ```toml
 [adapters.claude-code]
@@ -100,7 +100,7 @@ name = "child"
 extends = ["with-adapter"]
 
 [adapters.claude-code]
-files = []
+files = ["CLAUDE.md"]
 ```
 
 `child` will section-merge instructions and deep-merge structured files contributed by `with-adapter` (the parent). Parameters and policies declared on `with-adapter` are inherited unless `child` overrides them.
@@ -178,7 +178,7 @@ $BIN list --json
     "adapters": ["claude-code"],
     "parameters_declared": [],
     "policies_declared": [],
-    "resolved_hash": "sha256-v1:dc5c79b33cb25c8b033eea26a3daa383720babd9c506ca24b2bf4428888ff743"
+    "resolved_hash": "sha256-v1:199230c6d5047c73adbfe2e2cc705a801003159ec0074f66991f90376e0686eb"
   },
   ...
 ]
@@ -186,11 +186,14 @@ $BIN list --json
 
 ---
 
-## Observation: all three new namespaces hash to the same value
+## Observation: hash tracks material content, not name
 
-Look closely at `list --json`: `plain`, `with-adapter`, and `child` all produce the same `resolved_hash` (the `dc5c79b3...` value above).
+Look at the `resolved_hash` values across the three namespaces:
 
-That's correct, not a bug. Each namespace's material set is empty (no `files = [...]` populated, no parameters, no skills) so the hash input is the same: an empty file set plus an empty `.aenv/parameters.json`. As soon as you add a managed file or a parameter to any of them, the hashes diverge.
+- `plain` → `sha256-v1:dc5c79b3...` — no adapter, no files: a truly empty material set.
+- `with-adapter` and `child` → `sha256-v1:199230c6...` — **the same hash as each other**, because each resolves to exactly one empty `CLAUDE.md` and nothing else. (`child` extends `with-adapter`, but the parent contributes only that same empty `CLAUDE.md`, so the resolved set is identical.)
+
+That's correct, not a bug: the hash is a function of resolved content + the effective parameter map, not of the namespace name. `plain` differs because its set is empty; `with-adapter` and `child` match because their sets are byte-for-byte identical. Add a managed file, an instruction line, or a parameter to any of them and its hash diverges immediately.
 
 This is the §5.17 invariant working: hash is content-determined, not name-determined.
 

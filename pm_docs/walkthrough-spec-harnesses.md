@@ -73,6 +73,8 @@ detailed-execution     base                           claude-code
 experiments            base                           claude-code
 ```
 
+(A fresh registry also lists the built-in `cherny` and `karpathy` example namespaces; they're omitted from the `list` output blocks here for clarity.)
+
 ---
 
 ## Step 2 — base (the org-wide preamble)
