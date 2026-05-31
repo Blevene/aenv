@@ -67,7 +67,7 @@ karpathy               -                              claude-code
 
 ## Step 2 — populate manifests + CLAUDE.md content
 
-This step is still manual today: `--adapter` seeds the `[adapters.claude-code]` block with `files = []`, but you fill in the list and the CLAUDE.md body.
+This step is still manual today: `--adapter` seeds the `[adapters.claude-code]` block with `files = ["CLAUDE.md"]` and writes an empty `CLAUDE.md` into the namespace, but you still fill in the parameters, policies, and the CLAUDE.md body.
 
 `$AENV_HOME/envs/base/aenv.toml`:
 

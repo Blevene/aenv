@@ -642,40 +642,75 @@ experiments            base                           claude-code
 $BIN list --json
 ```
 
+(The binary pretty-prints `list --json` with one array element per line. The
+built-in `cherny` and `karpathy` entries also appear in the real array; they're
+elided below — shown as `…` — to match the table convention above.)
+
 ```json
 [
   {
     "name": "analyst",
-    "extends": ["base"],
-    "adapters": ["claude-code", "mcp"],
-    "parameters_declared": ["default_model", "forbid_tools"],
+    "extends": [
+      "base"
+    ],
+    "adapters": [
+      "claude-code",
+      "mcp"
+    ],
+    "parameters_declared": [
+      "default_model",
+      "forbid_tools"
+    ],
     "policies_declared": [],
     "resolved_hash": "sha256-v1:f70c93e16edaf4f7972dc30eeb39a03c24f2ed4daba31e990744580227b0256d"
   },
   {
     "name": "base",
     "extends": [],
-    "adapters": ["claude-code"],
-    "parameters_declared": ["default_model", "instructions_budget"],
-    "policies_declared": ["mcp_requires_command_or_url", "skill_requires_description"],
+    "adapters": [
+      "claude-code"
+    ],
+    "parameters_declared": [
+      "default_model",
+      "instructions_budget"
+    ],
+    "policies_declared": [
+      "mcp_requires_command_or_url",
+      "skill_requires_description"
+    ],
     "resolved_hash": "sha256-v1:f9e533093e78320ac2c9da1c834f99e5d580614edc1c986f4bc0ca843b0fde03"
   },
+  …
   {
     "name": "detailed-execution",
-    "extends": ["base"],
-    "adapters": ["claude-code", "mcp"],
-    "parameters_declared": ["auto_invoke_subagents", "default_model", "instructions_budget"],
+    "extends": [
+      "base"
+    ],
+    "adapters": [
+      "claude-code",
+      "mcp"
+    ],
+    "parameters_declared": [
+      "auto_invoke_subagents",
+      "default_model",
+      "instructions_budget"
+    ],
     "policies_declared": [],
     "resolved_hash": "sha256-v1:e0ed880142f4798e2bbdcc774f65ea42c6a824daac5bf5345f53de47135366da"
   },
   {
     "name": "experiments",
-    "extends": ["base"],
-    "adapters": ["claude-code"],
+    "extends": [
+      "base"
+    ],
+    "adapters": [
+      "claude-code"
+    ],
     "parameters_declared": [],
     "policies_declared": [],
     "resolved_hash": "sha256-v1:0908c9cb10468138451b5bd6633810db9e3e1e05bc21f30d265022b6ada2ea80"
-  }
+  },
+  …
 ]
 ```
 
@@ -848,7 +883,7 @@ $BIN activate --project $PROJECT
 ```
 
 ```
-Deactivated namespace in /tmp/aenv-spec-walk-proj
+Deactivated namespace 'experiments' in /tmp/aenv-spec-walk-proj
 Pinned /tmp/aenv-spec-walk-proj to namespace 'detailed-execution'
 Activated 'detailed-execution' in /tmp/aenv-spec-walk-proj
   + .claude/skills/check-before-submit/SKILL.md (Symlink)
@@ -912,7 +947,7 @@ $BIN activate --project $PROJECT
 ```
 
 ```
-Deactivated namespace in /tmp/aenv-spec-walk-proj
+Deactivated namespace 'detailed-execution' in /tmp/aenv-spec-walk-proj
 Pinned /tmp/aenv-spec-walk-proj to namespace 'analyst'
 Activated 'analyst' in /tmp/aenv-spec-walk-proj
   + .claude/skills/cite-evidence/SKILL.md (Symlink)
@@ -985,14 +1020,22 @@ Parameters:
   default_model: "claude-sonnet-4.6" → "claude-opus-4.7"
   instructions_budget: 5000 → 3000
   +auto_invoke_subagents: ["code-reviewer"]
+
+Instructions section bodies (common to both):
+  ## Build & Test (identical)
+  ## Conventions (identical)
+  ## Disposition (differs — experiments: 249 chars; detailed-execution: 245 chars)
+  ## Project Facts (identical)
 ```
 
 The skill roster flips entirely (different tasks, different tools), the model
 steps up, the budget tightens, and a new parameter appears declaring the
-code-reviewer subagent. This matches the §5.6 spec excerpt verbatim except for
-the absent `Instructions (CLAUDE.md, section-merged)` block — the binary's
-diff output focuses on parameters and skills; section-level instruction diffs
-are not yet surfaced.
+code-reviewer subagent. The binary also surfaces an `Instructions section
+bodies` block: it compares the section-merged CLAUDE.md heading-by-heading,
+marking each shared section `(identical)` or `(differs)` with each side's
+character count. Here the `base`-inherited sections (`## Build & Test`,
+`## Conventions`, `## Project Facts`) are identical and only the namespace's own
+`## Disposition` differs. This matches the §5.6 spec excerpt.
 
 ```bash
 $BIN diff detailed-execution analyst
@@ -1012,6 +1055,12 @@ Parameters:
   instructions_budget: 3000 → 5000
   +forbid_tools: ["edit","write","bash:rm","bash:mv"]
   -auto_invoke_subagents: ["code-reviewer"]
+
+Instructions section bodies (common to both):
+  ## Build & Test (identical)
+  ## Conventions (identical)
+  ## Disposition (differs — detailed-execution: 245 chars; analyst: 209 chars)
+  ## Project Facts (identical)
 ```
 
 Moving from `detailed-execution` to `analyst`: model steps down, budget
@@ -1033,6 +1082,12 @@ Skills:
 Parameters:
   default_model: "claude-sonnet-4.6" → "claude-haiku-4.5"
   +forbid_tools: ["edit","write","bash:rm","bash:mv"]
+
+Instructions section bodies (common to both):
+  ## Build & Test (identical)
+  ## Conventions (identical)
+  ## Disposition (differs — experiments: 249 chars; analyst: 209 chars)
+  ## Project Facts (identical)
 ```
 
 The widest contrast: breadth-seeking `experiments` vs. read-only `analyst`.
@@ -1081,7 +1136,7 @@ $BIN unpin --project $PROJECT
 ```
 
 ```
-Deactivated namespace in /tmp/aenv-spec-walk-proj.
+Deactivated namespace 'analyst' in /tmp/aenv-spec-walk-proj.
 Unpinned /tmp/aenv-spec-walk-proj (was 'analyst').
 ```
 
@@ -1180,12 +1235,17 @@ somebody else's problem." No gap here relative to the spec, but worth noting
 for downstream consumers: reading this value from `aenv get .forbid_tools` is
 correct; expecting `aenv activate` to block write tools is not.
 
-### 5. `aenv diff` doesn't surface instruction-section differences
+### 5. `aenv diff` instruction-section differences *(now surfaced)*
 
 The spec §5.6 shows `aenv diff` output with an "Instructions (CLAUDE.md,
 section-merged from base in both)" block that notes whether sections are
-identical or differ. The current binary's diff output covers skills and
-parameters but not CLAUDE.md section comparisons. This is a future surface.
+identical or differ. **The current binary surfaces this** as an `Instructions
+section bodies (common to both):` block: it lists each shared CLAUDE.md heading
+and marks it `(identical)` or `(differs — <a>: N chars; <b>: M chars)`. The
+section comparison is heading-keyed, so the `base`-inherited sections show as
+identical and only each namespace's own `## Disposition` differs (see the three
+diff blocks in Step 10). The label differs cosmetically from the spec's
+wording, but the structural surface the spec asked for is present.
 
 ### 6. Skill imports in this walkthrough use local path, not git
 
@@ -1214,7 +1274,8 @@ resolved git ref.
 - §5.3: switching between harnesses on one project — `deactivate` + `use` +
   `activate` — cleanly removes one harness's files and materializes the next.
 - §5.6: `aenv diff <a> <b>` surfaces the structural differences the spec calls
-  out (skill roster changes, parameter overrides, parameter additions/removals).
+  out (skill roster changes, parameter overrides, parameter additions/removals,
+  and per-section CLAUDE.md identical/differs comparison).
 - §7.3: four distinct `resolved_hash` values, stable across re-activation.
 
 The whole sequence runs in under 30 seconds on a developer laptop. The setup
