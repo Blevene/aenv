@@ -19,7 +19,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # GitHub-hosted runners ship rustup + a current stable toolchain
       # pre-installed. Using the bundled one avoids depending on an unpinned
@@ -39,7 +39,7 @@ jobs:
         run: echo "version=$(rustc --version)" >> "$GITHUB_OUTPUT"
 
       - name: Cache cargo registry and target
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -71,7 +71,7 @@ jobs:
     name: Cross-compile check (Windows GNU)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust + Windows target
         run: |
@@ -94,7 +94,7 @@ jobs:
     name: MSRV (1.85)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install pinned MSRV toolchain
         run: |
@@ -111,7 +111,7 @@ jobs:
     name: Security audit (cargo-audit)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust toolchain
         run: rustup default stable
