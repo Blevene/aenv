@@ -127,6 +127,42 @@ fn compute_material_set_for_scope<F: Filesystem>(
     let mut entries: Vec<(PathBuf, Vec<u8>)> = Vec::with_capacity(by_path.len());
     for (path, candidates) in by_path {
         let strategy = decide_strategy(&candidates, adapters)?;
+        // A pass-through (`Symlink`/`Identical`/`Copy`) entry whose source is a
+        // directory — e.g. a `user_files = [".claude/agents/"]` entry from a
+        // heuristic import. Activation symlinks the directory as a unit, so its
+        // resolved material is the directory's recursive file contents. Reading
+        // the directory itself as bytes fails with `Is a directory`; expand it
+        // into one entry per contained file so the hash covers the whole tree,
+        // matching what the symlinked directory exposes on disk.
+        if matches!(
+            strategy,
+            MaterializeStrategy::Symlink
+                | MaterializeStrategy::Identical
+                | MaterializeStrategy::Copy
+        ) {
+            let winner = candidates.last().expect("at least one candidate");
+            let is_dir = fs
+                .metadata(&winner.source_path)
+                .map(|m| matches!(m.kind, crate::fs::FileKind::Directory))
+                .unwrap_or(false);
+            if is_dir {
+                let mut rels = Vec::new();
+                crate::resolve::walk_dir(
+                    fs,
+                    &winner.source_path,
+                    std::path::Path::new(""),
+                    &mut rels,
+                )
+                .map_err(AenvError::from)?;
+                for rel in rels {
+                    let bytes = fs
+                        .read(&winner.source_path.join(&rel))
+                        .map_err(AenvError::from)?;
+                    entries.push((path.join(&rel), bytes));
+                }
+                continue;
+            }
+        }
         let bytes = materialize_one_in_memory(fs, &candidates, strategy)?;
         entries.push((path, bytes));
     }

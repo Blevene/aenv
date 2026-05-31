@@ -91,6 +91,76 @@ user_files = [".claude/CLAUDE.md"]
     );
 }
 
+/// Regression: a `user_files` entry that names a *directory* (e.g. the
+/// `.claude/agents/` a heuristic git import produces) must not crash the
+/// material-set computation. Activation symlinks the directory as a unit, so
+/// the resolved material is the directory's recursive file contents — reading
+/// the directory itself as bytes previously failed with `Is a directory`.
+#[test]
+fn user_scope_directory_entry_expands_into_per_file_material() {
+    let fs = RealFilesystem;
+
+    let make = |files: &[(&str, &[u8])]| {
+        let tmp = tempfile::tempdir().unwrap();
+        let reg = RegistryLayout::new(tmp.path().to_path_buf());
+        let adapters = setup_adapter(&fs, &reg);
+        let ns = reg.namespace_dir("dirns");
+        std::fs::create_dir_all(ns.join("user/.claude/agents")).unwrap();
+        for (rel, body) in files {
+            std::fs::write(ns.join("user").join(rel), body).unwrap();
+        }
+        std::fs::write(
+            ns.join("aenv.toml"),
+            r#"
+name = "dirns"
+[adapters.claude-code]
+user_files = [".claude/agents/"]
+"#,
+        )
+        .unwrap();
+        let ms =
+            compute_material_set_user(&fs, &reg, &adapters, &NamespaceId::new("dirns").unwrap())
+                .unwrap();
+        // `tmp` drops here, deleting the tempdir — fine, because the returned
+        // material set is self-contained: owned bytes and relative paths that
+        // reference no on-disk state.
+        ms
+    };
+
+    let ms = make(&[
+        (".claude/agents/a.md", b"agent one"),
+        (".claude/agents/b.md", b"agent two"),
+    ]);
+    // The directory expanded into one entry per contained file (not one entry
+    // for the directory itself).
+    let paths: Vec<String> = ms
+        .entries()
+        .iter()
+        .map(|(p, _)| p.to_string_lossy().replace('\\', "/"))
+        .collect();
+    assert!(
+        paths.iter().any(|p| p == ".claude/agents/a.md")
+            && paths.iter().any(|p| p == ".claude/agents/b.md"),
+        "directory entry must expand into per-file material, got {paths:?}"
+    );
+    assert!(
+        !paths.iter().any(|p| p == ".claude/agents"),
+        "the directory itself must not appear as a material entry"
+    );
+
+    // Hash covers the tree: changing a file inside the directory changes it.
+    let hash_a = hash_resolved_namespace(&ms);
+    let ms2 = make(&[
+        (".claude/agents/a.md", b"agent one CHANGED"),
+        (".claude/agents/b.md", b"agent two"),
+    ]);
+    assert_ne!(
+        hash_a,
+        hash_resolved_namespace(&ms2),
+        "hash must change when a file inside the directory entry changes"
+    );
+}
+
 #[test]
 fn user_scope_hash_changes_when_user_content_changes() {
     let fs = RealFilesystem;

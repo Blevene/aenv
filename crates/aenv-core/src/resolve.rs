@@ -694,7 +694,10 @@ fn expand_glob<F: Filesystem>(
         .collect())
 }
 
-fn walk_dir<F: Filesystem>(
+/// Recursively collect the forward-slashed relative paths of every regular
+/// file under `abs_base.join(rel_prefix)`. Shared with [`crate::materialize`]
+/// for expanding directory `files`/`user_files` entries into per-file material.
+pub(crate) fn walk_dir<F: Filesystem>(
     fs: &F,
     abs_base: &std::path::Path,
     rel_prefix: &std::path::Path,

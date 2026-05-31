@@ -10,7 +10,7 @@ pub fn run<F: Filesystem>(
     fs: &F,
     layout: &RegistryLayout,
     adapters: &AdapterRegistry,
-    _fake_home: &Path,
+    fake_home: &Path,
     path: &Path,
     json: bool,
 ) -> Result<()> {
@@ -28,7 +28,7 @@ pub fn run<F: Filesystem>(
         .map_err(|e| AenvError::ManifestInvalid(format!("global-state.json: {e}")))?;
     let state = aenv_core::state::ActivationState::from_json(text)?;
 
-    let normalized = normalize_query(path);
+    let normalized = normalize_query(path, fake_home);
     let hit = state.managed_files.iter().find(|m| m.path == normalized);
     match hit {
         Some(m) => {
@@ -78,13 +78,19 @@ pub fn run<F: Filesystem>(
     }
 }
 
-fn normalize_query(path: &Path) -> PathBuf {
+fn normalize_query(path: &Path, fake_home: &Path) -> PathBuf {
+    // Managed-file keys are stored relative to $HOME. A shell that expanded an
+    // unquoted `~/.claude/CLAUDE.md` hands us the absolute `$HOME/.claude/...`,
+    // so strip the home prefix first to recover the relative key.
+    if let Ok(rel) = path.strip_prefix(fake_home) {
+        return rel.to_path_buf();
+    }
     let s = path.to_string_lossy();
     if let Some(rest) = s.strip_prefix("~/") {
         PathBuf::from(rest)
     } else if let Some(rest) = s.strip_prefix('/') {
-        // Absolute path probably means $HOME-rooted; strip nothing else — let
-        // the lookup miss naturally if it doesn't match a managed file.
+        // Absolute but not under $HOME; strip the leading slash and let the
+        // lookup miss naturally if it doesn't match a managed file.
         PathBuf::from(rest)
     } else {
         path.to_path_buf()
@@ -104,4 +110,44 @@ fn sha256_hex(bytes: &[u8]) -> String {
         s.push_str(&format!("{b:02x}"));
     }
     s
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_query;
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn literal_tilde_strips_to_relative_key() {
+        assert_eq!(
+            normalize_query(Path::new("~/.claude/CLAUDE.md"), Path::new("/home/u")),
+            PathBuf::from(".claude/CLAUDE.md")
+        );
+    }
+
+    #[test]
+    fn shell_expanded_tilde_under_home_strips_to_relative_key() {
+        // Regression: an unquoted `~` the shell expanded to an absolute path
+        // under $HOME must resolve to the same home-relative managed key.
+        assert_eq!(
+            normalize_query(Path::new("/home/u/.claude/CLAUDE.md"), Path::new("/home/u")),
+            PathBuf::from(".claude/CLAUDE.md")
+        );
+    }
+
+    #[test]
+    fn absolute_path_outside_home_strips_leading_slash() {
+        assert_eq!(
+            normalize_query(Path::new("/etc/passwd"), Path::new("/home/u")),
+            PathBuf::from("etc/passwd")
+        );
+    }
+
+    #[test]
+    fn relative_path_is_unchanged() {
+        assert_eq!(
+            normalize_query(Path::new(".claude/CLAUDE.md"), Path::new("/home/u")),
+            PathBuf::from(".claude/CLAUDE.md")
+        );
+    }
 }

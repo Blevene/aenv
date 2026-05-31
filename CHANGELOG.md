@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-05-31
+
+Two `aenv global which` correctness fixes surfaced while reproducing the global-profile walkthrough against the real binary.
+
+### Fixed
+
+- **`aenv global which --json` no longer crashes on a namespace with directory `user_files`.** A `user_files` entry naming a directory (e.g. the `.claude/agents/` a heuristic git import produces) is symlinked as a unit by activation, but the material-set computation behind `--json`'s `content_hash` read the directory itself as bytes and failed with `Is a directory (os error 21)`. The pass-through material path now expands a directory entry into one hash entry per contained file, mirroring what the symlinked directory exposes on disk. This also fixes the same latent crash for any `resolved_hash`/`doctor` computation over a namespace with directory `files`/`user_files`. File-only namespace hashes are unchanged (byte-identical). `content_hash` for a directory-backed managed path is now reported as `null` (a directory has no single content hash) instead of erroring.
+- **`aenv global which <path>` now resolves a shell-expanded tilde.** An unquoted `~/.claude/CLAUDE.md` that the shell expanded to an absolute `$HOME/.claude/CLAUDE.md` previously missed the lookup (only a leading `/` was stripped, leaving `home/you/.claude/...`), reporting "not managed." The path is now normalized by stripping the `$HOME` prefix, so both the quoted `~/`-rooted form and the shell-expanded absolute form resolve to the same managed file.
+
 ## [0.3.0] — 2026-05-30
 
 Global profiles can now carry skills, and importing one skill from a monorepo no longer clones the whole thing.

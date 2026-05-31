@@ -1,6 +1,6 @@
 # Walkthrough: global namespaces with claude-cntrl
 
-**Tested against:** `main`, `aenv 0.3.0`.
+**Tested against:** `main`, `aenv 0.3.1`.
 **Goal:** onboard claude-ctrl from upstream in a single command (`aenv global use <url>`, which imports + activates and auto-captures a `baseline` return point), swap back to `baseline`, author your own profile from scratch with `aenv global new`, exercise the doctor surface, and walk through the full recovery story for when something breaks.
 
 > **The short version.** Standing up an alternate global profile is one command:
@@ -80,10 +80,10 @@ Snapshotted current ~/ user-scope surface into namespace 'default' (1 file, 0 di
   + .claude/CLAUDE.md
 ```
 
-`global snapshot` walks every installed adapter's declared `user_files` against `$HOME` and copies what's there into a new namespace at `$AENV_HOME/envs/<name>/`. The set of captured paths follows adapter defaults; to add paths not declared by any installed adapter (say, a personal `~/.claude/scratch/`), pass `--include` repeatedly:
+`global snapshot` walks every installed adapter's declared `user_files` against `$HOME` and copies what's there into a new namespace at `$AENV_HOME/envs/<name>/`. The set of captured paths follows adapter defaults; to add paths not declared by any installed adapter (say, a personal `~/.claude/scratch/`), pass `--include` repeatedly (snapshot into a fresh name — `default` already exists from the previous command, and snapshotting onto an existing namespace errors out):
 
 ```bash
-$BIN global snapshot default --include .claude/scratch
+$BIN global snapshot default-plus --include .claude/scratch
 ```
 
 `default` is now a real namespace under `~/.aenv/envs/default/`:
@@ -195,29 +195,29 @@ Managed files: 11
 Note: running harness sessions retain their previous config until restart.
 ```
 
-`aenv global which` answers "which namespace owns this file?":
+`aenv global which` answers "which namespace owns this file?". Both the quoted `~/`-rooted form and a shell-expanded absolute path under `$HOME` resolve to the same managed file (the command strips the home prefix before matching), so either works:
 
 ```bash
-$BIN global which ~/.claude/CLAUDE.md
+$BIN global which '~/.claude/CLAUDE.md'
 ```
 
 ```
 ~/.claude/CLAUDE.md -> claude-cntrl::.claude/CLAUDE.md
 ```
 
-With `--json`, the result also includes the file's `content_hash` — sha256 of the materialized bytes, useful for cross-machine verification:
+With `--json`, the result also includes the file's `content_hash` — sha256 of the materialized bytes, useful for cross-machine verification. For a plain-file entry this is the sha256 of the file's bytes; for a directory-backed entry (like `claude-cntrl`'s `.claude/agents/`, which activation symlinks as a unit) `content_hash` is `null`, since a directory has no single content hash. Demonstrating against a single-file profile such as `default`:
 
 ```bash
-$BIN global which ~/.claude/CLAUDE.md --json
+$BIN global which '~/.claude/CLAUDE.md' --json
 ```
 
 ```json
 {
   "content_hash": "sha256:...",
   "path": "~/.claude/CLAUDE.md",
-  "qualified": "claude-cntrl::.claude/CLAUDE.md",
+  "qualified": "default::.claude/CLAUDE.md",
   "scope": "user",
-  "strategy": "symlink"
+  "strategy": "identical"
 }
 ```
 
@@ -350,6 +350,7 @@ $BIN skill import git+https://github.com/K-Dense-AI/scientific-agent-skills \
 ```
 
 ```
+Resolving git+https://github.com/K-Dense-AI/scientific-agent-skills @ main...
 Imported skill 'exploratory-data-analysis' into namespace 'mine':
   - source: git+https://github.com/K-Dense-AI/scientific-agent-skills
   - scope: user
@@ -363,7 +364,7 @@ Notes:
 - `--scope user` writes `scope = "user"` on the `[[skills]]` entry. On `aenv global use mine`, the skill materializes at `~/.claude/skills/exploratory-data-analysis/` (symlinked from the cache). For an *authored* skill instead of an imported one, `aenv skill new <name> --ns mine --scope user` scaffolds it under the namespace's `user/.claude/skills/`.
 - The `--pin <ref>` resolves to a commit SHA recorded in the manifest, so the skill set is reproducible across machines.
 
-`aenv global which ~/.claude/skills/<name>/SKILL.md` (once active) reports which namespace owns it, and `aenv skill list --ns mine` shows every declared skill with its source, scope, and pinned ref.
+`aenv global which '~/.claude/skills/<name>/SKILL.md'` (once active, tilde quoted) reports which namespace owns it, and `aenv skill list --ns mine` shows every declared skill with its source, scope, and pinned ref.
 
 ---
 
@@ -406,6 +407,8 @@ $BIN global doctor chatty
 ```
 [WARN] instructions_max_chars chatty::~/.claude/CLAUDE.md — .claude/CLAUDE.md has 6765 chars (budget 5000). Refactor procedural content into skills, dispositional content into subagents, or use @-imports.
 ```
+
+(If you've already run a few activations, `doctor <name>` will also append an informational `Orphan stashes:` listing of any leftover stashes — passing a namespace name keeps that informational and still exits 0. See Step 7c for the no-argument form, which treats orphans as a hard error.)
 
 The `~/` prefix on the qualified-name target (`chatty::~/.claude/CLAUDE.md`) marks the diagnostic as user-scope rather than project-scope. The check is advisory at adapter defaults (`[WARN]`, exit 0). To make it blocking, add to the namespace manifest:
 
@@ -458,6 +461,8 @@ $BIN global doctor
 [WARN] copy_mode_local_edits copyns::~/.claude/CLAUDE.md — ~/.claude/CLAUDE.md has been edited locally since activation; next activation will overwrite your edits. Run `aenv global snapshot <name>` first to capture.
 ```
 
+(This clean output assumes no leftover stashes. The no-argument `global doctor` also audits global state and treats orphan stashes as a hard error (exit 19) — if earlier activations left stashes behind, you'll see an `Orphan stashes:` listing and a non-zero exit here. Clear them with `aenv global doctor --fix`; see Step 7c.)
+
 This warning is the contract: under copy mode, the namespace source is the authoritative copy, and re-activation is destructive to local edits. If you want to preserve them, run `aenv global snapshot <new-name>` before the next activation. Under symlink mode (the default), this scenario doesn't arise — local edits are edits to the namespace source.
 
 ---
@@ -468,27 +473,48 @@ Three failure modes you might run into, in increasing order of severity.
 
 ### 7a — broken `on_deactivate`
 
-`aenv global deactivate` runs the namespace's `on_deactivate` script first, then restores files. If the script exits non-zero, aenv logs a warning and proceeds with file restoration anyway:
+`aenv global deactivate` runs the namespace's `on_deactivate` script first, then restores files. (`on_deactivate` only fires when the matching activation actually ran an `on_activate` hook — if there was no setup to undo, there's nothing to tear down. The heuristic-imported `claude-cntrl` declares no lifecycle hooks at all, so it never runs one.) To see this path, author a namespace whose activation runs a hook and whose teardown fails:
+
+```bash
+mkdir -p "$AENV_HOME/envs/brokenhook/user/.claude"
+echo '# broken profile' > "$AENV_HOME/envs/brokenhook/user/.claude/CLAUDE.md"
+printf '#!/usr/bin/env bash\necho "setup ok"\n' > "$AENV_HOME/envs/brokenhook/setup.sh"
+printf '#!/usr/bin/env bash\nexit 1\n'          > "$AENV_HOME/envs/brokenhook/teardown.sh"
+cat > "$AENV_HOME/envs/brokenhook/aenv.toml" <<'EOF'
+name = "brokenhook"
+
+[adapters.claude-code]
+user_files = [".claude/CLAUDE.md"]
+
+[lifecycle]
+on_activate = "setup.sh"
+on_deactivate = "teardown.sh"
+EOF
+
+$BIN global use brokenhook --yes >/dev/null
+```
+
+If the teardown script exits non-zero, aenv logs a warning and proceeds with file restoration anyway:
 
 ```bash
 $BIN global deactivate
 ```
 
 ```
-Uninstalling claude-cntrl...
-warning: on_deactivate failed for 'claude-cntrl': lifecycle script exited with exit status: 1; continuing with file restoration
-Deactivated namespace 'claude-cntrl' globally in /tmp/aenv-home-XXXXXX
+warning: on_deactivate failed for 'brokenhook': lifecycle script exited with exit status: 1; continuing with file restoration
+Deactivated namespace 'brokenhook' globally in /tmp/aenv-home-XXXXXX
 ```
 
-Exit code is 0 because file restoration succeeded. If the script itself is fundamentally broken (e.g. it depends on a runtime that's been uninstalled), skip it entirely with `--force`:
+Exit code is 0 because file restoration succeeded. If the script itself is fundamentally broken (e.g. it depends on a runtime that's been uninstalled), skip it entirely with `--force` (re-activate `brokenhook` first if you want to try it):
 
 ```bash
+$BIN global use brokenhook --yes >/dev/null
 $BIN global deactivate --force
 ```
 
 ```
 --force: skipping on_deactivate.
-Deactivated namespace 'claude-cntrl' globally in /tmp/aenv-home-XXXXXX. (--force: skipped on_deactivate.)
+Deactivated namespace 'brokenhook' globally in /tmp/aenv-home-XXXXXX. (--force: skipped on_deactivate.)
 ```
 
 File restoration still runs. `--force` sets `AENV_FORCE=1` in the lifecycle env (in case a script wants to behave differently under force) but, in practice, the script just doesn't run.
@@ -549,6 +575,8 @@ EXIT CODES:
     0  Success (or no active activation; idempotent).
     1  State file present but unreadable or malformed.
     2  Unknown command-line argument.
+
+See `pm_docs/walkthrough-global-namespaces.md` for the full recovery flow.
 ```
 
 ### 7c — orphan stash
