@@ -66,7 +66,7 @@ Activated 'my-style' in /home/you/code/some-project
   + .claude/skills/scanpy/assets/analysis_template.py (Symlink)
 ```
 
-aenv shallow-cloned the repo into `~/.aenv/cache/skills/<source-hash>/9b13286d.../`, then symlinked the contents of `scientific-skills/scanpy/` (SKILL.md + everything under it) into your project. Subsequent activations are network-free — pinned ref + cached.
+aenv cloned the repo into `~/.aenv/cache/skills/<source-hash>/9b13286d.../` — and because you passed `--path`, it does a **sparse checkout of just `scientific-skills/scanpy/`** (not the whole monorepo), then symlinks that subtree's contents (SKILL.md + everything under it) into your project. Subsequent activations are network-free — pinned ref + cached.
 
 ## Step 3: Confirm provenance
 
@@ -117,6 +117,13 @@ aenv skill import git+https://github.com/example/skill --ns my-style
 # no --pin → resolves to whatever HEAD points at on each activate
 ```
 Trades reproducibility for staying current. State.json records the resolved SHA each time, so you can audit.
+
+**Global profile (user scope):** to add the skill to a profile you activate with `aenv global use` (so it installs into `~/.claude/skills/` rather than a project), pass `--scope user`:
+```bash
+aenv skill import git+https://github.com/k-dense-ai/scientific-agent-skills \
+    --ns research --scope user --path scientific-skills/scanpy --pin v2.39.0
+```
+The `[[skills]]` entry gets `scope = "user"`, and the skill materializes at `~/.claude/skills/scanpy/` on `aenv global use research`. (Omit `--scope user` and the skill is project-scope and silently won't appear in a global activation.) See [updating a profile → Global profiles](./updating-a-profile.md#global-profiles-user-scope).
 
 ## What is `--pin` and where do I get the ref from?
 

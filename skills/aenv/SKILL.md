@@ -62,6 +62,7 @@ Swapping the user-level config that every Claude Code / Codex session reads. `ae
 | Swap back to your original pre-aenv setup | `aenv global use baseline` (auto-captured on the first-ever global activation) |
 | Author a global profile from scratch | `aenv global new <name>` (scaffolds an editable `~/.aenv/envs/<name>/user/.claude/CLAUDE.md` + manifest), then `aenv global use <name>` |
 | Add a skill to a global profile | `aenv skill import git+<url> --ns <name> --scope user [--path <subdir>] [--pin <ref>]` (or `aenv skill new <skill> --ns <name> --scope user`). **`--scope user` is required for global profiles** — without it the skill is project-scope and won't materialize on `aenv global use`. User-scope skills land in `~/.claude/skills/<skill>/`. |
+| Add an arbitrary file to a global profile (settings.json, RTK.md, statusline/, …) | No CLI command — edit by hand: place the content at `~/.aenv/envs/<name>/user/<rel-path>` (mirroring its `$HOME` target, e.g. `user/.claude/RTK.md`), then add `<rel-path>` to the manifest's `[adapters.<adapter>] user_files` (a trailing `/` declares a whole directory), then `aenv global use <name>`. `user_files` is not capped by the adapter. |
 | Capture the current `~/.claude/` as a reusable namespace | `aenv global snapshot <name> [--include <path>…]` |
 | Import a source without activating it | `aenv global import <source> [<name>] [--pin <ref>]` |
 | What global profile is active / what it manages | `aenv global status` (`--json` for structured) |

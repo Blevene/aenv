@@ -212,6 +212,45 @@ aenv status                          # confirms scanpy materialized with resolve
 
 ---
 
+## Global profiles (user scope)
+
+Everything above is project scope. A **global** profile (one you activate with `aenv global use <ns>`, materializing into `~/.claude/` etc.) updates the same way, with two differences: skills and files must be declared **user-scope**, and the re-activate command is `aenv global use <ns>` (run it again; it re-materializes) rather than `aenv deactivate && aenv activate`.
+
+### Add a skill to a global profile
+
+Pass `--scope user` — without it the skill is project-scope and won't materialize on `aenv global use`:
+
+```bash
+aenv skill import git+https://github.com/k-dense-ai/scientific-agent-skills \
+    --ns research --scope user \
+    --path scientific-skills/scanpy --pin v2.39.0
+# (add --adapter <name> only if the namespace declares more than one adapter)
+```
+
+This writes `scope = "user"` on the `[[skills]]` entry. On the next `aenv global use research`, the skill materializes at `~/.claude/skills/scanpy/`. For an authored skill instead: `aenv skill new <name> --ns research --scope user` (scaffolds under the namespace's `user/.claude/skills/`). The import does a sparse checkout of just `--path`, so one skill out of a big monorepo stays small.
+
+### Add an arbitrary file to a global profile
+
+To add any user-level file beyond what the adapter declares (e.g. `~/.claude/settings.json`, a `~/.claude/RTK.md`, a whole `~/.claude/statusline/` dir):
+
+```bash
+# 1. Place the content under the namespace's user/ subtree, mirroring its
+#    target path under $HOME (e.g. ~/.claude/RTK.md -> user/.claude/RTK.md):
+mkdir -p ~/.aenv/envs/research/user/.claude
+cp ~/.claude/RTK.md ~/.aenv/envs/research/user/.claude/RTK.md
+
+# 2. Declare the path in the manifest's user_files (under the right adapter):
+$EDITOR ~/.aenv/envs/research/aenv.toml
+#   [adapters.claude-code]
+#   user_files = [".claude/CLAUDE.md", ".claude/RTK.md"]   # ← add it
+#   (a trailing "/" like ".claude/statusline/" declares a whole directory)
+
+# 3. Re-activate the profile:
+aenv global use research
+```
+
+`user_files` is not capped by what the adapter declares — any relative path that doesn't escape with `..` works. `aenv global doctor research` flags issues (e.g. a `settings.json` whose hook commands point at scripts you didn't include).
+
 ## What's still in flight
 
 - `aenv install` / `aenv sync` (Phase 6) — pull namespace updates from a git remote so multi-machine sync is automated.
