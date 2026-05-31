@@ -1,6 +1,6 @@
 # `aenv-namespace.toml` Convention File Spec
 
-> Status: stable for v0.1.0. Shipped in Milestone J Task 5 of the global-namespaces follow-ups.
+> Status: stable since v0.1.0. Shipped in Milestone J Task 5 of the global-namespaces follow-ups.
 
 ## Purpose
 

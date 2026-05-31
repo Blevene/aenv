@@ -1,6 +1,6 @@
 # Walkthrough: creating a namespace
 
-**Tested against:** `phase-5-complete` (commit `18eeaec`), `aenv 0.0.1`.
+**Tested against:** `main`, `aenv 0.3.0`.
 **Goal:** create a new namespace in the registry, from the minimum viable form (one command) up to the full form (one command with extends + adapter pre-seeded).
 
 A *namespace* in `aenv` is a directory under `$AENV_HOME/envs/<name>/` containing an `aenv.toml` manifest and any associated harness files (CLAUDE.md, skill SKILL.md files, etc.). This walkthrough covers `aenv create` and its two flags.
@@ -161,6 +161,8 @@ child                  with-adapter                   claude-code
 plain                  -                              -
 with-adapter           -                              claude-code
 ```
+
+(A fresh registry also lists the built-in `cherny` and `karpathy` example namespaces aenv ships; omitted from the example output here for clarity.)
 
 Or the scriptable form:
 

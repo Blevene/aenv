@@ -1,6 +1,6 @@
 # Walkthrough: three harnesses on one project
 
-**Tested against:** `phase-5-complete` (commit `18eeaec`), `aenv 0.0.1`.
+**Tested against:** `main`, `aenv 0.3.0`.
 **Goal:** stand up three distinct AI-coding harnesses for the same Rust project, swap between them, observe the bytes that change on disk per activation, capture a content hash per harness, and disengage cleanly.
 
 This walkthrough is the smoke test for the §7.5 *scripted comparison* use case from the functional spec — it reproduces the workflow a downstream evaluation tool would automate, but executed by hand so each surface is observable.
@@ -23,7 +23,7 @@ export PROJECT=/path/to/your/rust/project   # use any project you can write to
 export BIN=$PWD/target/release/aenv
 
 $BIN --version
-# → aenv 0.0.1
+# → aenv 0.3.0
 ```
 
 The rest of the commands assume these three env vars are set.
@@ -55,9 +55,13 @@ $BIN list
 ```
 NAME                   EXTENDS                        ADAPTERS
 base                   -                              claude-code
+cherny                 -                              claude-code
 detailed-execution     base                           claude-code
 experiments            base                           claude-code
+karpathy               -                              claude-code
 ```
+
+(`cherny` and `karpathy` are built-in example namespaces aenv ships — they appear in every fresh registry and can be ignored or deleted.)
 
 ---
 
@@ -444,7 +448,7 @@ $BIN unpin --project $PROJECT
 ```
 
 ```
-Deactivated namespace in /path/to/your/rust/project.
+Deactivated namespace 'experiments' in /path/to/your/rust/project.
 Unpinned /path/to/your/rust/project (was 'experiments').
 ```
 
@@ -497,7 +501,7 @@ This walkthrough is the post-polish experience. Things still missing today that 
 
 - **The `aenv` pin file and the project's `.git` repo coexist quietly here**, but in a project that ignores `.aenv` by convention, you may want to add it to `.gitignore` (or commit it, if your team shares the pin). The functional spec doesn't take a side.
 - **No `aenv install` yet** — the Phase 6 remote-sync surface would let a teammate clone the repo and `aenv install` to fetch the namespaces. Today the registry layout under `$AENV_HOME/envs/` has to be set up by hand or by some out-of-band sync.
-- **No shell hook yet** — Phase 6 will add `aenv init-shell bash|zsh|fish` so that `cd` into a pinned directory auto-activates. Today the `aenv use && aenv activate` pair is manual.
+- **Auto-activate on `cd` is available** via `aenv init-shell bash|zsh|fish` (source its output into your rc file); the hook calls `aenv activate-if-needed` on each `chpwd`. This walkthrough drives `aenv use && aenv activate` by hand to keep each step observable.
 - **The `aenv list` ADAPTERS column shows comma-separated adapter names but doesn't show declared parameters or policies.** `--json` does — for tabular text discovery beyond that, `aenv get` + `aenv doctor` per namespace.
 
-These are scoped to Phase 6 / 7. The current `phase-5-complete` state is what you'd dogfood today for a single-machine, single-user harness-comparison workflow.
+Remote sync (`install`/`sync`/`promote`) remains unimplemented. As of v0.3.0 this single-machine, single-user harness-comparison workflow is fully dogfoodable — and `aenv global` extends the same model to your user-level `~/.claude/` config (see [walkthrough-global-namespaces.md](./walkthrough-global-namespaces.md)).

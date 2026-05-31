@@ -1,6 +1,6 @@
 # Walkthrough: global namespaces with claude-cntrl
 
-**Tested against:** `main`, `aenv 0.1.0`.
+**Tested against:** `main`, `aenv 0.3.0`.
 **Goal:** onboard claude-ctrl from upstream in a single command (`aenv global use <url>`, which imports + activates and auto-captures a `baseline` return point), swap back to `baseline`, author your own profile from scratch with `aenv global new`, exercise the doctor surface, and walk through the full recovery story for when something breaks.
 
 > **The short version.** Standing up an alternate global profile is one command:
@@ -35,7 +35,7 @@ export RESCUE=$PWD/target/release/aenv-rescue
 
 mkdir -p "$HOME"
 $BIN --version
-# → aenv 0.1.0
+# → aenv 0.3.0
 ```
 
 Two paths to keep in your head:
@@ -334,6 +334,36 @@ $BIN global use mine
 ```
 
 `--adapter <name>` scaffolds for a different harness. This is the third way to create a namespace, alongside `global snapshot` (from your current `$HOME`) and `global import` / `global use <source>` (from an external tree).
+
+---
+
+## Step 5c — add skills to a global profile
+
+A global profile can carry skills that install into `~/.claude/skills/` when you activate it. Use `aenv skill import` with **`--scope user`** — this is required for global profiles; without it the skill is project-scope and won't materialize on `aenv global use`.
+
+Import a single skill from a monorepo subdir with `--path` (the import does a sparse checkout — it fetches only that subdir, not the whole repo):
+
+```bash
+$BIN skill import git+https://github.com/K-Dense-AI/scientific-agent-skills \
+  --ns mine --scope user \
+  --path skills/exploratory-data-analysis --pin main
+```
+
+```
+Imported skill 'exploratory-data-analysis' into namespace 'mine':
+  - source: git+https://github.com/K-Dense-AI/scientific-agent-skills
+  - scope: user
+  - path: skills/exploratory-data-analysis
+  - pinned ref: <resolved-sha>
+  - registered in /tmp/aenv-home-XXXXXX/.aenv/envs/mine/aenv.toml
+```
+
+Notes:
+- **`--adapter claude-code`** is needed only when the namespace declares more than one adapter (to disambiguate which one the skill belongs to); a single-adapter namespace infers it.
+- `--scope user` writes `scope = "user"` on the `[[skills]]` entry. On `aenv global use mine`, the skill materializes at `~/.claude/skills/exploratory-data-analysis/` (symlinked from the cache). For an *authored* skill instead of an imported one, `aenv skill new <name> --ns mine --scope user` scaffolds it under the namespace's `user/.claude/skills/`.
+- The `--pin <ref>` resolves to a commit SHA recorded in the manifest, so the skill set is reproducible across machines.
+
+`aenv global which ~/.claude/skills/<name>/SKILL.md` (once active) reports which namespace owns it, and `aenv skill list --ns mine` shows every declared skill with its source, scope, and pinned ref.
 
 ---
 

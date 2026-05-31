@@ -7,7 +7,7 @@
 
 `aenv` is a Rust CLI for managing named, composable, version-controlled bundles of AI-coding-agent configuration (`CLAUDE.md`, `.cursorrules`, `.mcp.json`, skills, agents, slash commands, MCP entries). Think Python's `venv`, but for the rules and configurations that shape how AI coding agents behave.
 
-> **Status:** Active development. Latest release is [`v0.1.0`](https://github.com/Blevene/aenv/releases/tag/v0.1.0) — Issue #4 global namespaces (swap `~/.claude/` and other user-level harness configs). A subsequent UX-simplification pass (one-command `aenv global use`, `aenv global new`, auto-baseline) is on `main` and slated for the next release. See [§What works today](#what-works-today) for the full feature surface and [§Roadmap](#roadmap--whats-still-in-flight) for what's pending.
+> **Status:** Active development. Latest release is [`v0.3.0`](https://github.com/Blevene/aenv/releases/tag/v0.3.0) — global namespaces with a one-command UX (`aenv global use` for onboarding/swap, `aenv global new`, auto-baseline), user-scope skills (`aenv skill import --scope user` installs into `~/.claude/skills/`), and sparse skill-import clones. See [§What works today](#what-works-today) for the full feature surface and [§Roadmap](#roadmap--whats-still-in-flight) for what's pending.
 
 ## Installation
 
@@ -455,7 +455,7 @@ Ships with built-in adapters for **Claude Code, Cursor, Aider, Cline, Continue, 
 The full plan lives in [`tasks/todo.md`](./tasks/todo.md). Two phases remain:
 
 - **Phase 6** — Partial. `cd`-based auto-activation ships now via `aenv init-shell` (see [§Shell integration](#shell-integration)); git remotes / `aenv install` / `aenv sync` / `aenv promote` still pending.
-- **Phase 7** — Windows symlink fallback, cross-platform CI, v0.1.0 release.
+- **Phase 7** — Windows symlink fallback + cross-platform CI. Windows is still unsupported; Linux and macOS binaries ship on every release (latest: v0.3.0).
 
 ## Reading order
 

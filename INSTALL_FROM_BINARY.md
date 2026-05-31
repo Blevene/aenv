@@ -1,6 +1,6 @@
 # Installing aenv from a pre-built binary
 
-Pre-built binaries for Linux and macOS are published to the [GitHub Releases page](https://github.com/blevene/aenv/releases) on every `v*` tag. Windows is not yet supported (the `aenv activate` codepath needs the symlink fallback landing in Phase 7); Windows users should [build from source](./README.md#installation) or wait for v0.1.0.
+Pre-built binaries for Linux and macOS are published to the [GitHub Releases page](https://github.com/blevene/aenv/releases) on every `v*` tag. Windows is not yet supported (the `aenv activate` codepath needs a symlink fallback); Windows users should [build from source](./README.md#installation).
 
 ## Pick the right tarball
 
@@ -19,7 +19,7 @@ The steps are the same on Linux and macOS; substitute the tarball name for your 
 
 ```bash
 # 1. Set version (latest release; check the Releases page)
-VERSION=0.2.1
+VERSION=0.3.0
 TARGET=aarch64-apple-darwin   # or x86_64-unknown-linux-gnu, etc.
 
 # 2. Download the tarball and its checksum
@@ -56,7 +56,7 @@ macOS attaches a quarantine attribute to any file downloaded via a browser or `c
 xattr -d com.apple.quarantine ~/.local/bin/aenv
 ```
 
-This is a one-time operation per downloaded binary. (Notarization is on the roadmap for v0.1.0.)
+This is a one-time operation per downloaded binary. (Notarization is still on the roadmap.)
 
 ## Verify
 

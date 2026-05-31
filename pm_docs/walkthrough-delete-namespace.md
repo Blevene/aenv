@@ -1,6 +1,6 @@
 # Walkthrough: deleting a namespace
 
-**Tested against:** `phase-5-complete` (commit `18eeaec`), `aenv 0.0.1`.
+**Tested against:** `main`, `aenv 0.3.0`.
 **Goal:** remove a namespace from the registry, understand the warning that fires on every delete, and know which safety nets are NOT yet in place.
 
 `aenv delete <name>` is the only delete-flavored command today. It removes the entire `$AENV_HOME/envs/<name>/` directory tree — manifest, CLAUDE.md, skill directories, everything. The operation is irreversible (no `aenv restore` for deleted namespaces; `restore` is for project-side backups only).
@@ -45,6 +45,8 @@ NAME                   EXTENDS                        ADAPTERS
 base                   -                              claude-code
 child                  base                           claude-code
 ```
+
+(`list` in a fresh registry also shows the built-in `cherny` and `karpathy` example namespaces; they're omitted from the `list` output blocks below for clarity.)
 
 ---
 
@@ -211,7 +213,7 @@ $BIN unpin --project $PROJECT
 ```
 
 ```
-Deactivated namespace in /tmp/aenv-delete-proj-XXXXXX.
+Deactivated namespace 'child' in /tmp/aenv-delete-proj-XXXXXX.
 Unpinned /tmp/aenv-delete-proj-XXXXXX (was 'child').
 ```
 

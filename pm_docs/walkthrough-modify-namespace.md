@@ -1,6 +1,6 @@
 # Walkthrough: modifying a namespace
 
-**Tested against:** `phase-5-complete` (commit `18eeaec`), `aenv 0.0.1`.
+**Tested against:** `main`, `aenv 0.3.0`.
 **Goal:** mutate an existing namespace — add managed files, parameters, policies, authored skills, and imported skills — using the right tool for each kind of change.
 
 The vocabulary deliberately tracks where the source of truth lives:

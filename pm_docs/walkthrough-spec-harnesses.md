@@ -1,6 +1,6 @@
 # Walkthrough: building the three spec example harnesses
 
-**Tested against:** `phase-5-complete` (commit `6413502`), `aenv 0.0.1`.
+**Tested against:** `main`, `aenv 0.3.0`.
 **Goal:** instantiate the four namespaces from functional spec §2 + §4 as a
 working registry — `base`, `experiments`, `detailed-execution`, `analyst` —
 including authored skills, imported skills, parameter overrides, and policies.
@@ -38,7 +38,7 @@ export BIN=$PWD/target/release/aenv
 mkdir -p "$PROJECT"
 
 $BIN --version
-# → aenv 0.0.1
+# → aenv 0.3.0
 ```
 
 The rest of the commands use these three env vars.
