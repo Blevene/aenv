@@ -2,9 +2,11 @@
 
 Goal: import one specific skill out of a public skill collection (the `scanpy` skill from [k-dense-ai/scientific-agent-skills](https://github.com/k-dense-ai/scientific-agent-skills)), pin it for reproducibility, and verify provenance after activation. Compact reference lives in the [README §Skills](../../README.md#skills).
 
+> **New to aenv?** A **skill** is a reusable instruction module aenv adds to a **namespace**'s **manifest** (`aenv.toml`) and *materializes* into your project on `aenv activate`. This guide adds one from a git repo. New to namespaces? See [setup-and-first-swap](./setup-and-first-swap.md). Full [glossary](./README.md#glossary).
+
 ## Prerequisites
 
-- `aenv` installed; a target namespace exists (`my-style` from [build-your-own](./build-your-own.md), or any other). Network access for the first activate.
+- `aenv` installed; a target namespace exists (`my-style` from [build-your-own](./build-your-own.md), or any other). Don't have one yet? Create a throwaway: `aenv create my-style --adapter claude-code` (or follow [build-your-own](./build-your-own.md)). Network access for the first activate.
 
 ## Step 1: Import the skill
 
@@ -84,6 +86,8 @@ Skills (0 authored, 1 imported):
 
 The SHA is the same on every machine that activates with the same pin — that's the reproducibility guarantee.
 
+You now have the `scanpy` skill symlinked into `.claude/skills/scanpy/`, pinned to an immutable commit that reproduces the same content on any machine.
+
 ## Step 4: Update to a new pin later
 
 ```bash
@@ -118,7 +122,7 @@ aenv skill import git+https://github.com/example/skill --ns my-style
 ```
 Trades reproducibility for staying current. State.json records the resolved SHA each time, so you can audit.
 
-**Global profile (user scope):** to add the skill to a profile you activate with `aenv global use` (so it installs into `~/.claude/skills/` rather than a project), pass `--scope user`:
+**Global profile (user scope):** project scope installs into this repo's `.claude/`; user scope installs into `~/.claude/` for every project. To add the skill to a profile you activate with `aenv global use` (so it installs into `~/.claude/skills/` rather than a project), pass `--scope user`:
 ```bash
 aenv skill import git+https://github.com/k-dense-ai/scientific-agent-skills \
     --ns research --scope user --path scientific-skills/scanpy --pin v2.39.0
@@ -161,6 +165,12 @@ For [`k-dense-ai/scientific-agent-skills`](https://github.com/k-dense-ai/scienti
 - **Prefer a tag** if the repo has them. Semantic, stable, easy to read later. Tag names beat SHAs for code-review readability when you check in your namespace's `aenv.toml` to git.
 - **Use a commit SHA** if there are no tags, or if you need a guarantee that a misbehaving maintainer can't move the version under you. SHAs are the only form that's *content-addressed* — they can't lie about what they point at.
 - **Use a branch name** only when you actually want to track that branch's head, *and* you understand that aenv freezes the resolved SHA on import (re-import to pick up newer commits).
+
+## If something goes wrong
+
+- **Bad URL / a `--pin` ref that doesn't exist / `SKILL.md` not found under `--path`:** the import fails without modifying the namespace; fix the argument and re-run.
+- **Undo the import:** `aenv skill remove <name> --ns <namespace>` removes the `[[skills]]` entry (and, for authored skills, the on-disk dir). For imported skills the cache clone stays under `~/.aenv/cache/skills/` — run `aenv cache prune` to reclaim it.
+- **Undo materialization in a project:** `aenv deactivate` (add `aenv unpin` to also drop the `.aenv` pin).
 
 ## What to read next
 

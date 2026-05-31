@@ -2,6 +2,8 @@
 
 Goal: take a project whose `.claude/` tree and `CLAUDE.md` you've shaped by hand and capture it as a named namespace that you can reuse elsewhere. Compact reference lives in the [README §Capture an existing project](../../README.md#3-capture-an-existing-project).
 
+> **New to aenv?** An **adapter** (e.g. `claude-code`) defines which files a harness owns (`CLAUDE.md`, `.claude/`). `aenv snapshot` copies a project's matching files into a new **namespace**; `aenv activate` later *materializes* a namespace's files into a project as symlinks. See the [glossary](./README.md#glossary).
+
 ## Prerequisites
 
 - `aenv` installed; `~/.aenv/` populated (built-in adapters present).
@@ -105,7 +107,7 @@ Managed files:
 
 ## Step 5 (optional): Flip a captured skill to upstream-tracked
 
-`snapshot` records every skill as `mode = "authored"` — the SKILL.md content lives in the namespace tree, self-contained. If `linter-discipline` actually has a public source you'd rather track, edit its `[[skills]]` block (you may need to add one if snapshot didn't generate it — snapshot writes adapter files but doesn't synthesize `[[skills]]` entries for what it captured):
+`snapshot` copies the captured skill's SKILL.md content into the namespace tree but does **not** write a `[[skills]]` manifest entry for it. If `linter-discipline` actually has a public source you'd rather track, add a `[[skills]]` block for it yourself:
 
 ```toml
 [[skills]]
@@ -127,8 +129,13 @@ On next `aenv deactivate && aenv activate`, aenv fetches from the git source ins
 ## Common follow-ups
 
 - **Share across machines:** `cd ~/.aenv/envs/my-existing-style && git init && git push`. Namespace dirs are just files.
-- **Diff against the source:** if you keep editing the source project, `aenv diff` (Phase 5) compares the materialized state against the namespace — useful to catch drift.
+- **Diff against the source:** if you keep editing the source project, `aenv diff` compares the materialized state against the namespace — useful to catch drift.
 - **Combine with composition:** `aenv create new-style --extends my-existing-style` lets you build on top of the snapshot without touching the original.
+
+## If something goes wrong
+
+- **Undo a reuse/activate:** `aenv deactivate` removes the files aenv materialized into the target project and restores any originals it backed up; add `aenv unpin` to also drop the `.aenv` pin. `snapshot` itself only writes a new namespace under `~/.aenv/envs/` — delete that directory (or `aenv delete <name>`) to discard it.
+- **A step errored partway?** aenv backs up displaced originals to `.aenv-state/backup/<timestamp>/` before writing; `aenv restore` copies the latest backup back if `deactivate` didn't finish cleanly.
 
 ## What to read next
 

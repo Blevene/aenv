@@ -2,6 +2,8 @@
 
 Goal: create a brand-new namespace, write a `CLAUDE.md`, author a skill, activate it in a project. About five commands end-to-end. Compact version lives in the [README's Creating-your-own-namespace section](../../README.md#creating-your-own-namespace).
 
+> **New to aenv?** An **adapter** (e.g. `claude-code`) tells aenv which files a harness owns — here, `CLAUDE.md`. A **namespace** bundles those files; `aenv activate` *materializes* them into a project as symlinks. See the [glossary](./README.md#glossary).
+
 ## Prerequisites
 
 - `aenv` installed and `~/.aenv/` populated — see [setup walkthrough](./setup-and-first-swap.md) if not.
@@ -119,9 +121,11 @@ aenv status
 #   my-style::.claude/skills/commit-discipline/SKILL.md  authored
 ```
 
+The `Resolution:` line shows the inheritance chain that produced this namespace — here just `my-style`, since it has no parent.
+
 ## Iterating
 
-Both `CLAUDE.md` and the skill `SKILL.md` are symlinks pointing back at `~/.aenv/envs/my-style/`. Edits propagate immediately — no re-activate needed unless you *add* a new file to the namespace (in which case `aenv deactivate && aenv activate` picks it up).
+Both `CLAUDE.md` and the skill `SKILL.md` are symlinks pointing back at `~/.aenv/envs/my-style/`. Edits propagate immediately — no re-activate needed unless you *add* a new file to the namespace (in which case `aenv deactivate && aenv activate` picks it up — `deactivate` safely restores the project, `activate` re-materializes; see [setup-and-first-swap](./setup-and-first-swap.md)).
 
 ## Sharing across machines
 
@@ -132,6 +136,11 @@ cd ~/.aenv/envs/my-style && git init && git add . && git commit -m "v1" && git p
 ```
 
 Phase 6 will add first-class `aenv install`/`aenv sync` over git remotes. Until then, manual sync is the path.
+
+## If something goes wrong
+
+- **Undo this walkthrough:** `aenv deactivate` removes what aenv materialized and restores any originals it backed up; add `aenv unpin` to also drop the `.aenv` pin.
+- **A step errored** (e.g. your project already had a `CLAUDE.md`)? aenv backs up displaced originals to `.aenv-state/backup/<timestamp>/` before writing. If `deactivate` didn't finish cleanly, `aenv restore` copies the latest backup back.
 
 ## What to read next
 

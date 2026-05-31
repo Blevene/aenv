@@ -2,6 +2,8 @@
 
 Goal: cover the full lifecycle of an existing namespace — adding, editing, and removing skills, files, and instructions — and when each change needs a re-activate to take effect.
 
+> **New to aenv?** This guide edits a namespace you already have. A **namespace** is a bundle of harness config; its **manifest** is `aenv.toml`. After most edits you re-activate (`aenv deactivate && aenv activate`) to *materialize* the change into your project. If namespaces are new to you, start with [setup-and-first-swap](./setup-and-first-swap.md). Full [glossary](./README.md#glossary).
+
 ## Prerequisites
 
 - A namespace you already created (e.g., `my-profile` from [build-your-own](./build-your-own.md))
@@ -210,9 +212,13 @@ aenv deactivate && aenv activate    # clones into ~/.aenv/cache/skills/...
 aenv status                          # confirms scanpy materialized with resolved SHA
 ```
 
+That's the whole project-scope lifecycle: you can now add, edit, and remove skills, files, and instructions in a namespace, and you know which changes are live-via-symlink and which need a re-activate to materialize.
+
 ---
 
 ## Global profiles (user scope)
+
+*Skip this section unless you manage global (user-scope) profiles — the project-scope flow above is complete on its own.*
 
 Everything above is project scope. A **global** profile (one you activate with `aenv global use <ns>`, materializing into `~/.claude/` etc.) updates the same way, with two differences: skills and files must be declared **user-scope**, and the re-activate command is `aenv global use <ns>` (run it again; it re-materializes) rather than `aenv deactivate && aenv activate`.
 
@@ -250,6 +256,12 @@ aenv global use research
 ```
 
 `user_files` is not capped by what the adapter declares — any relative path that doesn't escape with `..` works. `aenv global doctor research` flags issues (e.g. a `settings.json` whose hook commands point at scripts you didn't include).
+
+## If something goes wrong
+
+- **A re-activate failed or left the project in a weird state:** `aenv deactivate` restores backed-up originals and clears `.aenv-state/`; `aenv restore` copies the latest `.aenv-state/backup/<timestamp>/` back if deactivate didn't finish cleanly.
+- **Undo a skill you added:** `aenv skill remove <name> --ns <namespace>` (then `aenv cache prune` to reclaim disk for imported skills).
+- **Drop the project's pin entirely:** `aenv unpin`.
 
 ## What's still in flight
 

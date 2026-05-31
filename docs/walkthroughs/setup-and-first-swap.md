@@ -2,6 +2,8 @@
 
 Goal: from a clean machine to actively swapping between the `karpathy` and `cherny` starter namespaces in your project, in about five minutes. Compact version of this flow lives in the [README's Installation + Try-the-built-in-namespaces sections](../../README.md#installation).
 
+> **New to aenv?** A **namespace** is a named bundle of harness config (here, a `CLAUDE.md`). `aenv use` *pins* this project to one; `aenv activate` *materializes* it — symlinks its files into the project. See the [glossary](./README.md#glossary) for the rest.
+
 ## Prerequisites
 
 - Rust 1.85+ via [rustup](https://rustup.rs)
@@ -46,6 +48,8 @@ Both files are real text — `aenv.toml` is the manifest, `CLAUDE.md` is what'll
 
 ## Step 3: Pin a project to karpathy
 
+Use any existing project directory here, or spin up a throwaway one with `mkdir -p ~/code/my-project && cd $_`.
+
 ```bash
 cd ~/code/my-project
 aenv use karpathy
@@ -55,6 +59,8 @@ Expected:
 ```
 Pinned /home/you/code/my-project to namespace 'karpathy'
 ```
+
+(`/home/you` is just the shell-expanded `~` — the same directory you `cd`'d into, printed in full.)
 
 A one-line `.aenv` file lands at the project root containing `karpathy`. This records intent; nothing is materialized yet. Commit `.aenv` to git so collaborators know the project's expected namespace.
 
@@ -107,6 +113,11 @@ That's the whole swap loop. Three commands per switch (`deactivate`, `use`, `act
 aenv deactivate    # restores any pre-existing CLAUDE.md
 aenv unpin         # drops the .aenv pin file (optional)
 ```
+
+## If something goes wrong
+
+- **Undo this walkthrough:** `aenv deactivate` removes the files aenv symlinked in and restores anything it backed up; add `aenv unpin` to also drop the `.aenv` pin.
+- **`aenv activate` errored** (e.g. your project already had a `CLAUDE.md`)? aenv backs up displaced originals to `.aenv-state/backup/<timestamp>/` before writing. If `deactivate` didn't finish cleanly, `aenv restore` copies the latest backup back.
 
 ## What to read next
 
