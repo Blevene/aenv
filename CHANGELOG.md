@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.3] — 2026-06-01
+
+### Fixed
+
+- **`aenv global import` / `aenv global use` now accept the `git+https://…` URL form** that `aenv skill import` uses. Previously only bare schemes (`https://`, `git@`, `file://`, `.git`, …) were recognized, so `aenv global use git+https://github.com/owner/repo --as foo` failed with the confusing `namespace not found` (it fell through to a namespace-name lookup). The `git+` prefix is now detected and stripped before the URL reaches `git clone` (which doesn't understand it). Both forms work; bare and `git+` URLs derive the same namespace name. Found while writing the ECC global-profile demo walkthrough.
+
 ## [0.3.2] — 2026-05-31
 
 A `snapshot` fix and a full literal reproduction of the user-facing walkthroughs.

@@ -67,11 +67,11 @@ What happened:
   no existing `~/.claude`, there's nothing to capture, so no baseline namespace
   appears.
 
-> **URL form matters.** `global use` / `global import` accept a bare `https://`
-> URL (or `http://`, `git://`, `git@`, `file://`, or any URL ending in `.git`).
-> They do **not** accept the `git+https://` prefix that `aenv skill import`
-> uses — `git+https://…` is read as a namespace name and fails with
-> `namespace not found`. Use `--pin <tag|branch|sha>` to lock a specific commit.
+> **URL form.** `global use` / `global import` accept a bare `https://` URL (or
+> `http://`, `git://`, `git@`, `file://`, or any URL ending in `.git`). As of
+> **v0.3.3** the `git+https://…` prefix that `aenv skill import` uses is also
+> accepted (it's stripped before cloning), so either form works. Use
+> `--pin <tag|branch|sha>` to lock a specific commit.
 
 ## Step 2: Confirm what's active
 
@@ -208,8 +208,9 @@ use -` toggles back to the previous profile.
 
 ## If something goes wrong
 
-- **`namespace not found: git+https://…`** — you used the `git+` prefix. Re-run
-  with a bare `https://github.com/affaan-m/ECC` URL.
+- **`namespace not found: <url>`** — the target wasn't recognized as a git URL.
+  Check the scheme: use `https://…`, `git@…`, `git+https://…` (v0.3.3+), or a
+  URL ending in `.git`.
 - **Undo everything:** `aenv global deactivate` restores your prior `$HOME`
   config (from the stash) and removes ECC's symlinks. The import itself only
   added a namespace under `~/.aenv/envs/ECC/` — delete it with

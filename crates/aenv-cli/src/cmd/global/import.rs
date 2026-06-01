@@ -75,12 +75,23 @@ pub fn run<F: Filesystem>(
 /// is the standard way to clone a local repo, and that's how the offline
 /// test suite exercises this code path.
 pub(crate) fn looks_like_git_url(source: &str) -> bool {
-    source.starts_with("https://")
-        || source.starts_with("http://")
-        || source.starts_with("git://")
-        || source.starts_with("git@")
-        || source.starts_with("file://")
-        || source.ends_with(".git")
+    // Accept an optional `git+` prefix for parity with `aenv skill import`,
+    // whose sources are written `git+<scheme>://…`. The prefix is stripped
+    // before the URL reaches `git clone` (see `strip_git_prefix`).
+    let s = strip_git_prefix(source);
+    s.starts_with("https://")
+        || s.starts_with("http://")
+        || s.starts_with("git://")
+        || s.starts_with("git@")
+        || s.starts_with("file://")
+        || s.ends_with(".git")
+}
+
+/// Strip an optional leading `git+` prefix from a git source string. `git+` is
+/// the form `aenv skill import` accepts; `git`/`git clone` itself doesn't
+/// understand it, so it must be removed before the URL is cloned or named.
+pub(crate) fn strip_git_prefix(source: &str) -> &str {
+    source.strip_prefix("git+").unwrap_or(source)
 }
 
 /// Resolve a local-path source string into an absolute `PathBuf`. The
@@ -125,6 +136,8 @@ fn run_git<F: Filesystem>(
     name: &str,
     pin: Option<&str>,
 ) -> Result<()> {
+    // Normalize away any `git+` prefix — git itself doesn't understand it.
+    let url = strip_git_prefix(url);
     let effective_name = if name.is_empty() {
         default_name_from_url(url)?
     } else {
@@ -179,6 +192,9 @@ fn run_git<F: Filesystem>(
 /// with a trailing `.git` stripped. Errors if the URL has no usable name
 /// (e.g. `https://example.com/`).
 pub(crate) fn default_name_from_url(url: &str) -> Result<String> {
+    // Tolerate a `git+` prefix here too, so name derivation works whether or
+    // not the caller already stripped it.
+    let url = strip_git_prefix(url);
     // Trim any `?query` or `#fragment` tail; git URLs don't generally use
     // them but be defensive.
     let main = url.split(['?', '#']).next().unwrap_or(url);
@@ -194,4 +210,54 @@ pub(crate) fn default_name_from_url(url: &str) -> Result<String> {
         )));
     }
     Ok(cleaned.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{default_name_from_url, looks_like_git_url, strip_git_prefix};
+
+    #[test]
+    fn detects_bare_and_git_prefixed_urls() {
+        // Bare schemes (the forms that already worked).
+        assert!(looks_like_git_url("https://github.com/affaan-m/ECC"));
+        assert!(looks_like_git_url("git@github.com:affaan-m/ECC.git"));
+        assert!(looks_like_git_url("file:///tmp/repo"));
+        assert!(looks_like_git_url("https://example.com/x.git"));
+        // The `git+` prefix `aenv skill import` uses — the reconciled case.
+        assert!(looks_like_git_url("git+https://github.com/affaan-m/ECC"));
+        assert!(looks_like_git_url("git+ssh://git@host/repo.git"));
+    }
+
+    #[test]
+    fn rejects_non_urls() {
+        // A plain namespace name must NOT be mistaken for a git URL.
+        assert!(!looks_like_git_url("ECC"));
+        assert!(!looks_like_git_url("my-profile"));
+        // `git+` alone over a non-URL stays a non-URL (conservative).
+        assert!(!looks_like_git_url("git+nonsense"));
+    }
+
+    #[test]
+    fn strip_git_prefix_is_idempotent_on_bare_urls() {
+        assert_eq!(
+            strip_git_prefix("git+https://github.com/affaan-m/ECC"),
+            "https://github.com/affaan-m/ECC"
+        );
+        assert_eq!(
+            strip_git_prefix("https://github.com/affaan-m/ECC"),
+            "https://github.com/affaan-m/ECC"
+        );
+    }
+
+    #[test]
+    fn derives_name_regardless_of_git_prefix() {
+        assert_eq!(
+            default_name_from_url("git+https://github.com/affaan-m/ECC").unwrap(),
+            "ECC"
+        );
+        assert_eq!(
+            default_name_from_url("https://github.com/affaan-m/ECC.git").unwrap(),
+            "ECC"
+        );
+    }
 }

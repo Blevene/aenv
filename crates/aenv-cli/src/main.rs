@@ -450,8 +450,9 @@ enum GlobalAction {
     /// file format.
     Import {
         /// Source: a local filesystem path, or a git URL
-        /// (https://, http://, git://, git@, file://, or any URL ending in
-        /// `.git`).
+        /// (https://, http://, git://, git@, file://, any URL ending in
+        /// `.git`, or any of these with a `git+` prefix as `aenv skill import`
+        /// uses).
         source: String,
         /// Namespace name. Defaults to the last path component of `source`
         /// for local paths, or the repo name (with trailing `.git` stripped)
