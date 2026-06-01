@@ -23,6 +23,9 @@ walkthroughs in the recommended order below.
   project's existing harness config into a reusable namespace.
 - [install-a-skill-from-github](./install-a-skill-from-github.md) — add a skill
   from a git repo to a namespace, pinned to an immutable commit.
+- [import-a-global-profile-from-github](./import-a-global-profile-from-github.md)
+  — turn a whole GitHub repo of harness config (e.g. `affaan-m/ECC`) into a
+  global profile that materializes into `~/.claude/`, `~/.codex/`, ….
 - [updating-a-profile](./updating-a-profile.md) — day-to-day edits to a
   namespace you already have (add a skill, bump a pin, change instructions).
 - [shell-integration](./shell-integration.md) — auto-activate the right
