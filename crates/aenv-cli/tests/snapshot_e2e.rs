@@ -233,3 +233,38 @@ fn snapshot_refuses_empty_project() {
         "empty namespace dir should be cleaned up"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Test 5: regression — bare `aenv snapshot <name>` from cwd on an UNMANAGED
+// (un-pinned) project must succeed. snapshot captures a project that isn't
+// aenv-managed yet, so requiring a `.aenv` pin would be a chicken-and-egg trap
+// (you can't pin to the namespace you're about to create). Earlier this errored
+// with "project not pinned" (exit 20). All other tests pass `--project`, which
+// masked the cwd path — this one deliberately does not.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn snapshot_from_cwd_without_pin_succeeds() {
+    let aenv_home = TempDir::new().unwrap();
+    let project = project_with_claude_md(b"# from cwd\n");
+
+    let out = Command::new(bin())
+        .arg("snapshot")
+        .arg("cwd-snap")
+        .current_dir(project.path()) // no --project; resolve from cwd
+        .env("AENV_HOME", aenv_home.path())
+        .output()
+        .unwrap();
+    assert_success(&out, "bare snapshot from cwd (unpinned project)");
+
+    let manifest = read_manifest(aenv_home.path(), "cwd-snap");
+    assert!(
+        manifest.contains("CLAUDE.md"),
+        "manifest should list CLAUDE.md; got:\n{manifest}"
+    );
+    // snapshot must still not write a pin.
+    assert!(
+        !project.path().join(".aenv").exists(),
+        "snapshot must not write .aenv pin"
+    );
+}

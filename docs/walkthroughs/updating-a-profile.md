@@ -57,7 +57,7 @@ aenv skill import git+https://github.com/k-dense-ai/scientific-agent-skills \
     --pin v2.39.0
 ```
 
-The CLI appends a `[[skills]]` block with `mode = "imported"` plus `source`, `ref`, and `path`. No content is fetched yet — that happens on the next `aenv activate`, which shallow-clones into `~/.aenv/cache/skills/<source-hash>/<ref>/` and symlinks into `.claude/skills/<skill_name>/`.
+The CLI resolves the `--pin` to a concrete commit and appends a `[[skills]]` block with `mode = "imported"` plus `source`, `ref` (the resolved SHA), and `path`. It also shallow-clones the content into `~/.aenv/cache/skills/<source-hash>/<ref>/` right away (sparse-checkout of just `--path`). The next `aenv activate` symlinks that cached content into `.claude/skills/<skill_name>/`.
 
 See the [full skill-import walkthrough](./install-a-skill-from-github.md) for the variations (no-pin, sub-path semantics, local paths).
 
@@ -87,8 +87,9 @@ name = "scanpy"
 mode = "imported"
 adapter = "claude-code"
 source = "git+https://github.com/k-dense-ai/scientific-agent-skills"
-ref = "v2.39.0"        # ← change this to v2.40.0, a branch name, or a commit SHA
+ref = "9b13286d8bae8b87d0d1361bb945fd64de9817bc"   # ← resolved SHA from --pin v2.39.0; change it to a new tag, branch, or SHA
 path = "scientific-skills/scanpy"
+required = false
 ```
 
 A pin change is a structural change. Re-activate everywhere `my-profile` is in use:
@@ -203,12 +204,13 @@ aenv skill import git+https://github.com/k-dense-ai/scientific-agent-skills \
     --path scientific-skills/scanpy \
     --pin v2.39.0
 
-# Manifest now has a [[skills]] entry; nothing fetched yet.
-aenv skill list --ns my-profile     # → scanpy, mode = imported, pin = v2.39.0
+# Manifest now has a [[skills]] entry; --pin is already resolved to a SHA and
+# the content is shallow-cloned into ~/.aenv/cache/skills/ at import time.
+aenv skill list --ns my-profile     # → scanpy, mode = imported, PIN = the resolved SHA
 
-# In a project that has my-profile active, re-activate to fetch + materialize.
+# In a project that has my-profile active, re-activate to materialize the symlinks.
 cd ~/code/some-project
-aenv deactivate && aenv activate    # clones into ~/.aenv/cache/skills/...
+aenv deactivate && aenv activate    # symlinks the cached scanpy into .claude/skills/
 aenv status                          # confirms scanpy materialized with resolved SHA
 ```
 
@@ -259,7 +261,7 @@ aenv global use research
 
 ## If something goes wrong
 
-- **A re-activate failed or left the project in a weird state:** `aenv deactivate` restores backed-up originals and clears `.aenv-state/`; `aenv restore` copies the latest `.aenv-state/backup/<timestamp>/` back if deactivate didn't finish cleanly.
+- **A re-activate failed or left the project in a weird state:** `aenv deactivate` restores backed-up originals and clears the active state (add `--prune` to also remove the retained `.aenv-state/backup/` dirs); `aenv restore` copies the latest `.aenv-state/backup/<timestamp>/` back if deactivate didn't finish cleanly.
 - **Undo a skill you added:** `aenv skill remove <name> --ns <namespace>` (then `aenv cache prune` to reclaim disk for imported skills).
 - **Drop the project's pin entirely:** `aenv unpin`.
 

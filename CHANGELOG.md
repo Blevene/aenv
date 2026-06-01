@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-05-31
+
+A `snapshot` fix and a full literal reproduction of the user-facing walkthroughs.
+
+### Fixed
+
+- **`aenv snapshot <name>` now works from the project directory without a pin.** Run bare from `cwd` on an as-yet-unmanaged project (exactly as the snapshot walkthrough shows), it previously failed with `error: project not pinned` (exit 20) — a chicken-and-egg trap, since you can't pin to the namespace you're about to create. Snapshot now falls back to `cwd` when no `.aenv` pin is found anywhere (still preferring a pinned ancestor, and still never writing a pin itself). Extracted the shared cwd-fallback resolver (`resolve_project_root_or_cwd`) that `aenv use` already used.
+
+### Docs
+
+- **Every user-facing walkthrough in `docs/walkthroughs/` was literally reproduced against the binary** (they had only been accessibility-reviewed before). This caught real output drift the prose pass couldn't: alphabetical file ordering in `activate`/`status` output, `aenv use` vs `aenv activate` emitting different lines, `skill import` resolving + cloning at import time (not deferred to activate), a `scope: project` line, the resolved-SHA manifest shape, and the shell hook printing nothing as you `cd` (it captures stdout silently). Version strings bumped to 0.3.2.
+- **New `docs/walkthroughs/README.md`** — index with a recommended reading order and a canonical glossary; each journey gained a "Concepts" box and an "If something goes wrong" recovery section. Corrected the `deactivate` description: it restores backups and clears active state but retains `.aenv-state/backup/<ts>/` until `--prune` (the prior "deletes `.aenv-state/`" wording, also in `--help`, was overstated).
+
 ## [0.3.1] — 2026-05-31
 
 Two `aenv global which` correctness fixes surfaced while reproducing the global-profile walkthrough against the real binary.

@@ -43,12 +43,14 @@ pub fn resolve_project_root<F: Filesystem>(fs: &F, explicit: Option<PathBuf>) ->
     find_project_root(fs, &cwd)
 }
 
-/// Resolve the project root for commands that CREATE a pin (`aenv use`).
-/// Walks ancestors first — if an existing pin is found in an ancestor, the
-/// command should overwrite that pin (the user is somewhere inside an
-/// existing project tree). When no pin exists anywhere, fall back to cwd:
-/// the user is establishing a new project here.
-pub fn resolve_project_root_for_pin<F: Filesystem>(
+/// Resolve the project root, falling back to `cwd` when no pin exists anywhere.
+///
+/// Shared by commands that operate on "the current project" without requiring
+/// it to already be aenv-managed: `aenv use` (about to create a pin) and
+/// `aenv snapshot` (capturing an as-yet-unmanaged project). Prefers a pinned
+/// ancestor so running from a subdirectory of an existing project still targets
+/// the project root; with no pin anywhere, the user means "here", so use `cwd`.
+pub fn resolve_project_root_or_cwd<F: Filesystem>(
     fs: &F,
     explicit: Option<PathBuf>,
 ) -> Result<PathBuf> {
@@ -67,4 +69,14 @@ pub fn resolve_project_root_for_pin<F: Filesystem>(
         Err(AenvError::ProjectNotPinned) => Ok(cwd),
         Err(other) => Err(other),
     }
+}
+
+/// Resolve the project root for commands that CREATE a pin (`aenv use`).
+/// Identical semantics to [`resolve_project_root_or_cwd`]; kept as a named
+/// alias to document intent at the `use` call site.
+pub fn resolve_project_root_for_pin<F: Filesystem>(
+    fs: &F,
+    explicit: Option<PathBuf>,
+) -> Result<PathBuf> {
+    resolve_project_root_or_cwd(fs, explicit)
 }

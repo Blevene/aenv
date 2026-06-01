@@ -54,6 +54,7 @@ Expected:
 ```
 Created authored skill 'commit-discipline' in namespace 'my-style':
   - /home/you/.aenv/envs/my-style/.claude/skills/commit-discipline/SKILL.md
+  - registered in /home/you/.aenv/envs/my-style/aenv.toml
 ```
 
 Under `~/.aenv/envs/my-style/`:
@@ -100,8 +101,8 @@ Expected:
 ```
 Pinned /home/you/code/some-project to namespace 'my-style'
 Activated 'my-style' in /home/you/code/some-project
-  + CLAUDE.md (Symlink)
   + .claude/skills/commit-discipline/SKILL.md (Symlink)
+  + CLAUDE.md (Symlink)
 ```
 
 ## Step 5: Confirm
@@ -112,13 +113,13 @@ aenv status
 # Resolution:       my-style
 #
 # Managed files:
-#   ./CLAUDE.md
-#       from my-style::CLAUDE.md
 #   ./.claude/skills/commit-discipline/SKILL.md
 #       from my-style::.claude/skills/commit-discipline/SKILL.md
+#   ./CLAUDE.md
+#       from my-style::CLAUDE.md
 #
 # Skills (1 authored, 0 imported):
-#   my-style::.claude/skills/commit-discipline/SKILL.md  authored
+#   my-style::.claude/skills/commit-discipline/SKILL.md  authored  -
 ```
 
 The `Resolution:` line shows the inheritance chain that produced this namespace — here just `my-style`, since it has no parent.

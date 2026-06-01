@@ -7,7 +7,7 @@
 
 `aenv` is a Rust CLI for managing named, composable, version-controlled bundles of AI-coding-agent configuration (`CLAUDE.md`, `.cursorrules`, `.mcp.json`, skills, agents, slash commands, MCP entries). Think Python's `venv`, but for the rules and configurations that shape how AI coding agents behave.
 
-> **Status:** Active development. Latest release is [`v0.3.1`](https://github.com/Blevene/aenv/releases/tag/v0.3.1) — a patch over v0.3.0 fixing `aenv global which` (directory `user_files` no longer crash `--json`; a shell-expanded `~` path now resolves). v0.3.0 brought global namespaces with a one-command UX (`aenv global use` for onboarding/swap, `aenv global new`, auto-baseline), user-scope skills (`aenv skill import --scope user` installs into `~/.claude/skills/`), and sparse skill-import clones. See [§What works today](#what-works-today) for the full feature surface and [§Roadmap](#roadmap--whats-still-in-flight) for what's pending.
+> **Status:** Active development. Latest release is [`v0.3.2`](https://github.com/Blevene/aenv/releases/tag/v0.3.2) — fixes `aenv snapshot` from an unmanaged project directory (no longer errors "project not pinned") and reproduces every user-facing walkthrough against the binary. v0.3.1 fixed `aenv global which` (directory `user_files` no longer crash `--json`; a shell-expanded `~` path now resolves). v0.3.0 brought global namespaces with a one-command UX (`aenv global use` for onboarding/swap, `aenv global new`, auto-baseline), user-scope skills (`aenv skill import --scope user` installs into `~/.claude/skills/`), and sparse skill-import clones. See [§What works today](#what-works-today) for the full feature surface and [§Roadmap](#roadmap--whats-still-in-flight) for what's pending.
 
 ## Installation
 

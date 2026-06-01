@@ -50,8 +50,9 @@ The terms every walkthrough assumes. Definitions match `aenv --help`.
   as symlinks (or merged files where needed), backing up any displaced
   originals to `.aenv-state/backup/<timestamp>/`. "Materialize" = this step.
 - **`deactivate`** — reverses `activate`: removes the files aenv materialized,
-  restores backed-up originals byte-for-byte, and deletes `.aenv-state/`. Leaves
-  the `.aenv` pin in place (`unpin` removes that too).
+  restores backed-up originals byte-for-byte, and clears the active state.
+  Leaves the `.aenv` pin in place (`unpin` removes that too) and retains the
+  `.aenv-state/backup/<ts>/` scaffolding until you pass `--prune`.
 - **Pin (`.aenv`)** — the file `aenv use` drops at a project root marking which
   namespace belongs there. The shell hook reads it to auto-activate on `cd`.
 - **`extends`** — inheritance. A namespace inherits its parent's files and

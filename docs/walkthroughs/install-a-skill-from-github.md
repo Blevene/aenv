@@ -22,6 +22,7 @@ Expected:
 Resolving git+https://github.com/k-dense-ai/scientific-agent-skills @ v2.39.0...
 Imported skill 'scanpy' into namespace 'my-style':
   - source: git+https://github.com/k-dense-ai/scientific-agent-skills
+  - scope: project
   - path: scientific-skills/scanpy
   - pinned ref: 9b13286d8bae8b87d0d1361bb945fd64de9817bc
   - registered in /home/you/.aenv/envs/my-style/aenv.toml
@@ -55,17 +56,21 @@ aenv use my-style
 aenv activate
 ```
 
-Expected on first activation (the clone happens here):
+`aenv use` records the pin:
 ```
 Pinned /home/you/code/some-project to namespace 'my-style'
+```
+
+Expected on first activation (the clone happens here):
+```
 Activated 'my-style' in /home/you/code/some-project
-  + CLAUDE.md (Symlink)
   + .claude/skills/scanpy/SKILL.md (Symlink)
-  + .claude/skills/scanpy/references/api_reference.md (Symlink)
-  + .claude/skills/scanpy/references/standard_workflow.md (Symlink)
-  + .claude/skills/scanpy/references/plotting_guide.md (Symlink)
-  + .claude/skills/scanpy/scripts/qc_analysis.py (Symlink)
   + .claude/skills/scanpy/assets/analysis_template.py (Symlink)
+  + .claude/skills/scanpy/references/api_reference.md (Symlink)
+  + .claude/skills/scanpy/references/plotting_guide.md (Symlink)
+  + .claude/skills/scanpy/references/standard_workflow.md (Symlink)
+  + .claude/skills/scanpy/scripts/qc_analysis.py (Symlink)
+  + CLAUDE.md (Symlink)
 ```
 
 aenv cloned the repo into `~/.aenv/cache/skills/<source-hash>/9b13286d.../` — and because you passed `--path`, it does a **sparse checkout of just `scientific-skills/scanpy/`** (not the whole monorepo), then symlinks that subtree's contents (SKILL.md + everything under it) into your project. Subsequent activations are network-free — pinned ref + cached.
@@ -80,8 +85,7 @@ The Skills block at the bottom reports the resolved SHA per skill:
 
 ```
 Skills (0 authored, 1 imported):
-  my-style::.claude/skills/scanpy/SKILL.md  imported
-      git+https://github.com/k-dense-ai/scientific-agent-skills @ 9b13286d8bae8b87d0d1361bb945fd64de9817bc
+  my-style::.claude/skills/scanpy/SKILL.md  imported  git+https://github.com/k-dense-ai/scientific-agent-skills @ 9b13286d8bae8b87d0d1361bb945fd64de9817bc
 ```
 
 The SHA is the same on every machine that activates with the same pin — that's the reproducibility guarantee.

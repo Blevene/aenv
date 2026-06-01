@@ -31,11 +31,11 @@ aenv init-shell fish | source
 
 Open a new shell (or `source` the rc file).
 
-To confirm the hook loaded before you rely on it, run `type aenv` — it should succeed — or just `cd` into a pinned project and watch for the activation message the hook reports.
+To confirm the hook loaded before you rely on it, run `type aenv` — it should succeed — or just `cd` into a pinned project and check `echo "$_AENV_ACTIVE"` (or `aenv status`). The hook works silently: it captures the active project root into `_AENV_ACTIVE` and prints nothing to your terminal.
 
 ## Step 2: cd around — the hook does the rest
 
-The example below uses placeholder paths like `/home/you/...` and project names like `my-project-a`; substitute your own pinned project paths. The comments just show what the hook reports.
+The example below uses placeholder paths like `/home/you/...` and project names like `my-project-a`; substitute your own pinned project paths. The hook prints nothing as you `cd` — the comments just annotate what it tracks behind the scenes (inspect it with `echo "$_AENV_ACTIVE"`).
 
 ```bash
 cd ~/code/my-project-a

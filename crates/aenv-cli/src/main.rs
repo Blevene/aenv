@@ -74,9 +74,10 @@ enum Command {
         project: Option<PathBuf>,
     },
     /// Reverse `aenv activate`: remove every file aenv materialized,
-    /// restore any backed-up originals byte-for-byte, and delete the
-    /// `.aenv-state/` directory. Leaves the `.aenv` pin file in place
-    /// (use `aenv unpin` to remove that too).
+    /// restore any backed-up originals byte-for-byte, and clear the active
+    /// state. Leaves the `.aenv` pin file in place (use `aenv unpin` to remove
+    /// that too) and retains the `.aenv-state/backup/<ts>/` scaffolding unless
+    /// `--prune` is passed.
     Deactivate {
         #[arg(long)]
         project: Option<PathBuf>,
@@ -720,7 +721,9 @@ fn main() -> ExitCode {
                 project,
                 extends,
             } => {
-                let project_root = paths::resolve_project_root(&fs, project)?;
+                // snapshot captures an as-yet-unmanaged project, so it must not
+                // require a `.aenv` pin — fall back to cwd when none exists.
+                let project_root = paths::resolve_project_root_or_cwd(&fs, project)?;
                 let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
                     &fs,
                     &layout.adapters_dir(),

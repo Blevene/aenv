@@ -231,10 +231,10 @@ fn deactivate_with_state_path<F: Filesystem>(
 
     // Best-effort: for project scope only, if `.aenv-state/` is now empty
     // remove it too. Ignore the error — a non-empty directory (user files,
-    // stale backup) is fine to leave. For user scope, `<aenv_home>` holds
-    // the registry (adapters, envs) so we never touch it; orphan stash
-    // directories under `global-stash/<ts>/` are surfaced by
-    // `aenv global doctor`, which offers `--fix` to clear them.
+    // retained `backup/<ts>/` scaffolding, which `--prune` clears) is fine to
+    // leave. For user scope, `<aenv_home>` holds the registry (adapters, envs)
+    // so we never touch it; orphan stash directories under `global-stash/<ts>/`
+    // are surfaced by `aenv global doctor`, which offers `--fix` to clear them.
     if scope == crate::scope::Scope::Project {
         let state_dir = target_root.join(".aenv-state");
         let _ = std::fs::remove_dir(&state_dir);
