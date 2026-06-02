@@ -147,3 +147,4 @@ Phase 6 will add first-class `aenv install`/`aenv sync` over git remotes. Until 
 
 - [Install a skill from GitHub](./install-a-skill-from-github.md) — pull in third-party skills instead of authoring everything
 - [Snapshot an existing project](./snapshot-an-existing-project.md) — start the other direction, from a project you've already shaped
+- [Import a global profile from GitHub](./import-a-global-profile-from-github.md) — take a profile user-level (`~/.claude`) instead of per-project, and reuse one copy in both scopes (`shared_files`)

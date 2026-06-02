@@ -222,7 +222,7 @@ That's the whole project-scope lifecycle: you can now add, edit, and remove skil
 
 *Skip this section unless you manage global (user-scope) profiles — the project-scope flow above is complete on its own.*
 
-Everything above is project scope. A **global** profile (one you activate with `aenv global use <ns>`, materializing into `~/.claude/` etc.) updates the same way, with two differences: skills and files must be declared **user-scope**, and the re-activate command is `aenv global use <ns>` (run it again; it re-materializes) rather than `aenv deactivate && aenv activate`.
+Everything above is project scope. A **global** profile (one you activate with `aenv global use <ns>`, materializing into `~/.claude/` etc.) updates the same way, with two differences: skills and files must be declared **user-scope**, and the re-activate command is `aenv global use <ns>` (run it again; it re-materializes) — or the unified `aenv activate <ns> --global` — rather than `aenv deactivate && aenv activate`.
 
 ### Add a skill to a global profile
 
@@ -258,6 +258,28 @@ aenv global use research
 ```
 
 `user_files` is not capped by what the adapter declares — any relative path that doesn't escape with `..` works. `aenv global doctor research` flags issues (e.g. a `settings.json` whose hook commands point at scripts you didn't include).
+
+### Reuse the same content in both scopes (`shared_files`)
+
+A profile's user-scope content can also serve **project** scope from the same stored copy — no second tree to keep in sync. Declare the paths under `shared_files` instead of `user_files`:
+
+```bash
+$EDITOR ~/.aenv/envs/research/aenv.toml
+#   [adapters.claude-code]
+#   shared_files = [".claude/CLAUDE.md", ".claude/agents/"]   # was: user_files
+```
+
+Nothing moves on disk — the content stays under `~/.aenv/envs/research/user/`. (Authoring from scratch or capturing? Pass `--shared` to skip the rename: `aenv create research --global --shared`, `aenv global snapshot <ns> --shared`, or `aenv global import <src> --shared` emit `shared_files` directly.) Now the one copy materializes to whichever scope you activate:
+
+```bash
+aenv activate research --global         # → ~/.claude/...   (every project)
+cd ~/code/some-repo
+aenv use research && aenv activate      # → ./...           (this repo, same bytes)
+```
+
+The role-tagged instructions file is remapped to each scope's layout — `~/.claude/CLAUDE.md` globally, repo-root `CLAUDE.md` in a project — while `.claude/` directories keep their path in both. Editing the single source changes what both scopes materialize. The three buckets: `files` (project only), `user_files` (global only), `shared_files` (both). Both scopes can be active at once; inside the repo the agent reads the project copy in preference to the global one.
+
+> **Re-activating either scope.** The global re-activate is `aenv global use research` (or the equivalent `aenv activate research --global`); the project re-activate is `aenv deactivate && aenv activate` as usual.
 
 ## If something goes wrong
 

@@ -82,7 +82,9 @@ fn resolve_target<F: Filesystem>(
             None => default_name_from_url(target)?,
         };
         if !namespace_exists(fs, layout, &name) {
-            super::import::run(fs, layout, adapters, target, &name, pin)?;
+            // `global use <source>` imports global-only; for a dual-scope
+            // profile, `global import <src> --shared` then `global use <name>`.
+            super::import::run(fs, layout, adapters, target, &name, pin, false)?;
         } else {
             println!("Namespace '{name}' already imported; switching to it.");
         }
@@ -108,7 +110,7 @@ fn resolve_target<F: Filesystem>(
             None => default_name_for(&src)?,
         };
         if !namespace_exists(fs, layout, &name) {
-            super::import::run(fs, layout, adapters, target, &name, None)?;
+            super::import::run(fs, layout, adapters, target, &name, None, false)?;
         } else {
             println!("Namespace '{name}' already imported; switching to it.");
         }

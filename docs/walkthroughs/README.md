@@ -61,8 +61,10 @@ The terms every walkthrough assumes. Definitions match `aenv --help`.
 - **`extends`** — inheritance. A namespace inherits its parent's files and
   overrides them section-by-section.
 - **Scope** — *project* scope materializes into the current repo's `.claude/`;
-  *global* (user) scope materializes into `~/.claude/` for every project, via
-  the `aenv global …` commands.
+  *global* (user) scope materializes into `~/.claude/` for every project. Drive
+  either with the `aenv global …` commands or the unified `--global` flag on
+  `create` / `activate` / `deactivate`. A namespace can declare `shared_files` so
+  one stored copy serves **both** scopes.
 - **resolved_hash** — a content hash of everything a namespace materializes.
   Identical inputs produce an identical hash, so you can verify two setups match
   across machines.

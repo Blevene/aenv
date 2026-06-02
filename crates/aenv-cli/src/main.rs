@@ -31,6 +31,17 @@ enum Command {
         /// Each name is validated against installed adapters (exit 11 if unknown).
         #[arg(long)]
         adapter: Vec<String>,
+        /// Create a user-scope (global) namespace instead of a project one.
+        /// Equivalent to `aenv global new`: seeds the adapter's instructions
+        /// file under the namespace's `user/` subtree and pre-wires
+        /// `user_files`. `--extends` is not supported with `--global` yet.
+        #[arg(long)]
+        global: bool,
+        /// With `--global`, declare the seeded content as `shared_files` so one
+        /// stored copy serves both project and global scopes (issue #5). Only
+        /// valid together with `--global`.
+        #[arg(long)]
+        shared: bool,
     },
     /// List every namespace in the registry.
     List {
@@ -68,10 +79,25 @@ enum Command {
     /// explicitly. Backs up any displaced originals to
     /// `.aenv-state/backup/<timestamp>/`.
     Activate {
-        /// Namespace name (defaults to the .aenv pin).
+        /// Namespace name (defaults to the .aenv pin for project scope;
+        /// required with `--global`).
         name: Option<String>,
         #[arg(long)]
         project: Option<PathBuf>,
+        /// Activate the namespace's user-scope surface into `$HOME`
+        /// (`~/.claude/`, `~/.codex/`, …) instead of the project. Routes to
+        /// the same core as `aenv global use <name>`, including baseline
+        /// capture, pre-flight, and lifecycle approval.
+        #[arg(long)]
+        global: bool,
+        /// Approve lifecycle scripts and proceed past pre-flight findings
+        /// without prompting. Only meaningful with `--global`.
+        #[arg(long)]
+        yes: bool,
+        /// Skip the first-activation baseline capture. Only meaningful with
+        /// `--global`.
+        #[arg(long)]
+        no_baseline: bool,
     },
     /// Reverse `aenv activate`: remove every file aenv materialized,
     /// restore any backed-up originals byte-for-byte, and clear the active
@@ -84,8 +110,18 @@ enum Command {
         /// Also remove every timestamped backup directory under
         /// `.aenv-state/backup/`. Older runs' backups accumulate
         /// otherwise. (The global-scope analog is `aenv global doctor --fix`.)
+        /// Project scope only.
         #[arg(long)]
         prune: bool,
+        /// Deactivate the user-scope (global) activation in `$HOME` instead of
+        /// the project. Routes to the same core as `aenv global deactivate`.
+        #[arg(long)]
+        global: bool,
+        /// Skip `on_deactivate` lifecycle hooks (for when a hook itself is
+        /// broken). File restoration proceeds either way. Only meaningful with
+        /// `--global`.
+        #[arg(long)]
+        force: bool,
     },
     /// Recovery path when `aenv deactivate` didn't run cleanly. Copies
     /// the most recent `.aenv-state/backup/<timestamp>/` set back into
@@ -419,6 +455,10 @@ enum GlobalAction {
         /// Adapter to scaffold for.
         #[arg(long, default_value = "claude-code")]
         adapter: String,
+        /// Declare the seeded content as `shared_files` (both scopes from one
+        /// copy, issue #5) instead of `user_files` (global only).
+        #[arg(long)]
+        shared: bool,
     },
     /// Snapshot the current `$HOME` user-scope surface (`~/.claude/`,
     /// `~/.codex/`, etc.) into a new namespace. The set of captured paths
@@ -436,6 +476,10 @@ enum GlobalAction {
         /// defaults. Repeatable: `--include .claude/runtime --include .claude/bin`.
         #[arg(long)]
         include: Vec<String>,
+        /// Declare the captured content as `shared_files` (both scopes from one
+        /// copy, issue #5) instead of `user_files` (global only).
+        #[arg(long)]
+        shared: bool,
     },
     /// Import a source directory or git URL as a new namespace. When the
     /// source root contains `aenv-namespace.toml`, its declared `[layout]`
@@ -463,6 +507,10 @@ enum GlobalAction {
         /// applies to git URL sources.
         #[arg(long)]
         pin: Option<String>,
+        /// Declare the imported content as `shared_files` (both scopes from one
+        /// copy, issue #5) instead of `user_files` (global only).
+        #[arg(long)]
+        shared: bool,
     },
     /// Diff user-scope content against the active global activation or
     /// between two namespaces' user-scope subsets.
@@ -488,6 +536,17 @@ fn parse_scope(s: &str) -> Result<aenv_core::scope::Scope, aenv_core::AenvError>
     }
 }
 
+/// Resolve the user-scope target root (`$HOME`) for `--global` operations.
+/// User-scope activation materializes into `~/.claude/`, `~/.codex/`, … so it
+/// needs `HOME`; absence is a hard error rather than a silent default.
+fn fake_home() -> Result<std::path::PathBuf, aenv_core::AenvError> {
+    std::env::var("HOME")
+        .map(std::path::PathBuf::from)
+        .map_err(|_| {
+            aenv_core::AenvError::ManifestInvalid("HOME not set; --global requires HOME".into())
+        })
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let fs = RealFilesystem;
@@ -501,7 +560,36 @@ fn main() -> ExitCode {
                 name,
                 extends,
                 adapter,
+                global,
+                shared,
             } => {
+                if shared && !global {
+                    return Err(aenv_core::AenvError::ManifestInvalid(
+                        "--shared applies only with --global (it controls user-scope \
+                         scaffolding); a project namespace uses `files`"
+                            .into(),
+                    ));
+                }
+                if global {
+                    // `aenv create --global` scaffolds a user-scope namespace,
+                    // the same as `aenv global new`. The global scaffolder is
+                    // single-adapter and has no `extends` path yet.
+                    if !extends.is_empty() {
+                        return Err(aenv_core::AenvError::ManifestInvalid(
+                            "--extends is not supported with --global; create the \
+                             namespace then edit its manifest"
+                                .into(),
+                        ));
+                    }
+                    if adapter.len() > 1 {
+                        return Err(aenv_core::AenvError::ManifestInvalid(
+                            "--global scaffolds a single adapter; pass at most one --adapter"
+                                .into(),
+                        ));
+                    }
+                    let adapter_name = adapter.first().map(String::as_str).unwrap_or("claude-code");
+                    return cmd::global::new::run(&fs, &layout, &name, adapter_name, shared);
+                }
                 let adapters_reg = aenv_core::adapter::AdapterRegistry::load_from_dir(
                     &fs,
                     &layout.adapters_dir(),
@@ -528,13 +616,6 @@ fn main() -> ExitCode {
                         &fs,
                         &layout.adapters_dir(),
                     )?;
-                    let fake_home = std::env::var("HOME")
-                        .map(std::path::PathBuf::from)
-                        .map_err(|_| {
-                            aenv_core::AenvError::ManifestInvalid(
-                                "HOME not set; --global requires HOME".into(),
-                            )
-                        })?;
                     // `aenv use --global <ns>` forwards the user's `--yes`:
                     // with it, the whole sequence (pin, activate project,
                     // activate global) runs non-interactively; without it,
@@ -543,16 +624,84 @@ fn main() -> ExitCode {
                     // user didn't consent to. Baseline capture stays enabled
                     // (the safer default).
                     cmd::global::activate::run(
-                        &fs, &layout, &adapters, &fake_home, &name, yes, false,
+                        &fs,
+                        &layout,
+                        &adapters,
+                        &fake_home()?,
+                        &name,
+                        yes,
+                        false,
                     )?;
                 }
                 Ok(())
             }
-            Command::Activate { name, project } => {
+            Command::Activate {
+                name,
+                project,
+                global,
+                yes,
+                no_baseline,
+            } => {
+                if global {
+                    if project.is_some() {
+                        return Err(aenv_core::AenvError::ManifestInvalid(
+                            "--project (a project path) cannot be combined with --global".into(),
+                        ));
+                    }
+                    let name = name.ok_or_else(|| {
+                        aenv_core::AenvError::ManifestInvalid(
+                            "--global activation needs a namespace name: aenv activate <ns> --global"
+                                .into(),
+                        )
+                    })?;
+                    let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
+                        &fs,
+                        &layout.adapters_dir(),
+                    )?;
+                    return cmd::global::activate::run(
+                        &fs,
+                        &layout,
+                        &adapters,
+                        &fake_home()?,
+                        &name,
+                        yes,
+                        no_baseline,
+                    );
+                }
+                if yes || no_baseline {
+                    return Err(aenv_core::AenvError::ManifestInvalid(
+                        "--yes / --no-baseline only apply with --global".into(),
+                    ));
+                }
                 let project_root = paths::resolve_project_root(&fs, project)?;
                 cmd::activate::run(&fs, &layout, &project_root, name.as_deref())
             }
-            Command::Deactivate { project, prune } => {
+            Command::Deactivate {
+                project,
+                prune,
+                global,
+                force,
+            } => {
+                if global {
+                    if project.is_some() {
+                        return Err(aenv_core::AenvError::ManifestInvalid(
+                            "--project (a project path) cannot be combined with --global".into(),
+                        ));
+                    }
+                    if prune {
+                        return Err(aenv_core::AenvError::ManifestInvalid(
+                            "--prune is project scope only; clear global stashes with \
+                             `aenv global doctor --fix`"
+                                .into(),
+                        ));
+                    }
+                    return cmd::global::deactivate::run(&fs, &layout, &fake_home()?, force);
+                }
+                if force {
+                    return Err(aenv_core::AenvError::ManifestInvalid(
+                        "--force only applies with --global".into(),
+                    ));
+                }
                 let project_root = paths::resolve_project_root(&fs, project)?;
                 cmd::deactivate::run(&fs, &project_root, prune)
             }
@@ -629,7 +778,7 @@ fn main() -> ExitCode {
             } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;
                 let aenv_home = paths::resolve_aenv_home()?;
-                cmd::which::run(project_root, path, &aenv_home, json)
+                cmd::which::run(&fs, project_root, path, &aenv_home, json)
             }
             Command::Unpin { project } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;
@@ -848,19 +997,30 @@ fn main() -> ExitCode {
                             fix,
                         )
                     }
-                    GlobalAction::New { name, adapter } => {
-                        cmd::global::new::run(&fs, &layout, &name, &adapter)
-                    }
-                    GlobalAction::Snapshot { name, include } => {
+                    GlobalAction::New {
+                        name,
+                        adapter,
+                        shared,
+                    } => cmd::global::new::run(&fs, &layout, &name, &adapter, shared),
+                    GlobalAction::Snapshot {
+                        name,
+                        include,
+                        shared,
+                    } => {
                         let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
                             &fs,
                             &layout.adapters_dir(),
                         )?;
                         cmd::global::snapshot::run(
-                            &fs, &layout, &adapters, &fake_home, &name, &include,
+                            &fs, &layout, &adapters, &fake_home, &name, &include, shared,
                         )
                     }
-                    GlobalAction::Import { source, name, pin } => {
+                    GlobalAction::Import {
+                        source,
+                        name,
+                        pin,
+                        shared,
+                    } => {
                         let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
                             &fs,
                             &layout.adapters_dir(),
@@ -872,6 +1032,7 @@ fn main() -> ExitCode {
                             &source,
                             &name,
                             pin.as_deref(),
+                            shared,
                         )
                     }
                     GlobalAction::Diff { ns_a, ns_b, json } => cmd::global::diff::run(

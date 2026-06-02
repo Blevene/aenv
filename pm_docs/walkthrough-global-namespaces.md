@@ -35,13 +35,15 @@ export RESCUE=$PWD/target/release/aenv-rescue
 
 mkdir -p "$HOME"
 $BIN --version
-# → aenv 0.3.0
+# → aenv 0.3.3
 ```
 
 Two paths to keep in your head:
 
 - **`$HOME`** — the surface global activations materialize into. `aenv global use <ns>` writes (symlinks or copies) files under here.
 - **`$AENV_HOME`** — where the namespace registry lives, and also where the per-user **global activation state** is stored: `$AENV_HOME/global-state.json` (schema v6), stashes under `$AENV_HOME/global-stash/<timestamp>/`, the cross-process lock at `$AENV_HOME/global.lock`, and per-namespace lifecycle approval markers at `$AENV_HOME/envs/<ns>/.approved`.
+
+> **Unified verbs (issue #5).** Every `aenv global <verb>` below has an equivalent on the project verbs with a `--global` flag: `aenv create <ns> --global` (= `global new`), `aenv activate <ns> --global [--yes] [--no-baseline]`, `aenv deactivate --global [--force]`. Both spellings drive the same user-scope core; this walkthrough uses `aenv global …` throughout, but you can substitute the flag form anywhere.
 
 Confirm the starting state:
 
@@ -661,3 +663,15 @@ Everything aenv reads or writes for the global scope lives under one of these ro
 - **Lifecycle scripts.** `$AENV_HOME/envs/<ns>/<script-name>.sh` — at the namespace dir root, NOT under `user/`. The manifest's `[lifecycle].on_activate` / `on_deactivate` values are namespace-relative paths to these files.
 
 A namespace's `aenv.toml` declares user-scope ownership via per-adapter `user_files = [...]`. Paths in `user_files` are written **without** the `~/` prefix (that prefix is reserved for the adapter manifest's own `user_files` declaration, which describes the surface in the abstract; the namespace lists concrete paths under that surface).
+
+### Adapter file buckets: `files` / `user_files` / `shared_files`
+
+A per-adapter block has three file lists, distinguished by **which scopes the content serves** and **where it is stored**:
+
+| Bucket | Scope(s) | Stored at | Materializes to |
+| --- | --- | --- | --- |
+| `files` | project only | namespace root (`envs/<ns>/<rel>`) | `<project>/<rel>` |
+| `user_files` | global/user only | `envs/<ns>/user/<rel>` | `$HOME/<rel>` |
+| `shared_files` | **both**, from one copy | `envs/<ns>/user/<rel>` | `$HOME/<rel>` under `--global`; the project under `--project` |
+
+`shared_files` (issue #5, Layer 2) is authored exactly like `user_files` — user-scope layout, tilde-less, stored under the same `user/` subtree — but it emits a candidate in **both** scopes from the single stored copy. The project-scope destination is derived from the adapter's role map: a role-tagged path (the instructions file) lands in each scope's own layout — `.claude/CLAUDE.md` materializes at repo-root `CLAUDE.md` in a project but `$HOME/.claude/CLAUDE.md` globally — while non-role paths keep their relative path in both scopes. If a `shared_files` entry's `user_roles` role has zero or multiple matching `roles` paths, resolution fails with `ManifestInvalid` (exit 12). Migrate a global-only namespace to dual-scope by renaming its `user_files` key to `shared_files`; no files move.

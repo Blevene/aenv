@@ -94,6 +94,17 @@ pub struct AdapterEntry {
     /// User-scope analog of `merge`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub user_merge: Option<std::collections::BTreeMap<String, String>>,
+    /// Paths that serve BOTH scopes from a single stored copy (issue #5
+    /// Layer 2). Authored like `user_files` — user-scope-layout, tilde-less,
+    /// relative to the namespace's `user/` source subdir. At activation each
+    /// entry materializes to `$HOME/<rel>` under `--global` and to the
+    /// project-scope destination under `--project`; the project destination is
+    /// the same `<rel>` unless the entry is role-tagged (e.g. the instructions
+    /// file), in which case it is derived from the adapter's `roles` map (so
+    /// `.claude/CLAUDE.md` lands at `CLAUDE.md` in a project). Per-file strategy
+    /// overrides reuse `merge` (project key) and `user_merge` (user key).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub shared_files: Vec<String>,
     /// Override the adapter's default materialize strategy for this
     /// namespace. Same values as `Adapter::materialize` (`"symlink"` or
     /// `"copy"`). Per-file `merge` overrides still take precedence.
@@ -130,6 +141,8 @@ impl AenvManifest {
             #[serde(default)]
             user_merge: Option<MergeRaw>,
             #[serde(default)]
+            shared_files: Vec<String>,
+            #[serde(default)]
             materialize: Option<String>,
         }
 
@@ -164,6 +177,7 @@ impl AenvManifest {
                     merge: merge_raw,
                     user_files,
                     user_merge: user_merge_raw,
+                    shared_files,
                     materialize,
                 } = raw_entry;
                 let merge = merge_raw.map(|m| match m {
@@ -187,6 +201,7 @@ impl AenvManifest {
                         merge,
                         user_files,
                         user_merge,
+                        shared_files,
                         materialize,
                     },
                 )

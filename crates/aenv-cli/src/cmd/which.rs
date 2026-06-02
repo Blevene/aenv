@@ -2,20 +2,27 @@
 
 use std::path::{Path, PathBuf};
 
+use aenv_core::fs::Filesystem;
+use aenv_core::identity::NamespaceId;
 use aenv_core::resolve::{DeepMergeFormat, MaterializeStrategy};
 use aenv_core::state::ActivationState;
 
 /// Format a human-readable "which" report for `query` from `state`.
 ///
-/// `aenv_home` is used to construct the `Source path:` line for strategies
-/// where there is a single source file (Symlink, Copy, Identical). For merged
-/// strategies (multiple contributors) the line is omitted.
+/// For single-source strategies (Symlink, Copy, Identical) a `Source path:`
+/// line is shown. `source_path`, when provided, is the real on-disk source the
+/// resolver assigned — used because `ManagedFile` does not persist it and a
+/// `shared_files` entry materialises from `<ns>/user/…` rather than the
+/// namespace root. When `None`, the line falls back to the
+/// `<aenv_home>/envs/<ns>/<short>` reconstruction (correct for plain `files`).
+/// For merged strategies (multiple contributors) the line is omitted.
 ///
 /// Returns `Err(String)` if the path is not managed by the active namespace.
 pub fn format_which(
     state: &ActivationState,
     query: &Path,
     aenv_home: &Path,
+    source_path: Option<&Path>,
 ) -> Result<String, String> {
     let mf = state
         .managed_files
@@ -39,9 +46,14 @@ pub fn format_which(
         MaterializeStrategy::Symlink
         | MaterializeStrategy::Copy
         | MaterializeStrategy::Identical => {
-            let ns = mf.qualified_name.namespace().as_str();
-            let short = mf.qualified_name.short().as_str();
-            let src = aenv_home.join("envs").join(ns).join(short);
+            let src = match source_path {
+                Some(p) => p.to_path_buf(),
+                None => {
+                    let ns = mf.qualified_name.namespace().as_str();
+                    let short = mf.qualified_name.short().as_str();
+                    aenv_home.join("envs").join(ns).join(short)
+                }
+            };
             out.push_str(&format!("Source path:     {}\n", src.display()));
         }
         _ => {}
@@ -84,8 +96,32 @@ fn render_strategy(s: MaterializeStrategy) -> String {
     }
 }
 
+/// Best-effort recovery of the real project-scope source path for `query`.
+///
+/// `ManagedFile` does not persist `source_path`, so we re-resolve the active
+/// namespace and read it from the matching Project candidate. Returns `None`
+/// (and the caller falls back to path reconstruction) if anything fails.
+fn resolved_project_source<F: Filesystem>(
+    fs: &F,
+    aenv_home: &Path,
+    active_namespace: &str,
+    query: &Path,
+) -> Option<PathBuf> {
+    let registry = aenv_core::home::RegistryLayout::new(aenv_home.to_path_buf());
+    let adapters =
+        aenv_core::adapter::AdapterRegistry::load_from_dir(fs, &registry.adapters_dir()).ok()?;
+    let leaf = NamespaceId::new(active_namespace).ok()?;
+    let resolution = aenv_core::resolve::resolve_namespace(fs, &registry, &adapters, &leaf).ok()?;
+    resolution
+        .candidates
+        .iter()
+        .find(|c| c.scope == aenv_core::scope::Scope::Project && c.path == query)
+        .map(|c| c.source_path.clone())
+}
+
 /// Entry point for `aenv which <path>`.
-pub fn run(
+pub fn run<F: Filesystem>(
+    fs: &F,
     project_root: PathBuf,
     query: PathBuf,
     aenv_home: &Path,
@@ -123,7 +159,8 @@ pub fn run(
         return Ok(());
     }
 
-    let out = format_which(&state, &query, aenv_home)
+    let source = resolved_project_source(fs, aenv_home, state.active_namespace.as_str(), &query);
+    let out = format_which(&state, &query, aenv_home, source.as_deref())
         .map_err(aenv_core::AenvError::ActivationConflict)?;
     print!("{out}");
     Ok(())

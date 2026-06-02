@@ -57,7 +57,7 @@ fn import_with_convention_file_uses_explicit_layout() {
     fs.write(&src.join("myrules/b.md"), b"rule b").unwrap();
     fs.write(&src.join("top.md"), b"top").unwrap();
 
-    let summary = import_global(&fs, &layout, &empty_registry(), src, "ns1").unwrap();
+    let summary = import_global(&fs, &layout, &empty_registry(), src, "ns1", false).unwrap();
     assert!(
         summary.convention_file_used,
         "convention_file_used must be true"
@@ -90,7 +90,8 @@ fn import_heuristic_recognizes_claude_ctrl_layout() {
     fs.write(&src.join("install.sh"), b"#!/bin/sh\necho install\n")
         .unwrap();
 
-    let summary = import_global(&fs, &layout, &empty_registry(), src, "claude-cntrl").unwrap();
+    let summary =
+        import_global(&fs, &layout, &empty_registry(), src, "claude-cntrl", false).unwrap();
     assert!(!summary.convention_file_used);
 
     let user_root = layout.namespace_dir("claude-cntrl").join("user");
@@ -149,7 +150,7 @@ ignore = ["docs/"]
     fs.write(&src.join("docs/dontcopy.md"), b"docs").unwrap();
     fs.write(&src.join("CLAUDE.md"), b"hello").unwrap();
 
-    import_global(&fs, &layout, &empty_registry(), src, "ns2").unwrap();
+    import_global(&fs, &layout, &empty_registry(), src, "ns2", false).unwrap();
 
     let user_root = layout.namespace_dir("ns2").join("user");
     assert_eq!(
@@ -177,7 +178,7 @@ fn import_refuses_existing_namespace() {
     fs.write(&layout.manifest_path("existing"), b"name = \"existing\"\n")
         .unwrap();
 
-    let err = import_global(&fs, &layout, &empty_registry(), src, "existing")
+    let err = import_global(&fs, &layout, &empty_registry(), src, "existing", false)
         .expect_err("must reject existing namespace");
     assert!(
         matches!(err, AenvError::ActivationConflict(_)),
@@ -191,7 +192,7 @@ fn import_refuses_invalid_name() {
     let layout = layout();
     let src = fake_source();
     seed_dir(&fs, src);
-    let err = import_global(&fs, &layout, &empty_registry(), src, "bad:name")
+    let err = import_global(&fs, &layout, &empty_registry(), src, "bad:name", false)
         .expect_err("must reject invalid name");
     assert!(
         matches!(err, AenvError::ManifestInvalid(_)),
@@ -209,6 +210,7 @@ fn import_refuses_non_existent_source() {
         &empty_registry(),
         Path::new("/does/not/exist"),
         "ns",
+        false,
     )
     .expect_err("must reject missing source");
     assert!(
@@ -228,6 +230,7 @@ fn import_refuses_file_source() {
         &empty_registry(),
         Path::new("/not-a-dir.md"),
         "ns",
+        false,
     )
     .expect_err("must reject a regular file as source");
     assert!(
@@ -245,7 +248,7 @@ fn import_buckets_codex_paths_under_codex_adapter() {
     fs.write(&src.join(".codex/AGENTS.md"), b"agents").unwrap();
     fs.write(&src.join("CLAUDE.md"), b"claude").unwrap();
 
-    import_global(&fs, &layout, &empty_registry(), src, "mixed").unwrap();
+    import_global(&fs, &layout, &empty_registry(), src, "mixed", false).unwrap();
 
     let manifest = read_manifest(&fs, &layout, "mixed");
     let claude_entry = manifest
@@ -297,7 +300,7 @@ on_deactivate = "uninstall.sh"
     fs.write(&src.join("install.sh"), b"#!/bin/sh\n").unwrap();
     fs.write(&src.join("uninstall.sh"), b"#!/bin/sh\n").unwrap();
 
-    let summary = import_global(&fs, &layout, &empty_registry(), src, "with-lc").unwrap();
+    let summary = import_global(&fs, &layout, &empty_registry(), src, "with-lc", false).unwrap();
     assert!(summary.convention_file_used);
 
     let ns_dir = layout.namespace_dir("with-lc");

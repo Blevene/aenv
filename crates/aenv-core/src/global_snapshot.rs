@@ -27,6 +27,27 @@ use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
+/// Build a single-adapter manifest entry for captured / scaffolded user-scope
+/// content. With `shared = true` the paths go into `shared_files` (one stored
+/// copy serving both scopes, issue #5); otherwise into `user_files` (global
+/// scope only). Either way the content is stored under the namespace's `user/`
+/// subtree, so the choice is purely which scopes the manifest declares.
+fn user_scope_entry(paths: Vec<String>, shared: bool) -> AdapterEntry {
+    let (user_files, shared_files) = if shared {
+        (Vec::new(), paths)
+    } else {
+        (paths, Vec::new())
+    };
+    AdapterEntry {
+        files: Vec::new(),
+        merge: None,
+        user_files,
+        user_merge: None,
+        shared_files,
+        materialize: None,
+    }
+}
+
 /// Summary returned by [`snapshot_global`].
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SnapshotSummary {
@@ -69,6 +90,7 @@ pub fn snapshot_global<F: Filesystem>(
     target_root: &Path,
     name: &str,
     extra_includes: &[String],
+    shared: bool,
 ) -> Result<SnapshotSummary> {
     // 1. Validate name + namespace freshness.
     let _ = NamespaceId::new(name)?;
@@ -174,13 +196,7 @@ pub fn snapshot_global<F: Filesystem>(
     if !captured.is_empty() {
         adapters_block.insert(
             "claude-code".to_string(),
-            AdapterEntry {
-                files: Vec::new(),
-                merge: None,
-                user_files: captured.clone(),
-                user_merge: None,
-                materialize: None,
-            },
+            user_scope_entry(captured.clone(), shared),
         );
     }
     let manifest = AenvManifest {
@@ -228,6 +244,7 @@ pub fn scaffold_global_namespace<F: Filesystem>(
     adapters: &AdapterRegistry,
     name: &str,
     adapter_name: &str,
+    shared: bool,
 ) -> Result<ScaffoldSummary> {
     let _ = NamespaceId::new(name)?;
     let ns_dir = layout.namespace_dir(name);
@@ -272,13 +289,7 @@ pub fn scaffold_global_namespace<F: Filesystem>(
     let mut adapters_block: BTreeMap<String, AdapterEntry> = BTreeMap::new();
     adapters_block.insert(
         adapter_name.to_string(),
-        AdapterEntry {
-            files: Vec::new(),
-            merge: None,
-            user_files: summary.user_files_declared.clone(),
-            user_merge: None,
-            materialize: None,
-        },
+        user_scope_entry(summary.user_files_declared.clone(), shared),
     );
     let manifest = AenvManifest {
         name: name.to_string(),
@@ -377,6 +388,7 @@ pub fn import_global<F: Filesystem>(
     _adapters: &AdapterRegistry,
     source: &Path,
     name: &str,
+    shared: bool,
 ) -> Result<ImportSummary> {
     // 1. Validate name + namespace freshness.
     let _ = NamespaceId::new(name)?;
@@ -500,26 +512,11 @@ pub fn import_global<F: Filesystem>(
     if !claude_files.is_empty() {
         adapters_block.insert(
             "claude-code".to_string(),
-            AdapterEntry {
-                files: Vec::new(),
-                merge: None,
-                user_files: claude_files,
-                user_merge: None,
-                materialize: None,
-            },
+            user_scope_entry(claude_files, shared),
         );
     }
     if !codex_files.is_empty() {
-        adapters_block.insert(
-            "codex".to_string(),
-            AdapterEntry {
-                files: Vec::new(),
-                merge: None,
-                user_files: codex_files,
-                user_merge: None,
-                materialize: None,
-            },
-        );
+        adapters_block.insert("codex".to_string(), user_scope_entry(codex_files, shared));
     }
     let manifest = AenvManifest {
         name: name.to_string(),

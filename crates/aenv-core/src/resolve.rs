@@ -224,7 +224,15 @@ pub fn resolve_namespace<F: Filesystem>(
                 return Err(ResolutionError::AdapterMissing(adapter_name.clone()));
             }
         }
-        gather_candidates(fs, registry, ns, &manifest, &mut candidates)?;
+        gather_candidates(
+            fs,
+            registry,
+            adapters,
+            ns,
+            &manifest,
+            &mut candidates,
+            &mut warnings,
+        )?;
         gather_skill_candidates(
             fs,
             registry,
@@ -256,6 +264,9 @@ pub fn resolve_namespace<F: Filesystem>(
         }
     })?;
     validate_candidate_paths(&candidates)?;
+    // Coalesce identical warnings while preserving first-seen order.
+    let mut seen = BTreeSet::new();
+    warnings.retain(|w| seen.insert(w.clone()));
     Ok(ResolutionResult {
         chain,
         candidates,
@@ -388,9 +399,11 @@ fn load_manifest<F: Filesystem>(
 fn gather_candidates<F: Filesystem>(
     fs: &F,
     registry: &RegistryLayout,
+    adapters: &AdapterRegistry,
     ns: &NamespaceId,
     manifest: &AenvManifest,
     out: &mut Vec<Candidate>,
+    warnings: &mut Vec<String>,
 ) -> Result<(), ResolutionError> {
     let ns_root = registry.namespace_dir(ns.as_str());
     for (adapter_name, entry) in &manifest.adapters {
@@ -485,8 +498,175 @@ fn gather_candidates<F: Filesystem>(
                 });
             }
         }
+
+        // shared_files (issue #5 Layer 2): one stored copy under `user/`
+        // serving BOTH scopes. Emit a User candidate (identical to a
+        // user_files candidate) and a Project candidate from the SAME source,
+        // with the project destination role-derived from the adapter. Activation
+        // filters candidates by the requested scope, so `--global` materializes
+        // the user form and `--project` the project form from one set of bytes.
+        if !entry.shared_files.is_empty() {
+            let adapter = adapters.get(adapter_name);
+            // Project destinations this same namespace+adapter already declares
+            // via `files` (the `files` loop ran above). A `shared_files` entry
+            // whose project remap lands on one of these silently double-manages
+            // the path — warn so the author removes the redundant declaration.
+            let files_project_paths: BTreeSet<PathBuf> = out
+                .iter()
+                .filter(|c| {
+                    c.namespace == *ns
+                        && c.adapter == *adapter_name
+                        && c.scope == crate::scope::Scope::Project
+                })
+                .map(|c| c.path.clone())
+                .collect();
+            for rel in &entry.shared_files {
+                if rel.contains('*') {
+                    for literal in expand_glob(fs, &user_root, rel)
+                        .map_err(|e| ResolutionError::Io(e.to_string()))?
+                    {
+                        push_shared_pair(
+                            out,
+                            ns,
+                            adapter_name,
+                            adapter,
+                            entry,
+                            &user_root,
+                            &literal,
+                        )?;
+                        warn_on_files_collision(
+                            out,
+                            &files_project_paths,
+                            ns,
+                            adapter_name,
+                            warnings,
+                        );
+                    }
+                } else {
+                    // See the trailing-slash note in the project-files branch.
+                    let trimmed = rel.trim_end_matches('/');
+                    push_shared_pair(out, ns, adapter_name, adapter, entry, &user_root, trimmed)?;
+                    warn_on_files_collision(out, &files_project_paths, ns, adapter_name, warnings);
+                }
+            }
+        }
     }
     Ok(())
+}
+
+/// Warn when the project candidate just pushed by `push_shared_pair` (always
+/// the last element of `out`) lands on a project path the same namespace+adapter
+/// already manages via a `files` entry. De-duplicated by the caller's natural
+/// one-warning-per-entry cadence; identical messages are coalesced in
+/// `resolve_namespace`.
+fn warn_on_files_collision(
+    out: &[Candidate],
+    files_project_paths: &BTreeSet<PathBuf>,
+    ns: &NamespaceId,
+    adapter_name: &str,
+    warnings: &mut Vec<String>,
+) {
+    if let Some(proj) = out.last() {
+        if proj.scope == crate::scope::Scope::Project && files_project_paths.contains(&proj.path) {
+            warnings.push(format!(
+                "namespace '{}' adapter '{}': a shared_files entry materializes to project \
+                 path '{}', which a `files` entry already manages — both target the same \
+                 location from different sources. Remove one declaration to avoid ambiguity.",
+                ns.as_str(),
+                adapter_name,
+                proj.path.display()
+            ));
+        }
+    }
+}
+
+/// Push the User + Project candidate pair for a single `shared_files` entry.
+///
+/// Both candidates read the same `source_path` under `<ns>/user/<rel>`. The
+/// User candidate keeps `<rel>` as its destination; the Project candidate's
+/// destination is `project_path_for_shared`. Per-file strategy overrides are
+/// looked up in `user_merge` (User) and `merge` (Project) by destination path.
+#[allow(clippy::too_many_arguments)]
+fn push_shared_pair(
+    out: &mut Vec<Candidate>,
+    ns: &NamespaceId,
+    adapter_name: &str,
+    adapter: Option<&crate::adapter::Adapter>,
+    entry: &crate::manifest::AdapterEntry,
+    user_root: &std::path::Path,
+    rel: &str,
+) -> Result<(), ResolutionError> {
+    let source = user_root.join(rel);
+    out.push(Candidate {
+        namespace: ns.clone(),
+        path: PathBuf::from(rel),
+        source_path: source.clone(),
+        adapter: adapter_name.to_string(),
+        scope: crate::scope::Scope::User,
+        merge_override: entry.user_merge.as_ref().and_then(|m| m.get(rel).cloned()),
+        skill_provenance: None,
+        adapter_materialize_override: entry.materialize.clone(),
+    });
+    let proj_path = match adapter {
+        Some(a) => project_path_for_shared(a, ns, rel)?,
+        None => rel.to_string(),
+    };
+    out.push(Candidate {
+        namespace: ns.clone(),
+        path: PathBuf::from(&proj_path),
+        source_path: source,
+        adapter: adapter_name.to_string(),
+        scope: crate::scope::Scope::Project,
+        merge_override: entry
+            .merge
+            .as_ref()
+            .and_then(|m| m.get(&proj_path).cloned()),
+        skill_provenance: None,
+        adapter_materialize_override: entry.materialize.clone(),
+    });
+    Ok(())
+}
+
+/// Derive the project-scope destination for a `shared_files` entry.
+///
+/// Shared paths are authored in the user-scope layout (e.g. `.claude/CLAUDE.md`).
+/// Most files have the same relative path in both scopes; the exception is a
+/// role-tagged file (e.g. the instructions file) whose project destination
+/// differs (`CLAUDE.md`). When the entry carries a role in the adapter's
+/// `user_roles`, the project destination is the unique `roles` key bearing that
+/// same role; zero or multiple matches is a manifest error (fail loud).
+fn project_path_for_shared(
+    adapter: &crate::adapter::Adapter,
+    ns: &NamespaceId,
+    user_rel: &str,
+) -> Result<String, ResolutionError> {
+    let Some(role) = adapter.user_roles.get(&format!("~/{user_rel}")) else {
+        return Ok(user_rel.to_string());
+    };
+    let mut matches = adapter
+        .roles
+        .iter()
+        .filter(|(_, r)| r.as_str() == role.as_str())
+        .map(|(p, _)| p.clone());
+    match (matches.next(), matches.next()) {
+        (Some(p), None) => Ok(p),
+        (None, _) => Err(ResolutionError::ManifestInvalid {
+            namespace: ns.clone(),
+            reason: format!(
+                "shared_files entry '{user_rel}' has user-scope role '{role}' but adapter \
+                 '{}' declares no project-scope path with that role",
+                adapter.name
+            ),
+        }),
+        (Some(_), Some(_)) => Err(ResolutionError::ManifestInvalid {
+            namespace: ns.clone(),
+            reason: format!(
+                "shared_files entry '{user_rel}' maps to role '{role}', which adapter \
+                 '{}' assigns to multiple project-scope paths; cannot pick one",
+                adapter.name
+            ),
+        }),
+    }
 }
 
 /// Emit `Candidate`s for every skill file declared by this namespace.

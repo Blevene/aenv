@@ -18,9 +18,10 @@ pub fn run<F: Filesystem>(
     source: &str,
     name: &str,
     pin: Option<&str>,
+    shared: bool,
 ) -> Result<()> {
     if looks_like_git_url(source) {
-        return run_git(fs, layout, adapters, source, name, pin);
+        return run_git(fs, layout, adapters, source, name, pin, shared);
     }
     if pin.is_some() {
         return Err(AenvError::ManifestInvalid(
@@ -41,6 +42,7 @@ pub fn run<F: Filesystem>(
         adapters,
         &src_path,
         &effective_name,
+        shared,
     )?;
 
     let used = if summary.convention_file_used {
@@ -135,6 +137,7 @@ fn run_git<F: Filesystem>(
     url: &str,
     name: &str,
     pin: Option<&str>,
+    shared: bool,
 ) -> Result<()> {
     // Normalize away any `git+` prefix — git itself doesn't understand it.
     let url = strip_git_prefix(url);
@@ -158,6 +161,7 @@ fn run_git<F: Filesystem>(
         adapters,
         &clone_dir,
         &effective_name,
+        shared,
     )?;
 
     let used = if summary.convention_file_used {
