@@ -185,3 +185,35 @@ impl AdapterRegistry {
         Ok(reg)
     }
 }
+
+/// Infer which adapter owns a namespace-relative path by its prefix.
+///
+/// `.codex/…` (or exactly `.codex`) → `"codex"`; everything else — notably
+/// `.claude/…` and `CLAUDE.md` — → `"claude-code"` (the fallback). Mirrors the
+/// import/snapshot bucketing so `aenv vendor --as <path>` lands copied content
+/// under the right adapter without an explicit `--adapter`.
+pub fn adapter_for_path(rel: &str) -> &'static str {
+    if rel == ".codex" || rel.starts_with(".codex/") {
+        "codex"
+    } else {
+        "claude-code"
+    }
+}
+
+#[cfg(test)]
+mod adapter_for_path_tests {
+    use super::adapter_for_path;
+
+    #[test]
+    fn codex_prefix_maps_to_codex() {
+        assert_eq!(adapter_for_path(".codex/AGENTS.md"), "codex");
+        assert_eq!(adapter_for_path(".codex"), "codex");
+    }
+
+    #[test]
+    fn claude_and_other_map_to_claude_code() {
+        assert_eq!(adapter_for_path(".claude/agents/a.md"), "claude-code");
+        assert_eq!(adapter_for_path("CLAUDE.md"), "claude-code");
+        assert_eq!(adapter_for_path(".cursorrules"), "claude-code");
+    }
+}

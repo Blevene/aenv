@@ -40,9 +40,36 @@ pub struct AenvManifest {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub skills: Vec<SkillDecl>,
 
+    /// Vendored-content provenance from `[[vendored]]` entries (issue #2).
+    /// Each records a non-skill subtree/file copied into the namespace tree by
+    /// `aenv vendor`; the copied files are also declared under an adapter's
+    /// `files`, so this table is provenance only (drift detection / re-vendor),
+    /// not an activation input.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub vendored: Vec<VendoredDecl>,
+
     /// Lifecycle scripts (on_activate / on_deactivate). Empty by default.
     #[serde(default, skip_serializing_if = "LifecycleHooks::is_empty")]
     pub lifecycle: LifecycleHooks,
+}
+
+/// One `[[vendored]]` entry: provenance for a non-skill subtree or file copied
+/// into the namespace tree by `aenv vendor` (issue #2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VendoredDecl {
+    /// Source the content came from: a git URL (`git+…`) or a local path.
+    pub source: String,
+    /// Resolved commit SHA for git sources; `None` for local sources.
+    #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
+    pub ref_: Option<String>,
+    /// Path of the subtree/file within the source.
+    pub src_path: String,
+    /// Namespace-relative destination the content was copied to (the `--as`).
+    pub dest: String,
+    /// The expanded literal destination files written (namespace-relative),
+    /// recorded so a re-vendor can detect drift and clean up.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub files: Vec<String>,
 }
 
 /// Namespace lifecycle scripts. Paths are namespace-relative — `aenv`
@@ -162,6 +189,8 @@ impl AenvManifest {
             #[serde(default)]
             skills: Vec<SkillDecl>,
             #[serde(default)]
+            vendored: Vec<VendoredDecl>,
+            #[serde(default)]
             lifecycle: LifecycleHooks,
         }
         let raw: Raw =
@@ -235,6 +264,21 @@ impl AenvManifest {
             validate_relative_path("lifecycle.on_deactivate", p)?;
         }
 
+        // Stage 7: validate vendored entries — `dest` and every declared file
+        // must be safe relative paths (no absolute, no `..`, no `~/`); a
+        // non-empty `src_path` is required.
+        for v in &raw.vendored {
+            if v.src_path.trim().is_empty() {
+                return Err(AenvError::ManifestInvalid(
+                    "vendored entry has an empty src_path".into(),
+                ));
+            }
+            validate_relative_path("vendored.dest", &v.dest)?;
+            for f in &v.files {
+                validate_relative_path("vendored.files", f)?;
+            }
+        }
+
         Ok(AenvManifest {
             name: raw.name,
             extends: raw.extends,
@@ -242,6 +286,7 @@ impl AenvManifest {
             parameters,
             policies,
             skills: raw.skills,
+            vendored: raw.vendored,
             lifecycle: raw.lifecycle,
         })
     }
@@ -260,6 +305,7 @@ impl AenvManifest {
             parameters: BTreeMap::new(),
             policies: BTreeMap::new(),
             skills: Vec::new(),
+            vendored: Vec::new(),
             lifecycle: LifecycleHooks::default(),
         }
     }

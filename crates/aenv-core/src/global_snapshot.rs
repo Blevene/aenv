@@ -206,6 +206,7 @@ pub fn snapshot_global<F: Filesystem>(
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
         skills: Vec::new(),
+        vendored: Vec::new(),
         lifecycle: LifecycleHooks::default(),
     };
     let body =
@@ -298,6 +299,7 @@ pub fn scaffold_global_namespace<F: Filesystem>(
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
         skills: Vec::new(),
+        vendored: Vec::new(),
         lifecycle: LifecycleHooks::default(),
     };
     let body =
@@ -498,7 +500,7 @@ pub fn import_global<F: Filesystem>(
     let mut claude_files: Vec<String> = Vec::new();
     let mut codex_files: Vec<String> = Vec::new();
     for p in &captured {
-        if p.starts_with(".codex/") || p == ".codex" {
+        if crate::adapter::adapter_for_path(p) == "codex" {
             codex_files.push(p.clone());
         } else {
             // `.claude/...` and the fallback bucket.
@@ -525,6 +527,7 @@ pub fn import_global<F: Filesystem>(
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
         skills: Vec::new(),
+        vendored: Vec::new(),
         lifecycle: LifecycleHooks {
             on_activate: lifecycle.on_activate.clone(),
             on_deactivate: lifecycle.on_deactivate.clone(),

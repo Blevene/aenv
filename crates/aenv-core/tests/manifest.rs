@@ -323,6 +323,7 @@ fn manifest_lifecycle_roundtrips_through_to_toml() {
         parameters: std::collections::BTreeMap::new(),
         policies: std::collections::BTreeMap::new(),
         skills: vec![],
+        vendored: vec![],
         lifecycle: aenv_core::manifest::LifecycleHooks {
             on_activate: Some("install.sh".into()),
             on_deactivate: None,
@@ -331,4 +332,64 @@ fn manifest_lifecycle_roundtrips_through_to_toml() {
     let toml = original.to_toml();
     let parsed = aenv_core::manifest::AenvManifest::from_toml(&toml).unwrap();
     assert_eq!(parsed.lifecycle, original.lifecycle);
+}
+
+// --- [[vendored]] schema (issue #2) ---
+
+#[test]
+fn vendored_table_parses_and_round_trips() {
+    let toml = r#"
+name = "v"
+
+[adapters.claude-code]
+files = [".claude/agents/a.md"]
+
+[[vendored]]
+source = "git+https://github.com/acme/repo"
+ref = "abc123"
+src_path = "agents"
+dest = ".claude/agents"
+files = [".claude/agents/a.md"]
+"#;
+    let m = AenvManifest::from_toml(toml).unwrap();
+    assert_eq!(m.vendored.len(), 1);
+    let v = &m.vendored[0];
+    assert_eq!(v.source, "git+https://github.com/acme/repo");
+    assert_eq!(v.ref_.as_deref(), Some("abc123"));
+    assert_eq!(v.src_path, "agents");
+    assert_eq!(v.dest, ".claude/agents");
+    assert_eq!(v.files, vec![".claude/agents/a.md".to_string()]);
+
+    // Round-trip: serialize → parse → identical.
+    let reparsed = AenvManifest::from_toml(&m.to_toml()).unwrap();
+    assert_eq!(m, reparsed);
+}
+
+#[test]
+fn vendored_dest_rejects_path_traversal() {
+    let toml = r#"
+name = "v"
+[[vendored]]
+source = "/local"
+src_path = "agents"
+dest = "../escape"
+"#;
+    let err = AenvManifest::from_toml(toml).unwrap_err();
+    assert!(
+        format!("{err}").contains(".."),
+        "expected a path-traversal rejection, got: {err}"
+    );
+}
+
+#[test]
+fn vendored_requires_nonempty_src_path() {
+    let toml = r#"
+name = "v"
+[[vendored]]
+source = "/local"
+src_path = ""
+dest = ".claude/agents"
+"#;
+    let err = AenvManifest::from_toml(toml).unwrap_err();
+    assert!(format!("{err}").contains("src_path"), "got: {err}");
 }
