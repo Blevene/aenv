@@ -358,7 +358,11 @@ fn validate_skills(skills: &[crate::skills::SkillDecl]) -> crate::error::Result<
 ///
 /// `field_label` names the offending field in the error message (e.g.
 /// `"skill 'foo'"` or `"lifecycle.on_activate"`).
-fn validate_relative_path(field_label: &str, path: &str) -> crate::error::Result<()> {
+///
+/// Public so commands that write into the namespace tree from untrusted input
+/// (e.g. `aenv vendor --as`/`--path`) can reject traversal *before* touching the
+/// filesystem, not only on the next manifest parse.
+pub fn validate_relative_path(field_label: &str, path: &str) -> crate::error::Result<()> {
     use std::path::Component;
     if path.is_empty() {
         return Err(crate::error::AenvError::ManifestInvalid(format!(
