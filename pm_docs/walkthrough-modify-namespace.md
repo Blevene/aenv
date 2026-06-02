@@ -55,6 +55,8 @@ The two-file pattern is canonical:
 
 Multiple files are fine. Globs are fine (e.g., `.claude/skills/**/*` is the convention for adapter-managed skill directories).
 
+`files` is the **project-scope** bucket (stored at the namespace root, materializes into a project). Two sibling buckets cover the other scopes: `user_files` (global/user scope, stored under `user/`, materializes into `$HOME`) and `shared_files` (the same `user/`-stored content serving **both** scopes from one copy, issue #5). See the [global-namespaces appendix](./walkthrough-global-namespaces.md#adapter-file-buckets-files--user_files--shared_files) for the full bucket model.
+
 ---
 
 ## 2. Add parameters via `aenv set`

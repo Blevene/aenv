@@ -107,6 +107,34 @@ files = ["CLAUDE.md"]
 
 ---
 
+## Form 4: create a global (user-scope) profile (`--global`)
+
+`--global` scaffolds a **user-scope** namespace instead of a project one — the same thing `aenv global new` does, via the unified scope flag (issue #5, Layer 1). Content goes under the namespace's `user/` subtree and materializes into `$HOME` on activation, not into a project.
+
+```bash
+$BIN create my-global --global
+```
+
+```
+Created user-scope namespace 'my-global' at /tmp/aenv-create-XXXXXX/.aenv/envs/my-global
+  + user/.claude/CLAUDE.md  (edit this, then run: aenv global use my-global)
+```
+
+The generated manifest declares `user_files` (and an empty project `files`):
+
+```toml
+name = "my-global"
+extends = []
+
+[adapters.claude-code]
+files = []
+user_files = [".claude/CLAUDE.md"]
+```
+
+The on-disk tree is `aenv.toml` + a seeded `user/.claude/CLAUDE.md`. Edit it, then activate with `aenv global use my-global` (or the unified `aenv activate my-global --global`). To make one stored copy serve **both** scopes, rename `user_files` to `shared_files` — see the [global-namespaces walkthrough appendix](./walkthrough-global-namespaces.md#adapter-file-buckets-files--user_files--shared_files). Note `--global` rejects `--extends` (a user-scope scaffold takes no parent on the CLI) and `--project <path>`.
+
+---
+
 ## Error cases
 
 ### Unknown adapter (exit code 11)

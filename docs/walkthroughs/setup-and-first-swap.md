@@ -29,7 +29,7 @@ The first `aenv` invocation creates `~/.aenv/` with built-in adapters and starte
 
 ```bash
 aenv --version
-# → aenv 0.3.2
+# → aenv 0.3.3
 
 aenv list
 # NAME                   EXTENDS                        ADAPTERS
@@ -124,3 +124,4 @@ aenv unpin         # drops the .aenv pin file (optional)
 - [Build your own namespace from scratch](./build-your-own.md) — `aenv create --adapter` + author a skill
 - [Install a skill from GitHub](./install-a-skill-from-github.md) — pull in a public skill, pinned for reproducibility
 - [Snapshot an existing project](./snapshot-an-existing-project.md) — capture a hand-shaped `.claude/` tree as a reusable namespace
+- [Import a global profile from GitHub](./import-a-global-profile-from-github.md) — swap your *user-level* `~/.claude` config; covers `--global` and one-copy-both-scopes (`shared_files`)

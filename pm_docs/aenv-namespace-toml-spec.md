@@ -173,3 +173,31 @@ The `[lifecycle]` section is appended as raw TOML text after the serde-
 rendered body — the Rust `AenvManifest` struct doesn't have a `lifecycle`
 field yet (it ships in Milestone K), but `from_toml` tolerates the unknown
 section, so the round-trip is loss-free in practice.
+
+## Importing for both scopes: `shared_files`
+
+The importer always writes the captured paths under `user_files`, so a freshly
+imported namespace is **global-only**: `aenv global use <ns>` (or `aenv activate
+<ns> --global`) materializes it into `$HOME`, but it has nothing to materialize
+into a project.
+
+To reuse the same imported content **per-project as well**, without keeping a
+second copy, promote the adapter block's `user_files` key to `shared_files`
+after import (issue #5, Layer 2):
+
+```toml
+[adapters.claude-code]
+shared_files = [".claude/CLAUDE.md", ".claude/agents/", ".claude/hooks/"]
+```
+
+No files move — the content stays under `envs/<name>/user/`. `shared_files`
+entries are authored in the same user-scope layout as `user_files`; at activation
+each one materializes to `$HOME/<rel>` under `--global` and to the project under
+`--project`, from the single stored copy. A role-tagged file (the instructions
+file) is remapped to each scope's own layout via the adapter's `roles` /
+`user_roles` maps — e.g. `.claude/CLAUDE.md` lands at repo-root `CLAUDE.md` in a
+project but `~/.claude/CLAUDE.md` globally — while non-role paths keep their
+relative path in both scopes. The three buckets are: `files` (project only,
+stored at the namespace root), `user_files` (user/global only, under `user/`),
+and `shared_files` (both, under `user/`). A future importer flag may emit
+`shared_files` directly; for now it is a one-line post-import edit.

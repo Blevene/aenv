@@ -7,7 +7,7 @@
 
 `aenv` is a Rust CLI for managing named, composable, version-controlled bundles of AI-coding-agent configuration (`CLAUDE.md`, `.cursorrules`, `.mcp.json`, skills, agents, slash commands, MCP entries). Think Python's `venv`, but for the rules and configurations that shape how AI coding agents behave.
 
-> **Status:** Active development. Latest release is [`v0.3.3`](https://github.com/Blevene/aenv/releases/tag/v0.3.3) — `aenv global import`/`use` now accept the `git+https://` URL form (parity with `skill import`). v0.3.2 fixed `aenv snapshot` from an unmanaged project directory (no longer errors "project not pinned") and reproduced every user-facing walkthrough against the binary. v0.3.1 fixed `aenv global which` (directory `user_files` no longer crash `--json`; a shell-expanded `~` path now resolves). v0.3.0 brought global namespaces with a one-command UX (`aenv global use` for onboarding/swap, `aenv global new`, auto-baseline), user-scope skills (`aenv skill import --scope user` installs into `~/.claude/skills/`), and sparse skill-import clones. See [§What works today](#what-works-today) for the full feature surface and [§Roadmap](#roadmap--whats-still-in-flight) for what's pending.
+> **Status:** Active development. Latest release is [`v0.3.3`](https://github.com/Blevene/aenv/releases/tag/v0.3.3) — `aenv global import`/`use` now accept the `git+https://` URL form (parity with `skill import`). v0.3.2 fixed `aenv snapshot` from an unmanaged project directory (no longer errors "project not pinned") and reproduced every user-facing walkthrough against the binary. v0.3.1 fixed `aenv global which` (directory `user_files` no longer crash `--json`; a shell-expanded `~` path now resolves). v0.3.0 brought global namespaces with a one-command UX (`aenv global use` for onboarding/swap, `aenv global new`, auto-baseline), user-scope skills (`aenv skill import --scope user` installs into `~/.claude/skills/`), and sparse skill-import clones. In development (issue #5): unified `--global` scope flags on `create`/`activate`/`deactivate`, and `shared_files` — one stored copy of a profile serving both project and global scopes. See [§What works today](#what-works-today) for the full feature surface and [§Roadmap](#roadmap--whats-still-in-flight) for what's pending.
 
 ## Installation
 
@@ -459,6 +459,7 @@ aenv skill list --json         # machine-readable
 
 - **Create and compose namespaces.** A namespace bundles `CLAUDE.md`, `.cursorrules`, skills, agents, settings — anything an AI coding harness reads — and can `extends` another namespace. Composition produces section-merged Markdown, deep-merged JSON / YAML / TOML, and qualified-name provenance for every artifact. Cycles are caught (exit 15).
 - **Pin and activate projects.** `aenv use <name>` writes a `.aenv` pin file; `aenv activate` materializes the resolved namespace as symlinks (or merged files where strategy demands) and records every move in `.aenv-state/state.json`. `aenv deactivate` puts the project back exactly as it was, restoring any files it displaced.
+- **Activate at project or global scope.** Beyond per-project activation, `aenv global use <ns>` swaps the *user-level* config every session reads — `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, … — under a single named activation, stashing displaced originals and restoring them on deactivate. The project verbs also take a `--global` flag (`aenv create|activate|deactivate <ns> --global`) so one set of verbs drives either scope without switching command trees. A namespace can declare `shared_files` so a single stored copy serves **both** scopes from the same bytes — the role-tagged instructions file is remapped to each scope's layout (repo-root `CLAUDE.md` vs `~/.claude/CLAUDE.md`). See [§Global namespaces](#global-namespaces) (issue #5).
 - **Inspect provenance.** `aenv status` shows the resolution chain, every managed file with its qualified source, the shadow chain, effective parameters, and active policies. `aenv which <path>` answers "where did this file come from?".
 - **Declare typed parameters and policies.** Manifests carry `[parameters]` (string / int / bool / list-of-string) that inherit last-wins across the extends chain, and `[policies]` (advisory by default, or `enforce = true`) that inherit with R-75 enforce-protection — a child can tighten but not weaken a parent's enforced policy.
 - **Run a doctor check.** `aenv doctor [<ns>]` evaluates four built-in policy evaluators (`instructions_max_chars`, `skill_requires_description`, `mcp_requires_command_or_url`, `forbid_paths`) against the resolved namespace and prints per-policy outcomes. Enforced violations also block `aenv activate` with exit 17 — *before* any file is touched.
@@ -477,6 +478,7 @@ The full plan lives in [`tasks/todo.md`](./tasks/todo.md). Two phases remain:
 
 - **Phase 6** — Partial. `cd`-based auto-activation ships now via `aenv init-shell` (see [§Shell integration](#shell-integration)); git remotes / `aenv install` / `aenv sync` / `aenv promote` still pending.
 - **Phase 7** — Windows symlink fallback + cross-platform CI. Windows is still unsupported; Linux and macOS binaries ship on every release (latest: v0.3.0).
+- **Issue #5 (unified scope)** — Layer 1 (unified `--global` verbs) and Layer 2 (`shared_files` — one stored copy serving both scopes) have landed. Remaining follow-ups: snapshot / import and `aenv create` emitting `shared_files` directly, and a resolver warning when a legacy `files` entry and a `shared_files` remap target the same project path.
 
 ## Reading order
 
@@ -487,13 +489,13 @@ The full plan lives in [`tasks/todo.md`](./tasks/todo.md). Two phases remain:
 - **[`tasks/2026-05-22-phase-3-parameters-policies.md`](./tasks/2026-05-22-phase-3-parameters-policies.md)** — Most recent implementation plan (20 tasks, bite-sized, with code and tests inline). Earlier phase plans live alongside it.
 - **[`RELEASING.md`](./RELEASING.md)** — Maintainer guide for cutting a release: tag-triggered GH Actions matrix, version bump, dry-run, rollback.
 - **[`INSTALL_FROM_BINARY.md`](./INSTALL_FROM_BINARY.md)** — End-user guide for installing pre-built Linux / macOS binaries from a GitHub Release (alternative to the build-from-source path in the [Installation section](#installation)).
-- **[`docs/walkthroughs/`](./docs/walkthroughs/)** — Step-by-step recipes for common journeys: [setup + first swap](./docs/walkthroughs/setup-and-first-swap.md), [build your own namespace](./docs/walkthroughs/build-your-own.md), [install a skill from GitHub](./docs/walkthroughs/install-a-skill-from-github.md), [snapshot an existing project](./docs/walkthroughs/snapshot-an-existing-project.md), [update an existing profile](./docs/walkthroughs/updating-a-profile.md), [shell integration (cd-based auto-activation)](./docs/walkthroughs/shell-integration.md).
+- **[`docs/walkthroughs/`](./docs/walkthroughs/)** — Step-by-step recipes for common journeys: [setup + first swap](./docs/walkthroughs/setup-and-first-swap.md), [build your own namespace](./docs/walkthroughs/build-your-own.md), [install a skill from GitHub](./docs/walkthroughs/install-a-skill-from-github.md), [snapshot an existing project](./docs/walkthroughs/snapshot-an-existing-project.md), [update an existing profile](./docs/walkthroughs/updating-a-profile.md), [import a global profile from GitHub](./docs/walkthroughs/import-a-global-profile-from-github.md), [shell integration (cd-based auto-activation)](./docs/walkthroughs/shell-integration.md).
 
 ## Building & testing
 
 ```bash
 cargo build --workspace
-cargo test --workspace                            # ~500 tests
+cargo test --workspace                            # ~690 tests
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --check
 ```
