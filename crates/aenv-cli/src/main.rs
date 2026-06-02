@@ -322,6 +322,30 @@ enum SkillAction {
         #[arg(long, default_value = "project")]
         scope: String,
     },
+    /// Bulk-import every `<subdir>/SKILL.md` under a base directory of a
+    /// monorepo skill collection, as one `[[skills]]` entry each.
+    ImportAll {
+        /// Source: `/abs/path`, `~/path`, or `git+URL[#ref]`.
+        source: String,
+        #[arg(long)]
+        ns: String,
+        /// Directory in the source under which each `<subdir>/SKILL.md` lives.
+        /// Defaults to `skills`.
+        #[arg(long, default_value = "skills")]
+        base: String,
+        /// Comma-separated subset of skill names to import (by subdir basename).
+        /// Unknown names error before any manifest write.
+        #[arg(long)]
+        only: Option<String>,
+        /// Pin a git source to a tag, commit, or branch. Git sources only.
+        #[arg(long)]
+        pin: Option<String>,
+        #[arg(long)]
+        adapter: Option<String>,
+        /// Scope: `project` (default) or `user`.
+        #[arg(long, default_value = "project")]
+        scope: String,
+    },
     /// List every skill in every namespace (or one if --ns).
     List {
         #[arg(long)]
@@ -826,6 +850,32 @@ fn main() -> ExitCode {
                         adapter.as_deref(),
                         pin.as_deref(),
                         path.as_deref(),
+                        parse_scope(&scope)?,
+                    )
+                }
+                SkillAction::ImportAll {
+                    source,
+                    ns,
+                    base,
+                    only,
+                    pin,
+                    adapter,
+                    scope,
+                } => {
+                    let adapters_reg = aenv_core::adapter::AdapterRegistry::load_from_dir(
+                        &fs,
+                        &layout.adapters_dir(),
+                    )?;
+                    cmd::skill::import_all::run(
+                        &fs,
+                        &layout,
+                        &adapters_reg,
+                        &ns,
+                        &source,
+                        Some(base.as_str()),
+                        only.as_deref(),
+                        pin.as_deref(),
+                        adapter.as_deref(),
                         parse_scope(&scope)?,
                     )
                 }

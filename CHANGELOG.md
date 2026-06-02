@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`aenv skill import-all <source> --ns <ns> [--base <dir>] [--only a,b] [--pin <ref>]`** — bulk-import every `<base>/<subdir>/SKILL.md` from a monorepo skill collection in one command (issue #1). Clones the source once, discovers each skill, and appends one `[[skills]]` entry per skill in a single manifest write — turning the 23-command `addyosmani/agent-skills` onboarding into one. `--only` imports a named subset (unknown names error before any write); a subdir whose `SKILL.md` lacks valid `name:` frontmatter is warned about and skipped; re-runs are idempotent (already-declared skills are skipped and reported). Each entry is an ordinary `mode = "imported"` skill — no resolver/activation/schema changes.
+
 ## [0.4.0] — 2026-06-02
 
 Issue #5: one set of profile verbs across scopes, and one stored copy serving both.
