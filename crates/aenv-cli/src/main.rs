@@ -753,7 +753,7 @@ fn main() -> ExitCode {
             } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;
                 let aenv_home = paths::resolve_aenv_home()?;
-                cmd::which::run(project_root, path, &aenv_home, json)
+                cmd::which::run(&fs, project_root, path, &aenv_home, json)
             }
             Command::Unpin { project } => {
                 let project_root = paths::resolve_project_root(&fs, project)?;

@@ -179,6 +179,7 @@ pub fn snapshot_global<F: Filesystem>(
                 merge: None,
                 user_files: captured.clone(),
                 user_merge: None,
+                shared_files: Vec::new(),
                 materialize: None,
             },
         );
@@ -277,6 +278,7 @@ pub fn scaffold_global_namespace<F: Filesystem>(
             merge: None,
             user_files: summary.user_files_declared.clone(),
             user_merge: None,
+            shared_files: Vec::new(),
             materialize: None,
         },
     );
@@ -505,6 +507,7 @@ pub fn import_global<F: Filesystem>(
                 merge: None,
                 user_files: claude_files,
                 user_merge: None,
+                shared_files: Vec::new(),
                 materialize: None,
             },
         );
@@ -517,6 +520,7 @@ pub fn import_global<F: Filesystem>(
                 merge: None,
                 user_files: codex_files,
                 user_merge: None,
+                shared_files: Vec::new(),
                 materialize: None,
             },
         );

@@ -330,6 +330,25 @@ If your namespace needs to install a runtime (e.g. claude-ctrl's Python policy e
 
 A namespace's `user_files` is not capped by what its adapter declares. claude-ctrl, for example, declares `.claude/runtime/` in its own manifest even though the builtin claude-code adapter doesn't — aenv materializes any user-scoped path the namespace asks for, as long as it's relative and doesn't escape with `..`.
 
+### One copy, both scopes: `shared_files`
+
+To reuse one profile's content **both** globally and inside a project, declare it under `shared_files` instead of `user_files` — the content is stored once (under the namespace's `user/` tree) and serves whichever scope you activate:
+
+```toml
+[adapters.claude-code]
+shared_files = [".claude/CLAUDE.md", ".claude/agents/"]
+```
+
+```bash
+aenv activate myprof --global       # → ~/.claude/CLAUDE.md, ~/.claude/agents/
+cd ~/code/my-repo
+aenv use myprof && aenv activate    # → ./CLAUDE.md, ./.claude/agents/  (same bytes)
+```
+
+Paths are authored in the **user-scope layout** (tilde-less, like `user_files`). aenv derives the project-scope destination from the adapter's role map, so a role-tagged file lands in each scope's own layout — `.claude/CLAUDE.md` materializes at repo-root `CLAUDE.md` in a project but `~/.claude/CLAUDE.md` globally — while non-role files keep the same relative path in both. Editing the single source changes what both scopes materialize. Both scopes can be active at once; the agent's own project-over-user precedence does the overriding. `files` / `user_files` are unchanged and still mean project-only / user-only.
+
+> **Migrating a global-only profile to dual scope:** rename its adapter block's `user_files` key to `shared_files`. No files move — same `user/` content, now usable per-project too.
+
 ### Editing a live activation: where your edits go
 
 Two materialization modes, picked per adapter or per namespace via `materialize = "symlink"` (default) or `materialize = "copy"`:

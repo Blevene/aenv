@@ -354,3 +354,171 @@ files = ["../escape.md"]
         other => panic!("expected ManifestInvalid, got {other:?}"),
     }
 }
+
+// --- shared_files (issue #5 Layer 2) -------------------------------------
+
+/// claude-code-like adapter with the role maps shared_files remapping needs:
+/// the instructions file is asymmetric (`CLAUDE.md` project vs
+/// `~/.claude/CLAUDE.md` user).
+fn cc_adapter_with_roles() -> Adapter {
+    toml::from_str(
+        r#"
+name = "claude-code"
+files = ["CLAUDE.md", ".claude/"]
+user_files = ["~/.claude/CLAUDE.md", "~/.claude/agents/"]
+
+[roles]
+"CLAUDE.md" = "instructions"
+
+[user_roles]
+"~/.claude/CLAUDE.md" = "instructions"
+"#,
+    )
+    .unwrap()
+}
+
+fn registry_with_roles() -> AdapterRegistry {
+    let mut r = AdapterRegistry::default();
+    r.insert(cc_adapter_with_roles());
+    r
+}
+
+#[test]
+fn shared_files_emit_user_and_role_remapped_project_candidates() {
+    let fs = MockFilesystem::new();
+    write_manifest(
+        &fs,
+        "shareprof",
+        r#"
+name = "shareprof"
+[adapters.claude-code]
+shared_files = [".claude/CLAUDE.md", ".claude/agents/helper.md"]
+"#,
+    );
+    // One stored copy, under user/.
+    write_file(&fs, "shareprof", "user/.claude/CLAUDE.md", "# shared\n");
+    write_file(
+        &fs,
+        "shareprof",
+        "user/.claude/agents/helper.md",
+        "helper\n",
+    );
+
+    let resolved = resolve_namespace(
+        &fs,
+        &registry(),
+        &registry_with_roles(),
+        &NamespaceId::new("shareprof").unwrap(),
+    )
+    .unwrap();
+
+    let find = |scope: aenv_core::scope::Scope, path: &str| {
+        resolved
+            .candidates
+            .iter()
+            .find(|c| c.scope == scope && c.path == Path::new(path))
+            .unwrap_or_else(|| panic!("missing {scope:?} candidate for {path}"))
+    };
+
+    // The role-tagged instructions file: user keeps the .claude/ layout, the
+    // project destination is remapped to repo-root CLAUDE.md. Both read the
+    // SAME single source under user/.
+    let user_md = find(aenv_core::scope::Scope::User, ".claude/CLAUDE.md");
+    let proj_md = find(aenv_core::scope::Scope::Project, "CLAUDE.md");
+    let expected_src = Path::new("/aenv/envs/shareprof/user/.claude/CLAUDE.md");
+    assert_eq!(user_md.source_path, expected_src);
+    assert_eq!(proj_md.source_path, expected_src);
+    // No project candidate at the un-remapped user layout path.
+    assert!(
+        !resolved
+            .candidates
+            .iter()
+            .any(|c| c.scope == aenv_core::scope::Scope::Project
+                && c.path == Path::new(".claude/CLAUDE.md")),
+        "instructions file must remap, not pass through, for project scope"
+    );
+
+    // A non-role file is symmetric: identical path in both scopes, one source.
+    let user_h = find(aenv_core::scope::Scope::User, ".claude/agents/helper.md");
+    let proj_h = find(aenv_core::scope::Scope::Project, ".claude/agents/helper.md");
+    assert_eq!(user_h.source_path, proj_h.source_path);
+}
+
+#[test]
+fn shared_files_ambiguous_role_is_manifest_invalid() {
+    let fs = MockFilesystem::new();
+    write_manifest(
+        &fs,
+        "amb",
+        r#"
+name = "amb"
+[adapters.claude-code]
+shared_files = [".claude/CLAUDE.md"]
+"#,
+    );
+    write_file(&fs, "amb", "user/.claude/CLAUDE.md", "# x\n");
+
+    // Adapter assigns the `instructions` role to TWO project paths.
+    let adapter: Adapter = toml::from_str(
+        r#"
+name = "claude-code"
+files = ["CLAUDE.md", "AGENTS.md"]
+user_files = ["~/.claude/CLAUDE.md"]
+[roles]
+"CLAUDE.md" = "instructions"
+"AGENTS.md" = "instructions"
+[user_roles]
+"~/.claude/CLAUDE.md" = "instructions"
+"#,
+    )
+    .unwrap();
+    let mut reg = AdapterRegistry::default();
+    reg.insert(adapter);
+
+    let err =
+        resolve_namespace(&fs, &registry(), &reg, &NamespaceId::new("amb").unwrap()).unwrap_err();
+    match &err {
+        ResolutionError::ManifestInvalid { reason, .. } => {
+            assert!(reason.contains("multiple"), "got: {reason}");
+        }
+        other => panic!("expected ManifestInvalid, got {other:?}"),
+    }
+}
+
+#[test]
+fn shared_files_user_role_with_no_project_path_is_manifest_invalid() {
+    let fs = MockFilesystem::new();
+    write_manifest(
+        &fs,
+        "norole",
+        r#"
+name = "norole"
+[adapters.claude-code]
+shared_files = [".claude/CLAUDE.md"]
+"#,
+    );
+    write_file(&fs, "norole", "user/.claude/CLAUDE.md", "# x\n");
+
+    // user_roles tags the file `instructions`, but `roles` declares no such role.
+    let adapter: Adapter = toml::from_str(
+        r#"
+name = "claude-code"
+files = ["CLAUDE.md"]
+user_files = ["~/.claude/CLAUDE.md"]
+[user_roles]
+"~/.claude/CLAUDE.md" = "instructions"
+"#,
+    )
+    .unwrap();
+    let mut reg = AdapterRegistry::default();
+    reg.insert(adapter);
+
+    let err = resolve_namespace(&fs, &registry(), &reg, &NamespaceId::new("norole").unwrap())
+        .unwrap_err();
+    match &err {
+        ResolutionError::ManifestInvalid { reason, .. } => {
+            assert!(reason.contains("no project-scope path"), "got: {reason}");
+        }
+        other => panic!("expected ManifestInvalid, got {other:?}"),
+    }
+}

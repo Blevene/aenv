@@ -43,7 +43,7 @@ fn which_for_symlinked_file_with_shadow() {
         was_present_before_activation: true,
     });
     let aenv_home = Path::new(AENV_HOME);
-    let out = format_which(&state, Path::new("CLAUDE.md"), aenv_home).unwrap();
+    let out = format_which(&state, Path::new("CLAUDE.md"), aenv_home, None).unwrap();
     assert!(out.contains("Qualified name:  leaf::CLAUDE.md"));
     assert!(out.contains("Strategy:        symlink"));
     assert!(out.contains("Source path:"));
@@ -64,7 +64,7 @@ fn which_for_merged_file_lists_contributors() {
         was_present_before_activation: true,
     });
     let aenv_home = Path::new(AENV_HOME);
-    let out = format_which(&state, Path::new(".mcp.json"), aenv_home).unwrap();
+    let out = format_which(&state, Path::new(".mcp.json"), aenv_home, None).unwrap();
     assert!(out.contains("Qualified name:  (merged)"));
     assert!(out.contains("Strategy:        deep-merge (json)"));
     // Merged strategy: no Source path line.
@@ -89,6 +89,6 @@ fn which_for_unmanaged_path_reports_error() {
         lifecycle_ran: false,
     };
     let aenv_home = Path::new(AENV_HOME);
-    let err = format_which(&state, Path::new("unmanaged.txt"), aenv_home).unwrap_err();
+    let err = format_which(&state, Path::new("unmanaged.txt"), aenv_home, None).unwrap_err();
     assert!(err.to_string().contains("not managed"));
 }

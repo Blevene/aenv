@@ -181,6 +181,43 @@ skills    -> ~/.aenv/envs/ECC/user/.claude/skills
 Because they're symlinks, editing a file under `~/.aenv/envs/ECC/user/` (or
 through the symlink) takes effect immediately — no re-activate needed.
 
+## Also use ECC inside one project (`shared_files`)
+
+ECC ships as global-only — its manifest declares `files = []` and puts everything
+under `user_files`, so out of the box it activates into `$HOME` but not into a
+single repo. To run the *same* content per-project without a second copy, rename
+its adapter blocks' `user_files` key to `shared_files`:
+
+```bash
+$EDITOR ~/.aenv/envs/ECC/aenv.toml
+```
+
+```toml
+[adapters.claude-code]
+files = []
+shared_files = [          # was: user_files
+    ".claude/CLAUDE.md",
+    ".claude/agents/",
+    ".claude/commands/",
+    ".claude/hooks/",
+    ".claude/skills/",
+]
+```
+
+No files move — the content stays under `~/.aenv/envs/ECC/user/`. Now ECC serves
+both scopes from that one copy:
+
+```bash
+aenv activate ECC --global          # → ~/.claude/...   (every project)
+cd ~/code/my-repo
+aenv use ECC && aenv activate       # → ./...           (this repo, same bytes)
+```
+
+The role-tagged instructions file lands in each scope's own layout —
+`~/.claude/CLAUDE.md` globally, repo-root `CLAUDE.md` in the project — while the
+`.claude/` directories keep their path in both. Both can be active at once; inside
+the repo the agent reads the project copy in preference to the global one.
+
 ## Turning it off / swapping
 
 ```bash
