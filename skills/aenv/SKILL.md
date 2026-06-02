@@ -30,6 +30,8 @@ aenv works at two scopes, and the verb prefix tells them apart:
 | Restore project to pre-aenv state | `aenv deactivate` (then `aenv unpin` if they want the `.aenv` pin file gone too) |
 | Add a skill they wrote themselves | `aenv skill new <skill-name> --ns <namespace>` |
 | Install a skill from a public GitHub repo | `aenv skill import git+<url> --ns <ns> --pin <ref> [--path <subdir>]` — see "Pin selection" below |
+| Install MANY skills from a monorepo at once | `aenv skill import-all git+<url> --ns <ns> --base <dir> --pin <ref> [--only a,b]` — clones once, imports every `<base>/<subdir>/SKILL.md`; malformed skills are warned + skipped, re-runs are idempotent |
+| Copy non-skill content (agents, commands, reference docs) from a repo | `aenv vendor git+<url> --ns <ns> --pin <ref> --path <subtree> --as <dest>` — copies into the namespace tree, declares it under the adapter's `files`, records `[[vendored]]` provenance. `--force` to overwrite, re-run to refresh + report drift |
 | Remove a skill | `aenv skill remove <skill-name> --ns <ns>` |
 | Reclaim cache space (orphaned skill clones) | `aenv cache prune` |
 | See what's active in the current project | `aenv status` |

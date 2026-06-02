@@ -21,4 +21,5 @@ pub mod snapshot;
 pub mod status;
 pub mod unpin;
 pub mod use_;
+pub mod vendor;
 pub mod which;

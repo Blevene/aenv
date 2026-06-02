@@ -219,6 +219,32 @@ enum Command {
         #[arg(long)]
         project: Option<PathBuf>,
     },
+    /// Copy non-skill content (agents, commands, reference docs, …) from a git
+    /// source or local path into a namespace's tree, declare it under the right
+    /// adapter's `files`, and record provenance in `[[vendored]]`.
+    Vendor {
+        /// Source: `/abs/path`, `~/path`, or `git+URL[#ref]`.
+        source: String,
+        #[arg(long)]
+        ns: String,
+        /// Subtree or single file within the source to copy.
+        #[arg(long)]
+        path: String,
+        /// Namespace-relative destination (e.g. `.claude/agents`). For a
+        /// single-file `--path`, this is the full destination file path.
+        #[arg(long = "as")]
+        as_: String,
+        /// Pin a git source to a tag, commit, or branch. Git sources only.
+        #[arg(long)]
+        pin: Option<String>,
+        /// Adapter that owns the destination. Inferred from the `--as` prefix
+        /// when omitted (`.codex/…` → codex, else claude-code).
+        #[arg(long)]
+        adapter: Option<String>,
+        /// Overwrite destination files that already exist in the namespace.
+        #[arg(long)]
+        force: bool,
+    },
     /// Skill operations.
     Skill {
         #[command(subcommand)]
@@ -808,6 +834,25 @@ fn main() -> ExitCode {
                 let project_root = paths::resolve_project_root(&fs, project)?;
                 cmd::unpin::run(&fs, &project_root)
             }
+            Command::Vendor {
+                source,
+                ns,
+                path,
+                as_,
+                pin,
+                adapter,
+                force,
+            } => cmd::vendor::run(
+                &fs,
+                &layout,
+                &ns,
+                &source,
+                &path,
+                &as_,
+                pin.as_deref(),
+                adapter.as_deref(),
+                force,
+            ),
             Command::Skill { action } => match action {
                 SkillAction::New {
                     name,

@@ -133,6 +133,27 @@ Behavior worth knowing: a subdir whose `SKILL.md` lacks valid `name:` frontmatte
 
 > **Single skill vs. collection.** Use `aenv skill import … --path <one-skill>` for one skill out of a monorepo; use `aenv skill import-all … --base <dir>` for the whole set.
 
+## Vendor non-skill content (`aenv vendor`)
+
+A config repo often ships more than skills — agents, slash commands, reference docs. Those have no `SKILL.md` shape, so `skill import` doesn't apply. `aenv vendor` copies an arbitrary subtree (or single file) from a source into the namespace tree, declares it under the right adapter's `files`, and records provenance in a `[[vendored]]` entry:
+
+```bash
+# Vendor the repo's agents/ directory into .claude/agents
+aenv vendor git+https://github.com/addyosmani/agent-skills \
+    --ns my-addy --pin 0.6.1 \
+    --path agents --as .claude/agents
+```
+
+```
+Vendored 4 files from git+https://github.com/addyosmani/agent-skills@250ffaa6e8ae039e4071f69af623781165d20df7:agents into 'my-addy':.claude/agents
+  + .claude/agents/README.md
+  + .claude/agents/code-reviewer.md
+  + .claude/agents/security-auditor.md
+  + .claude/agents/test-engineer.md
+```
+
+`--path` names the subtree or file in the source; `--as` is the namespace-relative destination (the owning adapter is inferred from its prefix — `.codex/…` → codex, else claude-code — or set `--adapter`). A single file works too: `--path references/security.md --as .claude/references/security.md`. Re-running refreshes from the source and reports which files changed (`+`) vs. unchanged (`=`); a destination that collides with unrelated existing content errors unless you pass `--force`. The vendored files are ordinary authored content, so `aenv use my-addy && aenv activate` symlinks them like anything else under `files`.
+
 ## Variations
 
 **Single-skill repo (SKILL.md at the root):** drop `--path`:

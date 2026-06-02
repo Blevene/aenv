@@ -178,6 +178,7 @@ pub fn create_namespace_from_project<F: Filesystem>(
         parameters: BTreeMap::new(),
         policies: BTreeMap::new(),
         skills: Vec::new(),
+        vendored: Vec::new(),
         lifecycle: crate::manifest::LifecycleHooks::default(),
     };
     let body =
