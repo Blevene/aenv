@@ -71,7 +71,7 @@ fn snapshot_captures_existing_user_files_into_namespace() {
     ]);
     let adapters = registry_with(adapter);
 
-    let summary = snapshot_global(&fs, &layout, &adapters, home, "default", &[]).unwrap();
+    let summary = snapshot_global(&fs, &layout, &adapters, home, "default", &[], false).unwrap();
 
     // The bytes landed under envs/default/user/.
     let ns_user = layout.namespace_dir("default").join("user");
@@ -122,7 +122,7 @@ fn snapshot_skips_missing_adapter_paths() {
     ]);
     let adapters = registry_with(adapter);
 
-    let summary = snapshot_global(&fs, &layout, &adapters, home, "default", &[]).unwrap();
+    let summary = snapshot_global(&fs, &layout, &adapters, home, "default", &[], false).unwrap();
 
     let manifest = read_manifest(&fs, &layout, "default");
     let entry = manifest.adapters.get("claude-code").unwrap();
@@ -152,6 +152,7 @@ fn snapshot_includes_extra_paths() {
         home,
         "snap",
         &[".claude/runtime".to_string()],
+        false,
     )
     .unwrap();
 
@@ -174,7 +175,7 @@ fn snapshot_refuses_existing_namespace() {
     fs.write(&layout.manifest_path("existing"), b"name = \"existing\"\n")
         .unwrap();
     let adapters = registry_with(claude_adapter_with_user_files(&[]));
-    let err = snapshot_global(&fs, &layout, &adapters, home, "existing", &[])
+    let err = snapshot_global(&fs, &layout, &adapters, home, "existing", &[], false)
         .expect_err("must reject existing namespace");
     assert!(
         matches!(err, AenvError::ActivationConflict(_)),
@@ -189,7 +190,7 @@ fn snapshot_refuses_invalid_name() {
     let home = fake_home();
     let adapters = registry_with(claude_adapter_with_user_files(&[]));
     // Colons are rejected by `NamespaceId::new`.
-    let err = snapshot_global(&fs, &layout, &adapters, home, "bad:name", &[])
+    let err = snapshot_global(&fs, &layout, &adapters, home, "bad:name", &[], false)
         .expect_err("must reject invalid name");
     assert!(
         matches!(err, AenvError::ManifestInvalid(_)),
@@ -209,7 +210,7 @@ fn snapshot_copies_directory_recursively() {
     let adapter = claude_adapter_with_user_files(&["~/.claude/hooks/"]);
     let adapters = registry_with(adapter);
 
-    snapshot_global(&fs, &layout, &adapters, home, "dirsnap", &[]).unwrap();
+    snapshot_global(&fs, &layout, &adapters, home, "dirsnap", &[], false).unwrap();
 
     let ns_user = layout.namespace_dir("dirsnap").join("user");
     assert_eq!(fs.read(&ns_user.join(".claude/hooks/a.sh")).unwrap(), b"a");

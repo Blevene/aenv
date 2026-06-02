@@ -478,7 +478,7 @@ The full plan lives in [`tasks/todo.md`](./tasks/todo.md). Two phases remain:
 
 - **Phase 6** — Partial. `cd`-based auto-activation ships now via `aenv init-shell` (see [§Shell integration](#shell-integration)); git remotes / `aenv install` / `aenv sync` / `aenv promote` still pending.
 - **Phase 7** — Windows symlink fallback + cross-platform CI. Windows is still unsupported; Linux and macOS binaries ship on every release (latest: v0.3.0).
-- **Issue #5 (unified scope)** — Layer 1 (unified `--global` verbs) and Layer 2 (`shared_files` — one stored copy serving both scopes) have landed. Remaining follow-ups: snapshot / import and `aenv create` emitting `shared_files` directly, and a resolver warning when a legacy `files` entry and a `shared_files` remap target the same project path.
+- **Issue #5 (unified scope)** — feature-complete pending release. Layer 1 (unified `--global` verbs), Layer 2 (`shared_files` — one stored copy serving both scopes), the opt-in `--shared` flag on `create --global` / `global new` / `global snapshot` / `global import`, and a resolver collision warning have all landed.
 
 ## Reading order
 

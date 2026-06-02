@@ -37,6 +37,11 @@ enum Command {
         /// `user_files`. `--extends` is not supported with `--global` yet.
         #[arg(long)]
         global: bool,
+        /// With `--global`, declare the seeded content as `shared_files` so one
+        /// stored copy serves both project and global scopes (issue #5). Only
+        /// valid together with `--global`.
+        #[arg(long)]
+        shared: bool,
     },
     /// List every namespace in the registry.
     List {
@@ -450,6 +455,10 @@ enum GlobalAction {
         /// Adapter to scaffold for.
         #[arg(long, default_value = "claude-code")]
         adapter: String,
+        /// Declare the seeded content as `shared_files` (both scopes from one
+        /// copy, issue #5) instead of `user_files` (global only).
+        #[arg(long)]
+        shared: bool,
     },
     /// Snapshot the current `$HOME` user-scope surface (`~/.claude/`,
     /// `~/.codex/`, etc.) into a new namespace. The set of captured paths
@@ -467,6 +476,10 @@ enum GlobalAction {
         /// defaults. Repeatable: `--include .claude/runtime --include .claude/bin`.
         #[arg(long)]
         include: Vec<String>,
+        /// Declare the captured content as `shared_files` (both scopes from one
+        /// copy, issue #5) instead of `user_files` (global only).
+        #[arg(long)]
+        shared: bool,
     },
     /// Import a source directory or git URL as a new namespace. When the
     /// source root contains `aenv-namespace.toml`, its declared `[layout]`
@@ -494,6 +507,10 @@ enum GlobalAction {
         /// applies to git URL sources.
         #[arg(long)]
         pin: Option<String>,
+        /// Declare the imported content as `shared_files` (both scopes from one
+        /// copy, issue #5) instead of `user_files` (global only).
+        #[arg(long)]
+        shared: bool,
     },
     /// Diff user-scope content against the active global activation or
     /// between two namespaces' user-scope subsets.
@@ -544,7 +561,15 @@ fn main() -> ExitCode {
                 extends,
                 adapter,
                 global,
+                shared,
             } => {
+                if shared && !global {
+                    return Err(aenv_core::AenvError::ManifestInvalid(
+                        "--shared applies only with --global (it controls user-scope \
+                         scaffolding); a project namespace uses `files`"
+                            .into(),
+                    ));
+                }
                 if global {
                     // `aenv create --global` scaffolds a user-scope namespace,
                     // the same as `aenv global new`. The global scaffolder is
@@ -563,7 +588,7 @@ fn main() -> ExitCode {
                         ));
                     }
                     let adapter_name = adapter.first().map(String::as_str).unwrap_or("claude-code");
-                    return cmd::global::new::run(&fs, &layout, &name, adapter_name);
+                    return cmd::global::new::run(&fs, &layout, &name, adapter_name, shared);
                 }
                 let adapters_reg = aenv_core::adapter::AdapterRegistry::load_from_dir(
                     &fs,
@@ -972,19 +997,30 @@ fn main() -> ExitCode {
                             fix,
                         )
                     }
-                    GlobalAction::New { name, adapter } => {
-                        cmd::global::new::run(&fs, &layout, &name, &adapter)
-                    }
-                    GlobalAction::Snapshot { name, include } => {
+                    GlobalAction::New {
+                        name,
+                        adapter,
+                        shared,
+                    } => cmd::global::new::run(&fs, &layout, &name, &adapter, shared),
+                    GlobalAction::Snapshot {
+                        name,
+                        include,
+                        shared,
+                    } => {
                         let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
                             &fs,
                             &layout.adapters_dir(),
                         )?;
                         cmd::global::snapshot::run(
-                            &fs, &layout, &adapters, &fake_home, &name, &include,
+                            &fs, &layout, &adapters, &fake_home, &name, &include, shared,
                         )
                     }
-                    GlobalAction::Import { source, name, pin } => {
+                    GlobalAction::Import {
+                        source,
+                        name,
+                        pin,
+                        shared,
+                    } => {
                         let adapters = aenv_core::adapter::AdapterRegistry::load_from_dir(
                             &fs,
                             &layout.adapters_dir(),
@@ -996,6 +1032,7 @@ fn main() -> ExitCode {
                             &source,
                             &name,
                             pin.as_deref(),
+                            shared,
                         )
                     }
                     GlobalAction::Diff { ns_a, ns_b, json } => cmd::global::diff::run(

@@ -17,6 +17,7 @@ pub fn run<F: Filesystem>(
     layout: &RegistryLayout,
     name: &str,
     adapter: &str,
+    shared: bool,
 ) -> Result<()> {
     // Ensure built-in adapters are installed so a fresh registry can scaffold
     // against the default `claude-code` adapter without a prior `aenv create`,
@@ -25,7 +26,7 @@ pub fn run<F: Filesystem>(
     let adapters = AdapterRegistry::load_from_dir(fs, &layout.adapters_dir())?;
 
     let summary = aenv_core::global_snapshot::scaffold_global_namespace(
-        fs, layout, &adapters, name, adapter,
+        fs, layout, &adapters, name, adapter, shared,
     )?;
 
     println!(

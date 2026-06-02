@@ -131,7 +131,7 @@ files = []
 user_files = [".claude/CLAUDE.md"]
 ```
 
-The on-disk tree is `aenv.toml` + a seeded `user/.claude/CLAUDE.md`. Edit it, then activate with `aenv global use my-global` (or the unified `aenv activate my-global --global`). To make one stored copy serve **both** scopes, rename `user_files` to `shared_files` — see the [global-namespaces walkthrough appendix](./walkthrough-global-namespaces.md#adapter-file-buckets-files--user_files--shared_files). Note `--global` rejects `--extends` (a user-scope scaffold takes no parent on the CLI) and `--project <path>`.
+The on-disk tree is `aenv.toml` + a seeded `user/.claude/CLAUDE.md`. Edit it, then activate with `aenv global use my-global` (or the unified `aenv activate my-global --global`). To scaffold it as **dual-scope** from the start, add `--shared` (`aenv create my-global --global --shared`) — the manifest then declares `shared_files` instead of `user_files`, and the one stored copy serves both scopes (see the [global-namespaces appendix](./walkthrough-global-namespaces.md#adapter-file-buckets-files--user_files--shared_files)). Note `--global` rejects `--extends` (a user-scope scaffold takes no parent on the CLI) and `--project <path>`; `--shared` requires `--global`.
 
 ---
 

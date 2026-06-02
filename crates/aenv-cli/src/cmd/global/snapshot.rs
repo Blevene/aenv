@@ -18,9 +18,10 @@ pub fn run<F: Filesystem>(
     fake_home: &Path,
     name: &str,
     include: &[String],
+    shared: bool,
 ) -> Result<()> {
     let summary = aenv_core::global_snapshot::snapshot_global(
-        fs, layout, adapters, fake_home, name, include,
+        fs, layout, adapters, fake_home, name, include, shared,
     )?;
     println!(
         "Snapshotted current ~/ user-scope surface into namespace '{name}' ({} file{}, {} director{} captured).",

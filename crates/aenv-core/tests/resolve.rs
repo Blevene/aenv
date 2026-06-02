@@ -522,3 +522,74 @@ user_files = ["~/.claude/CLAUDE.md"]
         other => panic!("expected ManifestInvalid, got {other:?}"),
     }
 }
+
+#[test]
+fn files_and_shared_files_same_project_path_warns() {
+    let fs = MockFilesystem::new();
+    write_manifest(
+        &fs,
+        "collide",
+        r#"
+name = "collide"
+[adapters.claude-code]
+files = ["CLAUDE.md"]
+shared_files = [".claude/CLAUDE.md"]
+"#,
+    );
+    // Project-scope source for the `files` entry…
+    write_file(&fs, "collide", "CLAUDE.md", "# project copy\n");
+    // …and the shared copy under user/, which role-remaps to project `CLAUDE.md`.
+    write_file(&fs, "collide", "user/.claude/CLAUDE.md", "# shared copy\n");
+
+    let resolved = resolve_namespace(
+        &fs,
+        &registry(),
+        &registry_with_roles(),
+        &NamespaceId::new("collide").unwrap(),
+    )
+    .unwrap();
+
+    assert!(
+        resolved.warnings.iter().any(|w| w.contains("shared_files")
+            && w.contains("CLAUDE.md")
+            && w.contains("`files`")),
+        "expected a files/shared_files collision warning, got: {:?}",
+        resolved.warnings
+    );
+    // Coalesced: the message appears exactly once.
+    let n = resolved
+        .warnings
+        .iter()
+        .filter(|w| w.contains("shared_files entry materializes"))
+        .count();
+    assert_eq!(n, 1, "collision warning should not be duplicated");
+}
+
+#[test]
+fn shared_files_without_files_collision_is_quiet() {
+    let fs = MockFilesystem::new();
+    write_manifest(
+        &fs,
+        "noclash",
+        r#"
+name = "noclash"
+[adapters.claude-code]
+shared_files = [".claude/CLAUDE.md", ".claude/agents/helper.md"]
+"#,
+    );
+    write_file(&fs, "noclash", "user/.claude/CLAUDE.md", "# x\n");
+    write_file(&fs, "noclash", "user/.claude/agents/helper.md", "h\n");
+
+    let resolved = resolve_namespace(
+        &fs,
+        &registry(),
+        &registry_with_roles(),
+        &NamespaceId::new("noclash").unwrap(),
+    )
+    .unwrap();
+    assert!(
+        resolved.warnings.is_empty(),
+        "no collision expected, got: {:?}",
+        resolved.warnings
+    );
+}

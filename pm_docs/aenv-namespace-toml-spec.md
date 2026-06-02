@@ -199,5 +199,6 @@ file) is remapped to each scope's own layout via the adapter's `roles` /
 project but `~/.claude/CLAUDE.md` globally — while non-role paths keep their
 relative path in both scopes. The three buckets are: `files` (project only,
 stored at the namespace root), `user_files` (user/global only, under `user/`),
-and `shared_files` (both, under `user/`). A future importer flag may emit
-`shared_files` directly; for now it is a one-line post-import edit.
+and `shared_files` (both, under `user/`). Pass `--shared` to `aenv global import`
+(or `aenv global snapshot` / `aenv global new` / `aenv create --global`) to emit
+`shared_files` directly at import time, skipping the manifest edit.

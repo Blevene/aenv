@@ -54,7 +54,8 @@ fn scaffold_seeds_instructions_file_and_declares_it() {
     let layout = layout();
     let reg = registry();
 
-    let summary = scaffold_global_namespace(&fs, &layout, &reg, "mine", "claude-code").unwrap();
+    let summary =
+        scaffold_global_namespace(&fs, &layout, &reg, "mine", "claude-code", false).unwrap();
 
     assert_eq!(
         summary.seeded_instructions.as_deref(),
@@ -82,8 +83,9 @@ fn scaffold_refuses_existing_namespace() {
     let fs = MockFilesystem::new();
     let layout = layout();
     let reg = registry();
-    scaffold_global_namespace(&fs, &layout, &reg, "dup", "claude-code").unwrap();
-    let err = scaffold_global_namespace(&fs, &layout, &reg, "dup", "claude-code").unwrap_err();
+    scaffold_global_namespace(&fs, &layout, &reg, "dup", "claude-code", false).unwrap();
+    let err =
+        scaffold_global_namespace(&fs, &layout, &reg, "dup", "claude-code", false).unwrap_err();
     assert!(matches!(err, AenvError::ActivationConflict(_)));
 }
 
@@ -92,6 +94,6 @@ fn scaffold_unknown_adapter_errors() {
     let fs = MockFilesystem::new();
     let layout = layout();
     let reg = registry();
-    let err = scaffold_global_namespace(&fs, &layout, &reg, "x", "nope").unwrap_err();
+    let err = scaffold_global_namespace(&fs, &layout, &reg, "x", "nope", false).unwrap_err();
     assert!(matches!(err, AenvError::AdapterMissing(_)));
 }

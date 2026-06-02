@@ -269,7 +269,7 @@ $EDITOR ~/.aenv/envs/research/aenv.toml
 #   shared_files = [".claude/CLAUDE.md", ".claude/agents/"]   # was: user_files
 ```
 
-Nothing moves on disk — the content stays under `~/.aenv/envs/research/user/`. Now the one copy materializes to whichever scope you activate:
+Nothing moves on disk — the content stays under `~/.aenv/envs/research/user/`. (Authoring from scratch or capturing? Pass `--shared` to skip the rename: `aenv create research --global --shared`, `aenv global snapshot <ns> --shared`, or `aenv global import <src> --shared` emit `shared_files` directly.) Now the one copy materializes to whichever scope you activate:
 
 ```bash
 aenv activate research --global         # → ~/.claude/...   (every project)

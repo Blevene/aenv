@@ -56,6 +56,7 @@ user_files = ["~/.claude/plugins/"]
         &fake_home,
         "snap",
         &[],
+        false,
     )
     .unwrap();
 
@@ -120,6 +121,7 @@ user_files = ["~/.claude/agents/"]
         &fake_home,
         "snap",
         &[],
+        false,
     )
     .unwrap();
     assert_eq!(summary.directories_copied, 1);

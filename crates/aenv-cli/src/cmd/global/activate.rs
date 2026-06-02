@@ -189,6 +189,9 @@ fn maybe_capture_baseline<F: Filesystem>(
         fake_home,
         BASELINE_NAMESPACE,
         &[],
+        // The baseline is a pre-aenv return point for the global surface only;
+        // it is never a dual-scope profile.
+        false,
     )?;
     if summary.files_copied + summary.directories_copied == 0 {
         // Nothing to preserve — drop the empty namespace snapshot wrote.
