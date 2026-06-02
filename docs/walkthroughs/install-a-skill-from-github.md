@@ -105,6 +105,34 @@ aenv deactivate && aenv activate
 
 The old cache directory stays around (cheap; future `aenv cache prune` will clean it).
 
+## Bulk import: a whole collection at once (`import-all`)
+
+The steps above import **one** skill. For a monorepo that ships many skills under a base directory — e.g. [`addyosmani/agent-skills`](https://github.com/addyosmani/agent-skills) (23 skills under `skills/<name>/SKILL.md`) — use `aenv skill import-all` instead of repeating `import` 23 times. It clones the source once, discovers every `<base>/<subdir>/SKILL.md`, and appends one `[[skills]]` entry each in a single manifest write:
+
+```bash
+aenv skill import-all git+https://github.com/addyosmani/agent-skills \
+    --ns my-addy \
+    --base skills \
+    --pin 0.6.1
+```
+
+```
+  + agent-friendly-architecture
+  + code-review-and-quality
+  …
+  + using-agent-skills
+Imported 23 skills from git+https://github.com/addyosmani/agent-skills @ 250ffaa6e8ae039e4071f69af623781165d20df7 into namespace 'my-addy'.
+```
+
+Every entry shares the one resolved SHA, so the whole set is reproducible. Useful flags:
+
+- `--only context-engineering,test-driven-development` — import just the named subset (by subdir basename). An unknown name errors before anything is written.
+- `--base <dir>` — the directory the `<subdir>/SKILL.md` skills live under (default `skills`).
+
+Behavior worth knowing: a subdir whose `SKILL.md` lacks valid `name:` frontmatter is **warned about and skipped** (the rest still import); re-running is **idempotent** — already-declared skills are skipped and reported. Then `aenv use my-addy && aenv activate` materializes all of them under `.claude/skills/`.
+
+> **Single skill vs. collection.** Use `aenv skill import … --path <one-skill>` for one skill out of a monorepo; use `aenv skill import-all … --base <dir>` for the whole set.
+
 ## Variations
 
 **Single-skill repo (SKILL.md at the root):** drop `--path`:
