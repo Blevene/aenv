@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Unified scope flags — `aenv create|activate|deactivate --global`.** The project-side lifecycle verbs now take a `--global` flag that operates on the user-scope surface (`~/.claude/`, `~/.codex/`, …) instead of the project, routing to the same core as the `aenv global …` tree (which stays as a backward-compatible alias). So `aenv activate <ns> --global [--yes] [--no-baseline]`, `aenv deactivate --global [--force]`, and `aenv create <ns> --global` (subsumes `aenv global new`) now work without switching command trees. Scope-specific flags are guarded: `--global` rejects a `--project <path>` override, `--yes`/`--no-baseline`/`--force` are global-only, and `--prune` stays project-only. This is Layer 1 of #5 (one set of verbs across scopes); Layer 2 (a single stored copy of a profile serving both scopes without duplicated content) is tracked separately on that issue.
+
 ## [0.3.3] — 2026-06-01
 
 ### Fixed

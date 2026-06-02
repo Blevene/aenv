@@ -206,6 +206,12 @@ To switch to a different global profile, just `aenv global use <other>`; aenv
 deactivates ECC and activates the other in a single transaction. `aenv global
 use -` toggles back to the previous profile.
 
+> **Unified verbs.** Every `aenv global …` step above has an equivalent on the
+> project verbs with a `--global` flag: `aenv activate ECC --global` to turn it
+> on, `aenv deactivate --global` to turn it off, and `aenv create <ns> --global`
+> to scaffold one. The `aenv global …` spelling is fully supported too — use
+> whichever reads better.
+
 ## If something goes wrong
 
 - **`namespace not found: <url>`** — the target wasn't recognized as a git URL.

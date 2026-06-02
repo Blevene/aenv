@@ -74,6 +74,8 @@ Swapping the user-level config that every Claude Code / Codex session reads. `ae
 
 **Deprecated:** `aenv global activate <ns>` still works but prints a deprecation notice — prefer `aenv global use <ns>` (a superset that also imports sources and records a swap-back point).
 
+**Unified scope flags (equivalent to the `aenv global` tree):** the project verbs accept `--global` to act on user scope without switching command trees — `aenv create <ns> --global` (= `global new`), `aenv activate <ns> --global [--yes] [--no-baseline]`, `aenv deactivate --global [--force]`. Either spelling is fine; `aenv global …` is not going away. Guards: `--global` can't be combined with a `--project <path>` override, `--yes`/`--no-baseline`/`--force` are global-only, and `--prune` is project-only.
+
 ## Global gotchas — surface these proactively
 
 - **One activation per user.** `aenv global use <b>` while `<a>` is active deactivates `<a>` and activates `<b>` atomically; on failure `<a>` is restored. There's no "both at once."
