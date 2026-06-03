@@ -35,7 +35,7 @@ export RESCUE=$PWD/target/release/aenv-rescue
 
 mkdir -p "$HOME"
 $BIN --version
-# → aenv 0.4.0
+# → aenv 0.5.0
 ```
 
 Two paths to keep in your head:

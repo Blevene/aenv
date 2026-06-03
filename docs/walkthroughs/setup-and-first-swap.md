@@ -29,7 +29,7 @@ The first `aenv` invocation creates `~/.aenv/` with built-in adapters and starte
 
 ```bash
 aenv --version
-# → aenv 0.4.0
+# → aenv 0.5.0
 
 aenv list
 # NAME                   EXTENDS                        ADAPTERS
