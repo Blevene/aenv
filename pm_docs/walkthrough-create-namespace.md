@@ -1,6 +1,6 @@
 # Walkthrough: creating a namespace
 
-**Tested against:** `main`, `aenv 0.3.0`.
+**Tested against:** `main`, `aenv 0.5.1`.
 **Goal:** create a new namespace in the registry, from the minimum viable form (one command) up to the full form (one command with extends + adapter pre-seeded).
 
 A *namespace* in `aenv` is a directory under `$AENV_HOME/envs/<name>/` containing an `aenv.toml` manifest and any associated harness files (CLAUDE.md, skill SKILL.md files, etc.). This walkthrough covers `aenv create` and its two flags.

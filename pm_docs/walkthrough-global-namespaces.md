@@ -1,6 +1,6 @@
-# Walkthrough: global namespaces with claude-cntrl
+# Walkthrough: global namespaces with my-ctrl
 
-**Tested against:** `main`, `aenv 0.3.1`.
+**Tested against:** `main`, `aenv 0.5.1`.
 **Goal:** onboard claude-ctrl from upstream in a single command (`aenv global use <url>`, which imports + activates and auto-captures a `baseline` return point), swap back to `baseline`, author your own profile from scratch with `aenv global new`, exercise the doctor surface, and walk through the full recovery story for when something breaks.
 
 > **The short version.** Standing up an alternate global profile is one command:
@@ -35,7 +35,7 @@ export RESCUE=$PWD/target/release/aenv-rescue
 
 mkdir -p "$HOME"
 $BIN --version
-# → aenv 0.5.0
+# → aenv 0.5.1
 ```
 
 Two paths to keep in your head:
@@ -109,18 +109,18 @@ This is the point you can always swap back to. Re-activating `default` later is 
 
 ## Step 2 — onboard claude-ctrl in one command
 
-`aenv global use <target>` is the front door. When `<target>` is a git URL or local path, it imports the source as a namespace **and** activates it in a single step; when it's an existing namespace name it just switches to it; `-` toggles to the previous profile. Here we onboard claude-ctrl, naming the namespace `claude-cntrl` with `--as`:
+`aenv global use <target>` is the front door. When `<target>` is a git URL or local path, it imports the source as a namespace **and** activates it in a single step; when it's an existing namespace name it just switches to it; `-` toggles to the previous profile. Here we onboard claude-ctrl, naming the namespace `my-ctrl` with `--as`:
 
 ```bash
-$BIN global use https://github.com/juanandresgs/claude-ctrl --as claude-cntrl
+$BIN global use https://github.com/juanandresgs/claude-ctrl --as my-ctrl
 ```
 
 aenv does three things under one command:
 
-**(a) Import.** The importer prefers an `aenv-namespace.toml` at the source root if one is shipped (see [`aenv-namespace-toml-spec.md`](./aenv-namespace-toml-spec.md) for the convention file format); otherwise it falls back to a built-in heuristic that recognizes well-known config layouts (notably claude-ctrl-style repos). It picks up the config it knows — `CLAUDE.md`, `agents/`, `commands/`, `hooks/`, `skills/`, `settings.json`, `bin/`, `runtime/`, `sidecars/`, `.codex/`, … — and maps each under its adapter target. The generated `~/.aenv/envs/claude-cntrl/aenv.toml` reads roughly:
+**(a) Import.** The importer prefers an `aenv-namespace.toml` at the source root if one is shipped (see [`aenv-namespace-toml-spec.md`](./aenv-namespace-toml-spec.md) for the convention file format); otherwise it falls back to a built-in heuristic that recognizes well-known config layouts (notably claude-ctrl-style repos). It picks up the config it knows — `CLAUDE.md`, `agents/`, `commands/`, `hooks/`, `skills/`, `settings.json`, `bin/`, `runtime/`, `sidecars/`, `.codex/`, … — and maps each under its adapter target. The generated `~/.aenv/envs/my-ctrl/aenv.toml` reads roughly:
 
 ```toml
-name = "claude-cntrl"
+name = "my-ctrl"
 extends = []
 
 [adapters.claude-code]
@@ -160,7 +160,7 @@ Pre-flight found 33 potential issues:
   …
 Continuing because --yes was passed.
 Captured your current ~/ surface as 'baseline' (swap back with: aenv global use baseline).
-Activated 'claude-cntrl' globally in /tmp/aenv-home-XXXXXX
+Activated 'my-ctrl' globally in /tmp/aenv-home-XXXXXX
   + .claude/CLAUDE.md (Symlink)
   + .claude/agents (Symlink)
   + .claude/bin (Symlink)
@@ -175,7 +175,7 @@ Note: running harness sessions retain their previous config until restart.
 What happened:
 
 1. `~/.claude/CLAUDE.md` already existed (you wrote it in Setup). It was moved to `$AENV_HOME/global-stash/<ts>/.claude/CLAUDE.md` for byte-perfect restore on deactivate.
-2. Each managed path was symlinked back into `$AENV_HOME/envs/claude-cntrl/user/`.
+2. Each managed path was symlinked back into `$AENV_HOME/envs/my-ctrl/user/`.
 3. The activation state file at `$AENV_HOME/global-state.json` was written — the activation is now persisted.
 
 > **claude-ctrl's policy-engine runtime.** Because aenv didn't run claude-ctrl's `install.sh`, its Python runtime / `cc-policy` wiring isn't set up here — the pre-flight warnings above flag exactly that. The clean way to wire it is for claude-ctrl to ship an `aenv-namespace.toml` with a **runtime-only** `on_activate` (one that sets up the runtime, since aenv already placed the config). See [Lifecycle hooks](#lifecycle-hooks-opt-in).
@@ -187,7 +187,7 @@ $BIN global status
 ```
 
 ```
-Active global namespace: claude-cntrl
+Active global namespace: my-ctrl
 Target root: /tmp/aenv-home-XXXXXX
 Managed files: 11
   ~/.claude/CLAUDE.md
@@ -204,10 +204,10 @@ $BIN global which '~/.claude/CLAUDE.md'
 ```
 
 ```
-~/.claude/CLAUDE.md -> claude-cntrl::.claude/CLAUDE.md
+~/.claude/CLAUDE.md -> my-ctrl::.claude/CLAUDE.md
 ```
 
-With `--json`, the result also includes the file's `content_hash` — sha256 of the materialized bytes, useful for cross-machine verification. For a plain-file entry this is the sha256 of the file's bytes; for a directory-backed entry (like `claude-cntrl`'s `.claude/agents/`, which activation symlinks as a unit) `content_hash` is `null`, since a directory has no single content hash. Demonstrating against a single-file profile such as `default`:
+With `--json`, the result also includes the file's `content_hash` — sha256 of the materialized bytes, useful for cross-machine verification. For a plain-file entry this is the sha256 of the file's bytes; for a directory-backed entry (like `my-ctrl`'s `.claude/agents/`, which activation symlinks as a unit) `content_hash` is `null`, since a directory has no single content hash. Demonstrating against a single-file profile such as `default`:
 
 ```bash
 $BIN global which '~/.claude/CLAUDE.md' --json
@@ -225,7 +225,7 @@ $BIN global which '~/.claude/CLAUDE.md' --json
 
 ---
 
-## Step 4 — use Claude Code with claude-cntrl active
+## Step 3 — use Claude Code with my-ctrl active
 
 This is where you actually do work. Open a fresh Claude Code session and the harness reads the now-materialized `~/.claude/CLAUDE.md`, the agents under `~/.claude/agents/`, and the hooks under `~/.claude/hooks/`. aenv's job is done — it's a file-mover, not a runtime.
 
@@ -281,7 +281,7 @@ Answer `y` and the script runs (you'll see `provisioning runtime for hooked`), t
 
 ---
 
-## Step 5 — swap back to `default`
+## Step 4 — swap back to `default`
 
 ```bash
 $BIN global use default
@@ -297,10 +297,10 @@ Note: running harness sessions retain their previous config until restart.
 
 Behind the scenes that one call performed two operations under a single global lock (`$AENV_HOME/global.lock`):
 
-1. **Deactivated `claude-cntrl`** — removed every symlink it created, restored the backed-up `.claude/CLAUDE.md` from the stash, and deleted `claude-cntrl`'s state. (It declared no `on_deactivate`, so there was no lifecycle script to run; a namespace that opts into one would run it here first.)
+1. **Deactivated `my-ctrl`** — removed every symlink it created, restored the backed-up `.claude/CLAUDE.md` from the stash, and deleted `my-ctrl`'s state. (It declared no `on_deactivate`, so there was no lifecycle script to run; a namespace that opts into one would run it here first.)
 2. **Activated `default`** — applied `default`'s `user_files` against the now-restored `$HOME`. The strategy for `.claude/CLAUDE.md` is `Identical`: `default`'s source bytes already match what's at `~/.claude/CLAUDE.md` (because `default` is a snapshot of that file), so there's nothing to swap.
 
-If step 2 had failed, aenv would re-activate `claude-cntrl` as best-effort rollback before returning the error. One activation lives per user, full stop.
+If step 2 had failed, aenv would re-activate `my-ctrl` as best-effort rollback before returning the error. One activation lives per user, full stop.
 
 ```bash
 cat $HOME/.claude/CLAUDE.md
@@ -311,11 +311,11 @@ cat $HOME/.claude/CLAUDE.md
 Standard operating mode.
 ```
 
-The `agents/` and `hooks/` symlinks from `claude-cntrl` are gone — they belonged to `claude-cntrl` and were removed during its deactivate half of the transaction. The `.claude/` directory now contains only what `default` declared.
+The `agents/` and `hooks/` symlinks from `my-ctrl` are gone — they belonged to `my-ctrl` and were removed during its deactivate half of the transaction. The `.claude/` directory now contains only what `default` declared.
 
 ---
 
-## Step 5b — author your own profile from scratch
+## Step 5 — author your own profile from scratch
 
 Importing an existing profile is one path; building your own is another. `aenv global new` scaffolds an editable user-scope namespace so you don't have to `mkdir user/.claude/` and hand-write the manifest:
 
@@ -339,7 +339,7 @@ $BIN global use mine
 
 ---
 
-## Step 5c — add skills to a global profile
+## Step 6 — add skills to a global profile
 
 A global profile can carry skills that install into `~/.claude/skills/` when you activate it. Use `aenv skill import` with **`--scope user`** — this is required for global profiles; without it the skill is project-scope and won't materialize on `aenv global use`.
 
@@ -370,7 +370,7 @@ Notes:
 
 ---
 
-## Step 6 — doctor your namespaces
+## Step 7 — doctor your namespaces
 
 `aenv global doctor` runs the user-scope policy evaluators. Three built-in checks fire today:
 
@@ -378,7 +378,7 @@ Notes:
 - **`hook_paths_resolvable`** — every command path referenced by a settings.json `hooks` / `mcpServers` / `statusLine` entry is checked for existence on disk. Missing paths surface as warnings.
 - **`copy_mode_local_edits`** — when a namespace uses `materialize = "copy"`, the doctor compares the materialized `$HOME` file against the namespace source. Local edits flag a warning that the next activation will overwrite them.
 
-### 6a — oversize `~/.claude/CLAUDE.md`
+### 7a — oversize `~/.claude/CLAUDE.md`
 
 Create a namespace with a deliberately chatty CLAUDE.md:
 
@@ -410,7 +410,7 @@ $BIN global doctor chatty
 [WARN] instructions_max_chars chatty::~/.claude/CLAUDE.md — .claude/CLAUDE.md has 6765 chars (budget 5000). Refactor procedural content into skills, dispositional content into subagents, or use @-imports.
 ```
 
-(If you've already run a few activations, `doctor <name>` will also append an informational `Orphan stashes:` listing of any leftover stashes — passing a namespace name keeps that informational and still exits 0. See Step 7c for the no-argument form, which treats orphans as a hard error.)
+(If you've already run a few activations, `doctor <name>` will also append an informational `Orphan stashes:` listing of any leftover stashes — passing a namespace name keeps that informational and still exits 0. See Step 8c for the no-argument form, which treats orphans as a hard error.)
 
 The `~/` prefix on the qualified-name target (`chatty::~/.claude/CLAUDE.md`) marks the diagnostic as user-scope rather than project-scope. The check is advisory at adapter defaults (`[WARN]`, exit 0). To make it blocking, add to the namespace manifest:
 
@@ -421,7 +421,7 @@ instructions_max_chars = { value = 5000, enforce = true }
 
 …and the next `aenv global use chatty` will refuse (exit 17) before materializing anything.
 
-### 6b — copy-mode local edits
+### 7b — copy-mode local edits
 
 Author a namespace that opts into copy materialization:
 
@@ -463,19 +463,19 @@ $BIN global doctor
 [WARN] copy_mode_local_edits copyns::~/.claude/CLAUDE.md — ~/.claude/CLAUDE.md has been edited locally since activation; next activation will overwrite your edits. Run `aenv global snapshot <name>` first to capture.
 ```
 
-(This clean output assumes no leftover stashes. The no-argument `global doctor` also audits global state and treats orphan stashes as a hard error (exit 19) — if earlier activations left stashes behind, you'll see an `Orphan stashes:` listing and a non-zero exit here. Clear them with `aenv global doctor --fix`; see Step 7c.)
+(This clean output assumes no leftover stashes. The no-argument `global doctor` also audits global state and treats orphan stashes as a hard error (exit 19) — if earlier activations left stashes behind, you'll see an `Orphan stashes:` listing and a non-zero exit here. Clear them with `aenv global doctor --fix`; see Step 8c.)
 
 This warning is the contract: under copy mode, the namespace source is the authoritative copy, and re-activation is destructive to local edits. If you want to preserve them, run `aenv global snapshot <new-name>` before the next activation. Under symlink mode (the default), this scenario doesn't arise — local edits are edits to the namespace source.
 
 ---
 
-## Step 7 — when things go wrong: recovery
+## Step 8 — when things go wrong: recovery
 
 Three failure modes you might run into, in increasing order of severity.
 
-### 7a — broken `on_deactivate`
+### 8a — broken `on_deactivate`
 
-`aenv global deactivate` runs the namespace's `on_deactivate` script first, then restores files. (`on_deactivate` only fires when the matching activation actually ran an `on_activate` hook — if there was no setup to undo, there's nothing to tear down. The heuristic-imported `claude-cntrl` declares no lifecycle hooks at all, so it never runs one.) To see this path, author a namespace whose activation runs a hook and whose teardown fails:
+`aenv global deactivate` runs the namespace's `on_deactivate` script first, then restores files. (`on_deactivate` only fires when the matching activation actually ran an `on_activate` hook — if there was no setup to undo, there's nothing to tear down. The heuristic-imported `my-ctrl` declares no lifecycle hooks at all, so it never runs one.) To see this path, author a namespace whose activation runs a hook and whose teardown fails:
 
 ```bash
 mkdir -p "$AENV_HOME/envs/brokenhook/user/.claude"
@@ -521,9 +521,9 @@ Deactivated namespace 'brokenhook' globally in /tmp/aenv-home-XXXXXX. (--force: 
 
 File restoration still runs. `--force` sets `AENV_FORCE=1` in the lifecycle env (in case a script wants to behave differently under force) but, in practice, the script just doesn't run.
 
-### 7b — locked-out Claude Code session
+### 8b — locked-out Claude Code session
 
-The risk pattern: claude-cntrl materializes a `~/.claude/settings.json` whose `hooks.PreToolUse` entry calls a runtime that wasn't installed (or got removed). Every Bash tool call inside an active Claude Code session fails-closed through that hook. You can't run `aenv global deactivate` from inside the Claude Code session because the hook blocks it.
+The risk pattern: my-ctrl materializes a `~/.claude/settings.json` whose `hooks.PreToolUse` entry calls a runtime that wasn't installed (or got removed). Every Bash tool call inside an active Claude Code session fails-closed through that hook. You can't run `aenv global deactivate` from inside the Claude Code session because the hook blocks it.
 
 Solution: open any **non-Claude** shell — a fresh terminal tab, the editor's terminal, an SSH session, anything that doesn't route through Claude Code's hook chain — and run:
 
@@ -532,7 +532,7 @@ aenv-rescue
 ```
 
 ```
-Rescuing active global activation of 'claude-cntrl' under /tmp/aenv-home-XXXXXX
+Rescuing active global activation of 'my-ctrl' under /tmp/aenv-home-XXXXXX
   removed symlink /tmp/aenv-home-XXXXXX/.claude/CLAUDE.md
   removed symlink /tmp/aenv-home-XXXXXX/.claude/agents
   removed symlink /tmp/aenv-home-XXXXXX/.claude/hooks
@@ -581,7 +581,7 @@ EXIT CODES:
 See `pm_docs/walkthrough-global-namespaces.md` for the full recovery flow.
 ```
 
-### 7c — orphan stash
+### 8c — orphan stash
 
 Each global activation writes a backed-up-originals dir under `$AENV_HOME/global-stash/<timestamp>/`. A clean deactivate consumes its own stash. If something went sideways mid-activation (process killed, hand-deleted `global-state.json`, two activations raced past the lock somehow), the stash directory survives but no state file points at it.
 
@@ -628,7 +628,7 @@ Exit 13 (`ActivationConflict`) — the doctor needs a target.
 
 ---
 
-## Step 8 — wrap-up
+## Step 9 — wrap-up
 
 A clean `aenv global deactivate` restores the original `~/.claude/` contents (every backed-up file moved back into place) and deletes `$AENV_HOME/global-state.json`:
 
@@ -659,7 +659,7 @@ Everything aenv reads or writes for the global scope lives under one of these ro
 - **Lock.** `$AENV_HOME/global.lock` — advisory file lock acquired around any state-mutating global op. Concurrent `aenv global use` invocations serialize cleanly; in-flight reads (`global status`, `global which`, `global list`) don't take the lock.
 - **Lifecycle approval markers.** `$AENV_HOME/envs/<ns>/.approved` — file containing the sha256 of the `on_activate` script the user previously approved for `<ns>`. Subsequent activations with matching SHA proceed silently; mismatched SHA re-prompts.
 - **Materialized files.** `$HOME/<rel-path>` — what the agent harness sees. Symlinks back into the namespace source under the default `materialize = "symlink"`; regular file copies under `materialize = "copy"`.
-- **Source layout.** `$AENV_HOME/envs/<ns>/user/<rel-path>` — what you hand-author (or what the importer / snapshotter wrote). The `user/` subdir mirrors the materialization target one-to-one: a file at `~/.aenv/envs/claude-cntrl/user/.claude/CLAUDE.md` materializes at `$HOME/.claude/CLAUDE.md`.
+- **Source layout.** `$AENV_HOME/envs/<ns>/user/<rel-path>` — what you hand-author (or what the importer / snapshotter wrote). The `user/` subdir mirrors the materialization target one-to-one: a file at `~/.aenv/envs/my-ctrl/user/.claude/CLAUDE.md` materializes at `$HOME/.claude/CLAUDE.md`.
 - **Lifecycle scripts.** `$AENV_HOME/envs/<ns>/<script-name>.sh` — at the namespace dir root, NOT under `user/`. The manifest's `[lifecycle].on_activate` / `on_deactivate` values are namespace-relative paths to these files.
 
 A namespace's `aenv.toml` declares user-scope ownership via per-adapter `user_files = [...]`. Paths in `user_files` are written **without** the `~/` prefix (that prefix is reserved for the adapter manifest's own `user_files` declaration, which describes the surface in the abstract; the namespace lists concrete paths under that surface).

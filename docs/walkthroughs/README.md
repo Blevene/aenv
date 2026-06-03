@@ -39,9 +39,10 @@ walkthroughs in the recommended order below.
 
 The terms every walkthrough assumes. Definitions match `aenv --help`.
 
-- **Namespace** — a named bundle of AI-harness config files (a `CLAUDE.md`,
-  skills, agents, …) that aenv swaps in and out of a project or your home
-  directory. Lives at `~/.aenv/envs/<name>/`.
+- **Namespace** (also called a **profile**, especially at global scope — the
+  two words are interchangeable; *namespace* is canonical) — a named bundle of
+  AI-harness config files (a `CLAUDE.md`, skills, agents, …) that aenv swaps in
+  and out of a project or your home directory. Lives at `~/.aenv/envs/<name>/`.
 - **Adapter** — aenv's definition of which files a given harness owns. The
   built-in `claude-code` adapter claims `CLAUDE.md` and `.claude/`. A namespace
   targets one or more adapters (`--adapter claude-code`).
@@ -68,6 +69,21 @@ The terms every walkthrough assumes. Definitions match `aenv --help`.
 - **resolved_hash** — a content hash of everything a namespace materializes.
   Identical inputs produce an identical hash, so you can verify two setups match
   across machines.
+- **Baseline** — the snapshot of your current `~/` surface that aenv captures
+  automatically the first time you activate *any* global profile, saved as a
+  namespace named `baseline` so you always have a named point to swap back to.
+- **Shadow chain** — when an `extends` chain has several namespaces providing
+  the same artifact, the order in which the nearer one shadows (overrides) the
+  ones it inherits from. `aenv status` prints it so you can see who won.
+- **Role map** — an adapter's mapping of a role-tagged file (e.g. the
+  instructions file) to each scope's layout, so one `shared_files` entry lands
+  at repo-root `CLAUDE.md` in a project and `~/.claude/CLAUDE.md` globally.
+- **Vendored** — non-skill content (agents, slash commands, reference docs)
+  copied into a namespace with `aenv vendor`; recorded in a `[[vendored]]`
+  manifest table that tracks its source and lets a re-run refresh it.
+- **Stash** — the global-scope analog of a project backup: when a global
+  activation displaces existing `~/` files, the originals are saved under
+  `<aenv_home>/global-stash/<timestamp>/` and restored on `deactivate`.
 
 ## If something goes wrong
 

@@ -1,6 +1,6 @@
 # Walkthrough: modifying a namespace
 
-**Tested against:** `main`, `aenv 0.3.0`.
+**Tested against:** `main`, `aenv 0.5.1`.
 **Goal:** mutate an existing namespace — add managed files, parameters, policies, authored skills, and imported skills — using the right tool for each kind of change.
 
 The vocabulary deliberately tracks where the source of truth lives:

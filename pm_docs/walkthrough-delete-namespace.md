@@ -1,6 +1,6 @@
 # Walkthrough: deleting a namespace
 
-**Tested against:** `main`, `aenv 0.3.0`.
+**Tested against:** `main`, `aenv 0.5.1`.
 **Goal:** remove a namespace from the registry, understand the warning that fires on every delete, and know which safety nets are NOT yet in place.
 
 `aenv delete <name>` is the only delete-flavored command today. It removes the entire `$AENV_HOME/envs/<name>/` directory tree — manifest, CLAUDE.md, skill directories, everything. The operation is irreversible (no `aenv restore` for deleted namespaces; `restore` is for project-side backups only).

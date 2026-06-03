@@ -160,7 +160,16 @@ pub fn run<F: Filesystem>(fs: &F, project_root: &Path, aenv_home: &Path, json: b
                     .map_err(|e| aenv_core::AenvError::ManifestInvalid(format!("json: {e}")))?
             );
         } else {
-            println!("No active namespace in {}", project_root.display());
+            // Not activated — but the project may still carry a `.aenv` pin.
+            // Surface it so `aenv use` followed by `status` doesn't read as a
+            // failure (the pin is set; activation is just a separate step).
+            match aenv_core::project::read_pin(fs, project_root) {
+                Ok(ns) => println!(
+                    "Pinned to '{ns}' but not activated in {} — run `aenv activate`",
+                    project_root.display()
+                ),
+                Err(_) => println!("No active namespace in {}", project_root.display()),
+            }
         }
         return Ok(());
     }

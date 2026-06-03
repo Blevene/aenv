@@ -10,6 +10,17 @@ Three documents specifying `aenv`, a virtual environment system for AI coding ha
 
 **[aenv-engineering.md](./aenv-engineering.md)** — Internal engineering decisions: Rust implementation, crate selection, error/exit-code strategy, the `Filesystem` trait for testability, namespace identity in the internal model, the rename-atomicity pitfall, testing approach, the `git` shell-out dependency. Lives outside the PRD because it can evolve as long as the public contracts hold.
 
+## Walkthroughs
+
+Step-by-step guides in this directory, each reproduced literally against the binary (see the `Tested against:` header in each). These are the maintainer-facing companions to the polished, accessibility-reviewed user guides under [`../docs/walkthroughs/`](../docs/walkthroughs/) — newcomers should start there.
+
+- **[walkthrough-create-namespace.md](./walkthrough-create-namespace.md)** — create a namespace, from the one-command minimum up to the full `extends` + `--adapter` form.
+- **[walkthrough-modify-namespace.md](./walkthrough-modify-namespace.md)** — add managed files, parameters, policies, and skills to an existing namespace.
+- **[walkthrough-delete-namespace.md](./walkthrough-delete-namespace.md)** — remove a namespace and understand the delete-time warning and safety nets.
+- **[walkthrough-three-harnesses.md](./walkthrough-three-harnesses.md)** — run three distinct harnesses on one project, swap between them, and observe the bytes that change per activation.
+- **[walkthrough-spec-harnesses.md](./walkthrough-spec-harnesses.md)** — instantiate the example namespaces from the functional spec (§2 + §4).
+- **[walkthrough-global-namespaces.md](./walkthrough-global-namespaces.md)** — onboard, swap, author, doctor, and recover a user-scope (global) profile.
+
 ## Status
 
 - PRD: v0.3 draft (namespaces, parameters, policies)
@@ -20,7 +31,7 @@ All three are working drafts. Versions move together when public contracts chang
 
 ## Vocabulary
 
-The primary unit of organization is a **namespace** — a named, directory-backed bundle of harness config files, skills, agents, parameters, and policies. The term *env* is retained as a deprecated alias in CLI command names (`aenv use`, `aenv list`) and the `AENV_HOME` environment variable for brevity, but the documentation and structured output use *namespace* as the canonical term.
+The primary unit of organization is a **namespace** — a named, directory-backed bundle of harness config files, skills, agents, parameters, and policies. The term *env* is retained as a deprecated alias in CLI command names (`aenv use`, `aenv list`) and the `AENV_HOME` environment variable for brevity, but the documentation and structured output use *namespace* as the canonical term. The walkthroughs sometimes call a namespace a **profile** (especially a global one) — the two words are interchangeable; *namespace* is canonical.
 
 Artifacts inside a namespace are addressable by qualified name: `namespace::short_name` (e.g. `detailed-execution::write-tests`). Parameters are addressable as `namespace.parameter` (e.g. `detailed-execution.default_model`). The `::` and `.` separators are visually distinct on purpose — one is about ownership of artifacts, the other is about typed configuration values.
 
