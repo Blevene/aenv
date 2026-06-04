@@ -142,10 +142,10 @@ Given a source tree:
   uninstall.sh
 ```
 
-Running `aenv global import ~/work/claude-ctrl claude-cntrl` produces:
+Running `aenv global import ~/work/claude-ctrl my-ctrl` produces:
 
 ```
-~/.aenv/envs/claude-cntrl/
+~/.aenv/envs/my-ctrl/
   aenv.toml
   install.sh
   uninstall.sh
@@ -159,7 +159,7 @@ Running `aenv global import ~/work/claude-ctrl claude-cntrl` produces:
 and the manifest reads (canonical TOML):
 
 ```toml
-name = "claude-cntrl"
+name = "my-ctrl"
 
 [adapters.claude-code]
 user_files = [".claude/CLAUDE.md", ".claude/agents/", ".claude/hooks/"]
