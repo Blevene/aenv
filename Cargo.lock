@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "aenv-cli"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "aenv-core",
  "clap",
@@ -17,7 +17,7 @@ dependencies = [
 
 [[package]]
 name = "aenv-core"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "insta",
  "libc",
@@ -34,7 +34,7 @@ dependencies = [
 
 [[package]]
 name = "aenv-rescue"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "aenv-core",
  "tempfile",

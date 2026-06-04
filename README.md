@@ -7,7 +7,9 @@
 
 `aenv` is a Rust CLI for managing named, composable, version-controlled bundles of AI-coding-agent configuration (`CLAUDE.md`, `.cursorrules`, `.mcp.json`, skills, agents, slash commands, MCP entries). Think Python's `venv`, but for the rules and configurations that shape how AI coding agents behave.
 
-> **Status:** Active development. Latest release is [`v0.5.0`](https://github.com/Blevene/aenv/releases/tag/v0.5.0) — two onboarding-throughput features: `aenv skill import-all` bulk-imports every skill from a monorepo collection in one command (issue #1), and `aenv vendor` copies non-skill content (agents, slash commands, reference docs) from a source into a namespace, hardened against path-traversal / symlink escape (issue #2). v0.4.0 — issue #5: unified `--global` scope flags on `create`/`activate`/`deactivate`, plus `shared_files` (one stored copy of a profile serving both project and global scopes) and the opt-in `--shared` flag to emit it at creation/capture time. v0.3.3 — `aenv global import`/`use` now accept the `git+https://` URL form (parity with `skill import`). v0.3.2 fixed `aenv snapshot` from an unmanaged project directory (no longer errors "project not pinned") and reproduced every user-facing walkthrough against the binary. v0.3.1 fixed `aenv global which` (directory `user_files` no longer crash `--json`; a shell-expanded `~` path now resolves). v0.3.0 brought global namespaces with a one-command UX (`aenv global use` for onboarding/swap, `aenv global new`, auto-baseline), user-scope skills (`aenv skill import --scope user` installs into `~/.claude/skills/`), and sparse skill-import clones. See [§What works today](#what-works-today) for the full feature surface and [§Roadmap](#roadmap--whats-still-in-flight) for what's pending.
+> **New to the terms?** *namespace*, *adapter*, *materialize*, *pin*, *baseline*, *shadow chain*, *vendored*, … are all defined in the short [walkthroughs glossary](./docs/walkthroughs/README.md#glossary).
+
+> **Status:** Active development. Latest release is [`v0.5.1`](https://github.com/Blevene/aenv/releases/tag/v0.5.1) — a docs + CLI-polish patch from an accessibility/functionality review: help text filled in on every flag, a scannable `aenv --help`, `aenv status` now reports a pinned-but-not-activated project, and a glossary/version/navigation cleanup across the docs. v0.5.0 — two onboarding-throughput features: `aenv skill import-all` bulk-imports every skill from a monorepo collection in one command (issue #1), and `aenv vendor` copies non-skill content (agents, slash commands, reference docs) from a source into a namespace, hardened against path-traversal / symlink escape (issue #2). v0.4.0 — issue #5: unified `--global` scope flags on `create`/`activate`/`deactivate`, plus `shared_files` (one stored copy of a profile serving both project and global scopes) and the opt-in `--shared` flag to emit it at creation/capture time. v0.3.3 — `aenv global import`/`use` now accept the `git+https://` URL form (parity with `skill import`). v0.3.2 fixed `aenv snapshot` from an unmanaged project directory (no longer errors "project not pinned") and reproduced every user-facing walkthrough against the binary. v0.3.1 fixed `aenv global which` (directory `user_files` no longer crash `--json`; a shell-expanded `~` path now resolves). v0.3.0 brought global namespaces with a one-command UX (`aenv global use` for onboarding/swap, `aenv global new`, auto-baseline), user-scope skills (`aenv skill import --scope user` installs into `~/.claude/skills/`), and sparse skill-import clones. See [§What works today](#what-works-today) for the full feature surface and [§Roadmap](#roadmap--whats-still-in-flight) for what's pending.
 
 ## Installation
 
@@ -42,7 +44,7 @@ echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.zshrc   # or ~/.bashrc
 ### Verify
 
 ```bash
-aenv --version            # → aenv 0.0.1
+aenv --version            # → aenv 0.5.1
 aenv list                 # → shows the karpathy + cherny starter namespaces
 ```
 
@@ -478,7 +480,7 @@ Ships with built-in adapters for **Claude Code, Cursor, Aider, Cline, Continue, 
 The full plan lives in [`tasks/todo.md`](./tasks/todo.md). Two phases remain:
 
 - **Phase 6** — Partial. `cd`-based auto-activation ships now via `aenv init-shell` (see [§Shell integration](#shell-integration)); git remotes / `aenv install` / `aenv sync` / `aenv promote` still pending.
-- **Phase 7** — Windows symlink fallback + cross-platform CI. Windows is still unsupported; Linux and macOS binaries ship on every release (latest: v0.5.0).
+- **Phase 7** — Windows symlink fallback + cross-platform CI. Windows is still unsupported; Linux and macOS binaries ship on every release (latest: v0.5.1).
 - **Issue #5 (unified scope)** — shipped in v0.4.0. Layer 1 (unified `--global` verbs), Layer 2 (`shared_files` — one stored copy serving both scopes), the opt-in `--shared` flag on `create --global` / `global new` / `global snapshot` / `global import`, and a resolver collision warning.
 - **Issue #1 (bulk skill import)** — shipped in v0.5.0. `aenv skill import-all <source> --ns <ns>` discovers and imports every skill from a monorepo collection in one manifest write (`--only`, `--base`, `--pin`).
 - **Issue #2 (vendor non-skill content)** — shipped in v0.5.0. `aenv vendor` copies agents / slash commands / reference docs into a namespace under a `[[vendored]]` provenance table, hardened against path-traversal and symlink escape.
@@ -498,7 +500,7 @@ The full plan lives in [`tasks/todo.md`](./tasks/todo.md). Two phases remain:
 
 ```bash
 cargo build --workspace
-cargo test --workspace                            # ~690 tests
+cargo test --workspace                            # ~715 tests
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --check
 ```

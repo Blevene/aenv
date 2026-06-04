@@ -1,6 +1,6 @@
 # Walkthrough: three harnesses on one project
 
-**Tested against:** `main`, `aenv 0.3.0`.
+**Tested against:** `main`, `aenv 0.5.1`.
 **Goal:** stand up three distinct AI-coding harnesses for the same Rust project, swap between them, observe the bytes that change on disk per activation, capture a content hash per harness, and disengage cleanly.
 
 This walkthrough is the smoke test for the §7.5 *scripted comparison* use case from the functional spec — it reproduces the workflow a downstream evaluation tool would automate, but executed by hand so each surface is observable.
@@ -23,7 +23,7 @@ export PROJECT=/path/to/your/rust/project   # use any project you can write to
 export BIN=$PWD/target/release/aenv
 
 $BIN --version
-# → aenv 0.3.0
+# → aenv 0.5.1
 ```
 
 The rest of the commands assume these three env vars are set.

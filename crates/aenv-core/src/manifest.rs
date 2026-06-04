@@ -113,7 +113,7 @@ pub struct AdapterEntry {
     ///
     /// Namespaces MAY declare paths that the adapter's own `user_files`
     /// doesn't list — this lets per-namespace harnesses extend the surface
-    /// (e.g. `claude-cntrl` adds `.claude/runtime/` and `.claude/bin/` even
+    /// (e.g. `my-ctrl` adds `.claude/runtime/` and `.claude/bin/` even
     /// though the builtin claude-code adapter doesn't). No containment check
     /// is enforced.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

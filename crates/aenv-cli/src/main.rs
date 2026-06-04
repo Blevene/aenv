@@ -45,6 +45,7 @@ enum Command {
     },
     /// List every namespace in the registry.
     List {
+        /// Emit machine-readable JSON instead of the human-readable output.
         #[arg(long)]
         json: bool,
     },
@@ -54,8 +55,10 @@ enum Command {
         name: String,
     },
     /// Pin the current project to a namespace by writing a `.aenv` file
-    /// at the project root. Does NOT materialize any files — follow with
-    /// `aenv activate` to symlink the namespace's content into the project.
+    /// at the project root.
+    ///
+    /// Does NOT materialize any files — follow with `aenv activate` to
+    /// symlink the namespace's content into the project.
     Use {
         /// Name of the namespace.
         name: String,
@@ -63,7 +66,7 @@ enum Command {
         #[arg(long)]
         project: Option<PathBuf>,
         /// Also activate the namespace fully on both surfaces. Sugar for
-        /// `aenv use <ns> && aenv activate && aenv global activate <ns>`.
+        /// `aenv use <ns> && aenv activate && aenv global use <ns>`.
         #[arg(long)]
         global: bool,
         /// Approve any `[lifecycle].on_activate` script without prompting.
@@ -74,14 +77,17 @@ enum Command {
         yes: bool,
     },
     /// Materialize the active namespace's content into the project as
-    /// symlinks (or merged files where strategy demands). Reads the
-    /// namespace name from the `.aenv` pin unless one is passed
+    /// symlinks (or merged files where strategy demands).
+    ///
+    /// Reads the namespace name from the `.aenv` pin unless one is passed
     /// explicitly. Backs up any displaced originals to
     /// `.aenv-state/backup/<timestamp>/`.
     Activate {
         /// Namespace name (defaults to the .aenv pin for project scope;
         /// required with `--global`).
         name: Option<String>,
+        /// Project root override (defaults to an ancestor walk from cwd).
+        /// Project scope only — not valid with `--global`.
         #[arg(long)]
         project: Option<PathBuf>,
         /// Activate the namespace's user-scope surface into `$HOME`
@@ -101,10 +107,14 @@ enum Command {
     },
     /// Reverse `aenv activate`: remove every file aenv materialized,
     /// restore any backed-up originals byte-for-byte, and clear the active
-    /// state. Leaves the `.aenv` pin file in place (use `aenv unpin` to remove
+    /// state.
+    ///
+    /// Leaves the `.aenv` pin file in place (use `aenv unpin` to remove
     /// that too) and retains the `.aenv-state/backup/<ts>/` scaffolding unless
     /// `--prune` is passed.
     Deactivate {
+        /// Project root override (defaults to an ancestor walk from cwd).
+        /// Project scope only — not valid with `--global`.
         #[arg(long)]
         project: Option<PathBuf>,
         /// Also remove every timestamped backup directory under
@@ -123,18 +133,22 @@ enum Command {
         #[arg(long)]
         force: bool,
     },
-    /// Recovery path when `aenv deactivate` didn't run cleanly. Copies
-    /// the most recent `.aenv-state/backup/<timestamp>/` set back into
+    /// Recovery path when `aenv deactivate` didn't run cleanly.
+    ///
+    /// Copies the most recent `.aenv-state/backup/<timestamp>/` set back into
     /// the project. Uses copy semantics (not move) so the backup is
     /// re-runnable. Errors if no backup exists.
     Restore {
+        /// Project root override (defaults to an ancestor walk from cwd).
         #[arg(long)]
         project: Option<PathBuf>,
     },
     /// Show the active namespace and managed files in a project.
     Status {
+        /// Project root override (defaults to an ancestor walk from cwd).
         #[arg(long)]
         project: Option<PathBuf>,
+        /// Emit machine-readable JSON instead of the human-readable output.
         #[arg(long)]
         json: bool,
     },
@@ -147,8 +161,10 @@ enum Command {
     Which {
         /// Project-relative path to query.
         path: PathBuf,
+        /// Project root override (defaults to an ancestor walk from cwd).
         #[arg(long)]
         project: Option<PathBuf>,
+        /// Emit machine-readable JSON instead of the human-readable output.
         #[arg(long)]
         json: bool,
     },
@@ -162,6 +178,7 @@ enum Command {
         /// Project root override for the `.<param>` form (ancestor walk from cwd otherwise).
         #[arg(long)]
         project: Option<PathBuf>,
+        /// Emit machine-readable JSON instead of the human-readable output.
         #[arg(long)]
         json: bool,
     },
@@ -181,8 +198,10 @@ enum Command {
     Doctor {
         /// Namespace to evaluate (defaults to the active project's pinned namespace).
         namespace: Option<String>,
+        /// Project root override (defaults to an ancestor walk from cwd).
         #[arg(long)]
         project: Option<PathBuf>,
+        /// Emit machine-readable JSON instead of the human-readable output.
         #[arg(long)]
         json: bool,
     },
@@ -194,6 +213,7 @@ enum Command {
     Fork {
         /// File path or namespace name to fork (omit for whole-project detach).
         target: Option<PathBuf>,
+        /// Project root override (defaults to an ancestor walk from cwd).
         #[arg(long)]
         project: Option<PathBuf>,
     },
@@ -213,18 +233,23 @@ enum Command {
         #[arg(long)]
         extends: Vec<String>,
     },
-    /// Remove the .aenv pin from a project. If a namespace is currently
-    /// active, runs the deactivate flow first.
+    /// Remove the .aenv pin from a project.
+    ///
+    /// If a namespace is currently active, runs the deactivate flow first.
     Unpin {
+        /// Project root override (defaults to an ancestor walk from cwd).
         #[arg(long)]
         project: Option<PathBuf>,
     },
     /// Copy non-skill content (agents, commands, reference docs, …) from a git
-    /// source or local path into a namespace's tree, declare it under the right
-    /// adapter's `files`, and record provenance in `[[vendored]]`.
+    /// source or local path into a namespace's tree.
+    ///
+    /// Declares it under the right adapter's `files`, and records provenance
+    /// in `[[vendored]]`.
     Vendor {
         /// Source: `/abs/path`, `~/path`, or `git+URL[#ref]`.
         source: String,
+        /// Target namespace.
         #[arg(long)]
         ns: String,
         /// Subtree or single file within the source to copy.
@@ -255,17 +280,20 @@ enum Command {
         #[command(subcommand)]
         action: CacheAction,
     },
-    /// Print a shell hook script for sourcing in your rc file. The hook
-    /// auto-activates the right namespace as you `cd` between projects.
+    /// Print a shell hook script for sourcing in your rc file.
+    ///
+    /// The hook auto-activates the right namespace as you `cd` between projects.
     ///
     /// Usage: `eval "$(aenv init-shell <bash|zsh|fish>)"` (or `| source` for fish).
     InitShell {
         /// Shell to emit a hook for.
         shell: String,
     },
-    /// Fast-path the shell hook calls on every chpwd. Walks ancestors for
-    /// a `.aenv` pin and transitions to the right namespace. Prints the
-    /// new active project root (or empty line if none) to stdout.
+    /// Fast-path the shell hook calls on every chpwd.
+    ///
+    /// Walks ancestors for a `.aenv` pin and transitions to the right
+    /// namespace. Prints the new active project root (or empty line if none)
+    /// to stdout.
     ///
     /// Not intended for direct user invocation.
     ActivateIfNeeded {
@@ -280,12 +308,15 @@ enum Command {
         ns_a: Option<String>,
         /// Second namespace name for structural diff.
         ns_b: Option<String>,
+        /// Project root override (defaults to an ancestor walk from cwd).
         #[arg(long)]
         project: Option<PathBuf>,
+        /// Emit machine-readable JSON instead of the human-readable output.
         #[arg(long)]
         json: bool,
     },
     /// User-global activation surface (`~/.claude/`, `~/.codex/`, …).
+    ///
     /// Mirrors the project-local verbs but operates on `$HOME` instead of
     /// the project root. One activation lives per user; activating a new
     /// namespace deactivates the prior one in a single transaction.
@@ -304,6 +335,7 @@ enum AdapterAction {
     },
     /// List installed adapters.
     List {
+        /// Emit machine-readable JSON instead of the human-readable output.
         #[arg(long)]
         json: bool,
     },
@@ -331,10 +363,13 @@ enum SkillAction {
     Import {
         /// Source: `/abs/path`, `~/path`, `git+URL[#ref]`, or `registry:<name>`.
         source: String,
+        /// Target namespace.
         #[arg(long)]
         ns: String,
+        /// Adapter that owns the skill (defaults to the namespace's only adapter if exactly one).
         #[arg(long)]
         adapter: Option<String>,
+        /// Pin a git source to a tag, commit, or branch. Git sources only.
         #[arg(long)]
         pin: Option<String>,
         /// Optional sub-path inside the source. Pick one skill out of a
@@ -353,6 +388,7 @@ enum SkillAction {
     ImportAll {
         /// Source: `/abs/path`, `~/path`, or `git+URL[#ref]`.
         source: String,
+        /// Target namespace.
         #[arg(long)]
         ns: String,
         /// Directory in the source under which each `<subdir>/SKILL.md` lives.
@@ -366,6 +402,7 @@ enum SkillAction {
         /// Pin a git source to a tag, commit, or branch. Git sources only.
         #[arg(long)]
         pin: Option<String>,
+        /// Adapter that owns the skills (defaults to the namespace's only adapter if exactly one).
         #[arg(long)]
         adapter: Option<String>,
         /// Scope: `project` (default) or `user`.
@@ -374,8 +411,10 @@ enum SkillAction {
     },
     /// List every skill in every namespace (or one if --ns).
     List {
+        /// Limit the listing to one namespace (default: every namespace).
         #[arg(long)]
         ns: Option<String>,
+        /// Emit machine-readable JSON instead of the human-readable output.
         #[arg(long)]
         json: bool,
     },
@@ -403,7 +442,9 @@ enum CacheAction {
 
 #[derive(Debug, Subcommand)]
 enum GlobalAction {
-    /// Switch your active global profile. `<target>` may be a git URL or
+    /// Switch your active global profile.
+    ///
+    /// `<target>` may be a git URL or
     /// local path (imported on the spot if not already present), an existing
     /// namespace name, or `-` to toggle back to the previous profile. This is
     /// the one-command front door: it folds import + activate + swap into a
@@ -427,7 +468,9 @@ enum GlobalAction {
         #[arg(long)]
         no_baseline: bool,
     },
-    /// DEPRECATED: use `aenv global use <name>` instead. Activates a
+    /// DEPRECATED: use `aenv global use <name>` instead.
+    ///
+    /// Activates a
     /// namespace's user-scope files into `$HOME`, replacing any existing
     /// activation in one transaction. `use` is a superset — it also imports
     /// git/path sources on the spot and records a swap-back point. This alias
@@ -462,6 +505,7 @@ enum GlobalAction {
     },
     /// Show the active global namespace and managed files.
     Status {
+        /// Emit machine-readable JSON instead of the human-readable output.
         #[arg(long)]
         json: bool,
     },
@@ -469,6 +513,7 @@ enum GlobalAction {
     Which {
         /// Path to query (absolute or relative to `$HOME`).
         path: PathBuf,
+        /// Emit machine-readable JSON instead of the human-readable output.
         #[arg(long)]
         json: bool,
     },
@@ -476,6 +521,7 @@ enum GlobalAction {
     /// `scope = "user"` skills). To see every namespace regardless of scope,
     /// use `aenv list`.
     List {
+        /// Emit machine-readable JSON instead of the human-readable output.
         #[arg(long)]
         json: bool,
     },
@@ -484,6 +530,7 @@ enum GlobalAction {
     Doctor {
         /// Namespace to evaluate (defaults to the active global namespace).
         namespace: Option<String>,
+        /// Emit machine-readable JSON instead of the human-readable output.
         #[arg(long)]
         json: bool,
         /// Delete any orphan stash directories found during the audit
@@ -569,6 +616,7 @@ enum GlobalAction {
         ns_a: Option<String>,
         /// Second namespace name for structural diff.
         ns_b: Option<String>,
+        /// Emit machine-readable JSON instead of the human-readable output.
         #[arg(long)]
         json: bool,
     },

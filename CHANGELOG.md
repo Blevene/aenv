@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-06-03
+
+Documentation and CLI-surface polish from an accessibility/functionality review. No feature changes; one small behavior improvement to `status`.
+
+### Changed
+
+- **`aenv status` on a pinned-but-not-activated project** now reports `Pinned to '<ns>' but not activated — run aenv activate` instead of the misleading `No active namespace`. A pin (`aenv use`) and activation are separate steps; the old wording read as a failure.
+- **Every CLI flag now carries help text.** `--json` (across ~13 read commands), `--project` (across 9 verbs), and `--ns` / `--adapter` / `--pin` on `vendor` and `skill import` / `import-all` previously rendered with a blank description in `--help`. The `activate` / `deactivate` `--project` help also notes it is project-scope only (rejected with `--global`).
+- **`aenv use --global` help** now points at `aenv global use` rather than the deprecated `aenv global activate`.
+- **`aenv --help` is scannable again.** Verbose verb descriptions were split (clap short vs. long help) so the root command table shows one line per verb; the full text remains under `aenv <verb> --help`.
+
+### Docs
+
+- Fixed stale version strings (a wrong `aenv 0.0.1` in the README Verify step; `0.3.0` output samples and `Tested against` headers across the `pm_docs/` walkthroughs).
+- De-orphaned the six `pm_docs/` walkthroughs with an index; renumbered the global-namespaces walkthrough's steps to a clean 1–9; renamed the confusing `claude-cntrl` (vs. the upstream `claude-ctrl`) to `my-ctrl`.
+- Glossary: added *baseline*, *shadow chain*, *role map*, *vendored*, *stash*; noted *profile* as a synonym for *namespace*; linked the README to the glossary.
+
 ## [0.5.0] — 2026-06-03
 
 Two onboarding-throughput features: bulk skill import (issue #1) and the `vendor` command for non-skill content (issue #2), the latter hardened against path-traversal / symlink escape.
